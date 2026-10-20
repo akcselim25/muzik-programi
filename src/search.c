@@ -9,6 +9,17 @@
 #include "search.h"
 #include "playlist.h"
 
+// Spotify Green & Apple Minimalist Dark Mode Renk Paleti
+#define SPOTIFY_GREEN       RGB(29, 185, 84)    // #1DB954
+#define SPOTIFY_GREEN_HOV   RGB(30, 215, 96)    // #1ED760
+#define SPOTIFY_GREEN_DARK  RGB(22, 156, 70)    // #169C46
+
+#define COLOR_SEARCH_BG     RGB(18, 18, 18)     // #121212 (Spotify Dark Base)
+#define COLOR_SEARCH_CARD   RGB(24, 24, 26)     // #18181A (Apple Rounded Hero Card)
+#define COLOR_SEARCH_BOX    RGB(30, 30, 34)     // #1E1E22 (Search Box Background)
+#define COLOR_SEARCH_LIST   RGB(20, 20, 22)     // #141416 (ListBox Background)
+#define COLOR_SEARCH_BORDER RGB(44, 44, 50)     // #2C2C32 (Hairline Separators)
+
 typedef struct {
     wchar_t id[64];
     wchar_t rawTitle[256];
@@ -303,7 +314,7 @@ static void LayoutSearchControls(HWND hWnd) {
     int searchH    = MulDiv(34, dpi, 96);
     int editW      = leftW - btnSearchW - MulDiv(8, dpi, 96);
 
-    if (g_hEditQuery) MoveWindow(g_hEditQuery, leftX + 2, pad + 2, editW - 4, searchH - 4, TRUE);
+    if (g_hEditQuery) MoveWindow(g_hEditQuery, leftX + 4, pad + 4, editW - 8, searchH - 8, TRUE);
     if (g_hBtnSearch) MoveWindow(g_hBtnSearch, leftX + editW, pad, btnSearchW, searchH, TRUE);
 
     // İkinci Satır: Klasör ve Klasör Seç butonu
@@ -312,7 +323,7 @@ static void LayoutSearchControls(HWND hWnd) {
     int row2H      = MulDiv(28, dpi, 96);
     int folderLblW = leftW - btnFolderW - MulDiv(8, dpi, 96);
 
-    if (g_hLblFolder) MoveWindow(g_hLblFolder, leftX + 2, row2Y + 2, folderLblW - 4, row2H - 4, TRUE);
+    if (g_hLblFolder) MoveWindow(g_hLblFolder, leftX + 2, row2Y + 4, folderLblW - 4, row2H - 4, TRUE);
     if (g_hBtnFolder) MoveWindow(g_hBtnFolder, leftX + folderLblW, row2Y, btnFolderW, row2H, TRUE);
 
     // Alt Durum Çubuğu
@@ -453,9 +464,9 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             DwmSetWindowAttribute(hWnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &useDark, sizeof(useDark));
             DwmSetWindowAttribute(hWnd, 19, &useDark, sizeof(useDark));
 
-            hBrBg   = CreateSolidBrush(RGB(16, 16, 18));
-            hBrBox  = CreateSolidBrush(RGB(28, 28, 34));
-            hBrList = CreateSolidBrush(RGB(20, 20, 24));
+            hBrBg   = CreateSolidBrush(COLOR_SEARCH_BG);
+            hBrBox  = CreateSolidBrush(COLOR_SEARCH_BOX);
+            hBrList = CreateSolidBrush(COLOR_SEARCH_LIST);
 
             int sMain  = -MulDiv(10, dpi, 72);
             int sBold  = -MulDiv(10, dpi, 72);
@@ -475,8 +486,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             g_hLblFolder = CreateWindowExW(0, L"STATIC", folderTxt, WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_FOLDER_LBL, GetModuleHandle(NULL), NULL);
             g_hBtnFolder = CreateWindowExW(0, L"BUTTON", L"Klasör Seç...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_FOLDER_BTN, GetModuleHandle(NULL), NULL);
 
-            g_hListResults = CreateWindowExW(0, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_LIST, GetModuleHandle(NULL), NULL);
-            // YouTube tarzı 16:9 thumbnail içeren şık satır yüksekliği
+            // LBS_NOINTEGRALHEIGHT beyaz boşluk kalmasını engeller!
+            g_hListResults = CreateWindowExW(0, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_LIST, GetModuleHandle(NULL), NULL);
             SendMessageW(g_hListResults, LB_SETITEMHEIGHT, 0, MulDiv(58, dpi, 96));
 
             g_hLblStatus = CreateWindowExW(0, L"STATIC", L"Şarkı veya sanatçı adı yazıp Ara'ya basın.", WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_STAT, GetModuleHandle(NULL), NULL);
@@ -484,7 +495,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             g_hBtnDownload = CreateWindowExW(0, L"BUTTON", L"📥  İndir ve Ekle", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_DOWN, GetModuleHandle(NULL), NULL);
 
             SendMessageW(g_hEditQuery, WM_SETFONT, (WPARAM)hFont, TRUE);
-            SendMessageW(g_hEditQuery, 0x1501 /* EM_SETCUEBANNER */, TRUE, (LPARAM)L"Şarkı veya sanatçı adı yazın (veya Ctrl+V ile yapıştırın)...");
+            SendMessageW(g_hEditQuery, 0x1501 /* EM_SETCUEBANNER */, TRUE, (LPARAM)L"Şarkı veya sanatçı adı yazın (Ctrl+V ile yapıştırın)...");
             SendMessageW(g_hLblFolder, WM_SETFONT, (WPARAM)hFontSmall, TRUE);
             SendMessageW(g_hLblStatus, WM_SETFONT, (WPARAM)hFontSmall, TRUE);
 
@@ -510,21 +521,26 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             return 0;
         }
 
-        case WM_ERASEBKGND:
+        case WM_ERASEBKGND: {
+            HDC hdc = (HDC)wParam;
+            RECT rc;
+            GetClientRect(hWnd, &rc);
+            FillRect(hdc, &rc, hBrBg);
             return 1;
+        }
 
         case WM_CTLCOLORSTATIC:
         case WM_CTLCOLORDLG: {
             HDC hdc = (HDC)wParam;
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(160, 160, 165));
+            SetTextColor(hdc, RGB(167, 167, 167));
             return (LRESULT)hBrBg;
         }
 
         case WM_CTLCOLOREDIT: {
             HDC hdc = (HDC)wParam;
             SetBkMode(hdc, OPAQUE);
-            SetBkColor(hdc, RGB(28, 28, 34));
+            SetBkColor(hdc, COLOR_SEARCH_BOX);
             SetTextColor(hdc, RGB(255, 255, 255));
             return (LRESULT)hBrBox;
         }
@@ -532,7 +548,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
         case WM_CTLCOLORLISTBOX: {
             HDC hdc = (HDC)wParam;
             SetBkMode(hdc, OPAQUE);
-            SetBkColor(hdc, RGB(20, 20, 24));
+            SetBkColor(hdc, COLOR_SEARCH_LIST);
             SetTextColor(hdc, RGB(255, 255, 255));
             return (LRESULT)hBrList;
         }
@@ -546,15 +562,15 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 if (dis->CtlID == IDC_SEARCH_DOWN) {
                     COLORREF bg, border, txtCol;
                     if (isDisabled) {
-                        bg = RGB(36, 36, 42);
-                        border = RGB(48, 48, 56);
-                        txtCol = RGB(120, 120, 130);
+                        bg = RGB(36, 36, 40);
+                        border = RGB(46, 46, 52);
+                        txtCol = RGB(120, 120, 128);
                     } else if (isPressed) {
-                        bg = RGB(225, 45, 55);
+                        bg = SPOTIFY_GREEN_DARK;
                         border = bg;
                         txtCol = RGB(255, 255, 255);
                     } else {
-                        bg = RGB(252, 60, 68); // Apple Music Red
+                        bg = SPOTIFY_GREEN; // İkonik Spotify Yeşili
                         border = bg;
                         txtCol = RGB(255, 255, 255);
                     }
@@ -566,8 +582,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     return TRUE;
                 }
                 else if (dis->CtlID == IDC_SEARCH_BTN) {
-                    COLORREF bg = isPressed ? RGB(58, 58, 66) : (isDisabled ? RGB(28, 28, 32) : RGB(40, 40, 46));
-                    COLORREF border = RGB(54, 54, 62);
+                    COLORREF bg = isPressed ? RGB(56, 56, 64) : (isDisabled ? RGB(26, 26, 30) : RGB(36, 36, 42));
+                    COLORREF border = RGB(48, 48, 56);
                     COLORREF txtCol = isDisabled ? RGB(95, 95, 102) : RGB(255, 255, 255);
                     DrawRoundedCard(dis->hDC, &dis->rcItem, bg, border, 8);
                     SetBkMode(dis->hDC, TRANSPARENT);
@@ -577,8 +593,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     return TRUE;
                 }
                 else if (dis->CtlID == IDC_SEARCH_FOLDER_BTN) {
-                    COLORREF bg = isPressed ? RGB(46, 46, 54) : RGB(34, 34, 40);
-                    COLORREF border = RGB(48, 48, 56);
+                    COLORREF bg = isPressed ? RGB(44, 44, 50) : RGB(32, 32, 36);
+                    COLORREF border = RGB(46, 46, 52);
                     DrawRoundedCard(dis->hDC, &dis->rcItem, bg, border, 6);
                     SetBkMode(dis->hDC, TRANSPARENT);
                     SelectObject(dis->hDC, hFontSmall);
@@ -590,8 +606,9 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             else if (dis->CtlType == ODT_LISTBOX && dis->itemID != (UINT)-1) {
                 int idx = dis->itemID;
                 BOOL isSel = (dis->itemState & ODS_SELECTED);
-                COLORREF bg = isSel ? RGB(44, 44, 52) : ((idx % 2 == 0) ? RGB(22, 22, 26) : RGB(26, 26, 30));
-                COLORREF border = isSel ? RGB(252, 60, 68) : bg;
+                // Seçili öğede asil Spotify yeşili parıltısı ve yeşil çerçeve
+                COLORREF bg = isSel ? RGB(24, 42, 30) : ((idx % 2 == 0) ? RGB(22, 22, 26) : RGB(26, 26, 30));
+                COLORREF border = isSel ? SPOTIFY_GREEN : bg;
 
                 RECT rcRow = dis->rcItem;
                 InflateRect(&rcRow, -2, -2);
@@ -610,7 +627,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     RECT rcThumb = { thumbX, thumbY, thumbX + thumbW, thumbY + thumbH };
 
                     // Küçük resim arka plan kartı
-                    DrawRoundedCard(dis->hDC, &rcThumb, RGB(16, 16, 20), RGB(38, 38, 44), 4);
+                    DrawRoundedCard(dis->hDC, &rcThumb, RGB(14, 14, 16), RGB(36, 36, 42), 4);
 
                     if (si->pThumb) {
                         OLE_XSIZE_HIMETRIC cx;
@@ -619,7 +636,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                         si->pThumb->lpVtbl->get_Height(si->pThumb, &cy);
                         si->pThumb->lpVtbl->Render(si->pThumb, dis->hDC, rcThumb.left + 1, rcThumb.top + 1, thumbW - 2, thumbH - 2, 0, cy, cx, -cy, NULL);
                     } else {
-                        // Resim henüz inerken zarif YouTube play ikonu
+                        // Resim henüz inerken zarif play ikonu
                         SetBkMode(dis->hDC, TRANSPARENT);
                         SelectObject(dis->hDC, hFontSmall);
                         SetTextColor(dis->hDC, RGB(110, 110, 120));
@@ -654,7 +671,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     DrawTextW(dis->hDC, si->cleanTitle, -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                     SelectObject(dis->hDC, hFontSmall);
-                    SetTextColor(dis->hDC, isSel ? RGB(200, 200, 210) : RGB(140, 140, 148));
+                    SetTextColor(dis->hDC, isSel ? SPOTIFY_GREEN : RGB(150, 150, 158));
                     DrawTextW(dis->hDC, si->uploader, -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                 }
                 return TRUE;
@@ -668,6 +685,9 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
             RECT rcClient;
             GetClientRect(hWnd, &rcClient);
+            // EN ÖNEMLİ DÜZELTME: Bütün beyazlıkları yok eden tam arka plan boyaması!
+            FillRect(hdc, &rcClient, hBrBg);
+
             int clientW = rcClient.right - rcClient.left;
             int clientH = rcClient.bottom - rcClient.top;
 
@@ -692,15 +712,9 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             int searchH    = MulDiv(34, dpi, 96);
             int editW      = leftW - btnSearchW - MulDiv(8, dpi, 96);
 
-            // Arama kutusu çerçevesi
+            // Arama kutusu arka planı ve şık Apple çerçevesi
             RECT rcEditBorder = { leftX, pad, leftX + editW, pad + searchH };
-            HPEN hPenEB = CreatePen(PS_SOLID, 1, RGB(48, 48, 54));
-            HBRUSH oldB1 = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
-            HPEN oldP1 = (HPEN)SelectObject(hdc, hPenEB);
-            RoundRect(hdc, rcEditBorder.left, rcEditBorder.top, rcEditBorder.right, rcEditBorder.bottom, 8, 8);
-            SelectObject(hdc, oldB1);
-            SelectObject(hdc, oldP1);
-            DeleteObject(hPenEB);
+            DrawRoundedCard(hdc, &rcEditBorder, COLOR_SEARCH_BOX, COLOR_SEARCH_BORDER, 8);
 
             // ListBox çerçevesi
             int row2Y = pad + searchH + MulDiv(8, dpi, 96);
@@ -711,24 +725,18 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             int listH = statY - listY - MulDiv(8, dpi, 96);
 
             RECT rcListBorder = { leftX - 1, listY - 1, leftX + leftW + 1, listY + listH + 1 };
-            HPEN hPenLB = CreatePen(PS_SOLID, 1, RGB(42, 42, 48));
-            HBRUSH oldB0 = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
-            HPEN oldP0 = (HPEN)SelectObject(hdc, hPenLB);
-            RoundRect(hdc, rcListBorder.left, rcListBorder.top, rcListBorder.right, rcListBorder.bottom, 8, 8);
-            SelectObject(hdc, oldB0);
-            SelectObject(hdc, oldP0);
-            DeleteObject(hPenLB);
+            DrawRoundedCard(hdc, &rcListBorder, COLOR_SEARCH_LIST, COLOR_SEARCH_BORDER, 8);
 
-            // Sağ Apple Music Hero Kart Bölgesi
+            // Sağ Apple Music / Spotify Hero Kart Bölgesi
             RECT rcCard = { cardLeft, cardTop, cardRight, cardBottom };
-            DrawRoundedCard(hdc, &rcCard, RGB(24, 24, 28), RGB(42, 42, 48), 10);
+            DrawRoundedCard(hdc, &rcCard, COLOR_SEARCH_CARD, COLOR_SEARCH_BORDER, 10);
 
             // Thumbnail Kutusu (16:9 oranı)
             int cardPad = MulDiv(14, dpi, 96);
             int thumbW  = cardW - (cardPad * 2);
             int thumbH  = (thumbW * 9) / 16;
             RECT rcThumb = { cardLeft + cardPad, cardTop + cardPad, cardLeft + cardPad + thumbW, cardTop + cardPad + thumbH };
-            DrawRoundedCard(hdc, &rcThumb, RGB(16, 16, 18), RGB(46, 46, 52), 8);
+            DrawRoundedCard(hdc, &rcThumb, RGB(14, 14, 16), COLOR_SEARCH_BORDER, 8);
 
             int sel = (int)SendMessageW(g_hListResults, LB_GETCURSEL, 0, 0);
 
@@ -762,14 +770,14 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 int artistH = MulDiv(22, dpi, 96);
                 RECT rcArtist = { rcThumb.left, artistY, rcThumb.right, artistY + artistH };
                 SelectObject(hdc, hFont);
-                SetTextColor(hdc, RGB(160, 160, 165));
+                SetTextColor(hdc, RGB(167, 167, 167));
                 DrawTextW(hdc, g_results[sel].uploader, -1, &rcArtist, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                 int durY = artistY + artistH + MulDiv(4, dpi, 96);
                 int durH = MulDiv(20, dpi, 96);
                 RECT rcMeta = { rcThumb.left, durY, rcThumb.right, durY + durH };
                 SelectObject(hdc, hFontSmall);
-                SetTextColor(hdc, RGB(252, 60, 68)); // Apple Accent
+                SetTextColor(hdc, SPOTIFY_GREEN); // Spotify Yeşil Vurgu
                 wchar_t metaTxt[128];
                 int m = g_results[sel].duration / 60;
                 int s = g_results[sel].duration % 60;
@@ -955,7 +963,7 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
     wc.hIcon = hMainIcon ? hMainIcon : LoadIcon(NULL, IDI_APPLICATION);
     wc.hIconSm = hSmallIcon ? hSmallIcon : wc.hIcon;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(RGB(16, 16, 18));
+    wc.hbrBackground = CreateSolidBrush(COLOR_SEARCH_BG);
     wc.lpszClassName = L"SeloPlayerSearch";
     RegisterClassExW(&wc);
 
@@ -978,7 +986,7 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
     g_hDlg = CreateWindowExW(
         WS_EX_TOPMOST,
         L"SeloPlayerSearch",
-        L"Müzik Ara & İndir (YouTube Tasarım)",
+        L"Müzik Ara & İndir (Spotify Yeşil Tasarım)",
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         x, y, dlgW, dlgH,
         hParentWnd, NULL, hInst, NULL

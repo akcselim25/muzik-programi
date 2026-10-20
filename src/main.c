@@ -32,17 +32,18 @@
 #define EM_SETCUEBANNER 0x1501
 #endif
 
-// Renk Paleti (Apple Dark Mode Foundation - Gradient Olmayan Saf & Asil Katmanlar)
-#define COLOR_BG          RGB(16, 16, 18)     // Apple Deep OLED Dark
-#define COLOR_HEADER      RGB(24, 24, 26)     // Apple Top & Bottom Bars
+// Renk Paleti (Spotify Green & Apple Minimalist Dark Mode - Saf, Canlı & Asil Katmanlar)
+#define COLOR_BG          RGB(18, 18, 18)     // Spotify Pure Dark Base (#121212)
+#define COLOR_HEADER      RGB(24, 24, 24)     // Spotify Navigation/Control Bars (#181818)
 #define COLOR_CARD        RGB(28, 28, 32)     // Apple Elevated Item Card
 #define COLOR_CARD_HOVER  RGB(40, 40, 46)     // Apple Interactive Hover
-#define COLOR_CARD_SEL    RGB(48, 48, 56)     // Apple Selected Item
-#define COLOR_ACCENT      RGB(252, 60, 68)    // Apple Music Vibrant Red (#FC3C44)
-#define COLOR_ACCENT_HOV  RGB(255, 82, 90)
+#define COLOR_CARD_SEL    RGB(26, 42, 32)     // Selected Item (Spotify Subtle Green Glow)
+#define COLOR_ACCENT      RGB(29, 185, 84)    // Spotify Iconic Green (#1DB954)
+#define COLOR_ACCENT_HOV  RGB(30, 215, 96)    // Spotify Vibrant Green (#1ED760)
+#define COLOR_ACCENT_DARK RGB(22, 156, 70)    // Spotify Pressed Green (#169C46)
 #define COLOR_TEXT_WHITE  RGB(255, 255, 255)  // Apple Crisp White
-#define COLOR_TEXT_MUTED  RGB(152, 152, 157)  // Apple System Gray (#98989D)
-#define COLOR_TEXT_DIM    RGB(105, 105, 110)  // Apple System Gray 3 (#69696E)
+#define COLOR_TEXT_MUTED  RGB(167, 167, 167)  // Apple/Spotify Muted Gray (#A7A7A7)
+#define COLOR_TEXT_DIM    RGB(110, 110, 115)  // Apple/Spotify Subtle Gray
 #define COLOR_BAR_BG      RGB(42, 42, 46)     // Apple Scrubber Track Background
 #define COLOR_SIDEBAR     RGB(20, 20, 22)     // Apple macOS Sidebar
 #define COLOR_BORDER      RGB(44, 44, 48)     // Apple Hairline Separator
@@ -557,7 +558,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                     DrawTextW(hdc, titlePart, -1, &rcSongTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                     SelectObject(hdc, g_hFontSmall);
-                    SetTextColor(hdc, actualTrackIdx == g_currentTrack ? RGB(255, 175, 180) : COLOR_TEXT_MUTED);
+                    SetTextColor(hdc, actualTrackIdx == g_currentTrack ? RGB(160, 230, 185) : COLOR_TEXT_MUTED);
                     DrawTextW(hdc, artistPart, -1, &rcArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                 } else {
                     RECT rcName = { textLeft, rcItem.top, textRight, rcItem.bottom };
