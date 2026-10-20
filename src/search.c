@@ -15,8 +15,9 @@ typedef struct {
     wchar_t cleanTitle[256];
     wchar_t uploader[128];
     wchar_t url[512];
-    wchar_t source[32]; // "YouTube", "SoundCloud"
+    wchar_t source[32]; // "YouTube"
     int duration;
+    IPicture *pThumb;
 } SearchItem;
 
 static HWND g_hDlg = NULL;
@@ -34,11 +35,7 @@ static SearchItem g_results[50];
 static int g_resultCount = 0;
 static volatile BOOL g_isSearching = FALSE;
 static volatile BOOL g_isDownloading = FALSE;
-
-// Canlı Kapak Resmi Değişkenleri
-static IPicture *g_pThumbPic = NULL;
-static int g_thumbSelIndex = -1;
-static volatile BOOL g_isThumbLoading = FALSE;
+static volatile LONG g_searchGen = 0;
 
 #define IDC_SEARCH_EDIT         2001
 #define IDC_SEARCH_BTN          2002
@@ -52,13 +49,23 @@ static volatile BOOL g_isThumbLoading = FALSE;
 #define WM_APP_DOWN_DONE         (WM_APP + 202)
 #define WM_APP_THUMB_READY       (WM_APP + 203)
 
+static void FreeSearchResults(void) {
+    for (int i = 0; i < g_resultCount; i++) {
+        if (g_results[i].pThumb) {
+            g_results[i].pThumb->lpVtbl->Release(g_results[i].pThumb);
+            g_results[i].pThumb = NULL;
+        }
+    }
+    g_resultCount = 0;
+}
+
 static DWORD WINAPI SearchThread(LPVOID param) {
     wchar_t *query = (wchar_t*)param;
     g_resultCount = 0;
 
-    // Türkçe karakterleri bozmayan ve 1.5 saniyede şimşek hızında arayan YouTube motoru
+    // Şimşek hızında arama: 10 sonuç, hafif ve doğrudan YouTube video bilgisi
     wchar_t cmdLine[2048];
-    wsprintfW(cmdLine, L"yt-dlp.exe --encoding utf-8 --no-warnings --flat-playlist --print \"%%(id)s\t%%(title)s\t%%(duration)s\t%%(uploader)s\t%%(webpage_url)s\" \"ytsearch12:%s\"", query);
+    wsprintfW(cmdLine, L"yt-dlp.exe --encoding utf-8 --no-warnings --flat-playlist --print \"%%(id)s\t%%(title)s\t%%(duration)s\t%%(uploader)s\t%%(webpage_url)s\" \"ytsearch10:%s\"", query);
     free(query);
 
     HANDLE hRead, hWrite;
@@ -104,6 +111,7 @@ static DWORD WINAPI SearchThread(LPVOID param) {
                                     if (tab4) *tab4 = '\0';
 
                                     SearchItem *item = &g_results[g_resultCount];
+                                    item->pThumb = NULL;
                                     MultiByteToWideChar(CP_UTF8, 0, lineBuf, -1, item->id, 64);
                                     MultiByteToWideChar(CP_UTF8, 0, tab1 + 1, -1, item->rawTitle, 256);
                                     item->duration = (int)atof(tab2 + 1);
@@ -145,22 +153,39 @@ static DWORD WINAPI SearchThread(LPVOID param) {
     return 0;
 }
 
+// Bütün YouTube küçük resimlerini (thumbnails) paralel ve anında indiren iş parçacığı
 typedef struct {
-    wchar_t thumbUrl[512];
-    int selIndex;
-} ThumbParam;
+    int itemIndex;
+    LONG searchGen;
+    wchar_t id[64];
+} SingleThumbTask;
 
-static DWORD WINAPI ThumbLoadThread(LPVOID param) {
-    ThumbParam *tp = (ThumbParam*)param;
+static DWORD WINAPI SingleThumbThread(LPVOID param) {
+    SingleThumbTask *task = (SingleThumbTask*)param;
     OleInitialize(NULL);
+
+    // YouTube 16:9 hızlı küçük resim (mqdefault 320x180, default 120x90)
+    wchar_t thumbUrl[256];
+    wsprintfW(thumbUrl, L"https://i.ytimg.com/vi/%s/mqdefault.jpg", task->id);
+
     IPicture *pPic = NULL;
-    HRESULT hr = OleLoadPicturePath(tp->thumbUrl, NULL, 0, 0, &IID_IPicture, (void**)&pPic);
-    if (SUCCEEDED(hr) && pPic) {
-        PostMessageW(g_hDlg, WM_APP_THUMB_READY, (WPARAM)pPic, (LPARAM)tp->selIndex);
-    } else {
-        PostMessageW(g_hDlg, WM_APP_THUMB_READY, 0, (LPARAM)tp->selIndex);
+    HRESULT hr = OleLoadPicturePath(thumbUrl, NULL, 0, 0, &IID_IPicture, (void**)&pPic);
+    if (FAILED(hr) || !pPic) {
+        wsprintfW(thumbUrl, L"https://i.ytimg.com/vi/%s/default.jpg", task->id);
+        hr = OleLoadPicturePath(thumbUrl, NULL, 0, 0, &IID_IPicture, (void**)&pPic);
     }
-    free(tp);
+
+    if (SUCCEEDED(hr) && pPic) {
+        if (task->searchGen == g_searchGen && task->itemIndex < g_resultCount && wcscmp(g_results[task->itemIndex].id, task->id) == 0) {
+            g_results[task->itemIndex].pThumb = pPic;
+            PostMessageW(g_hDlg, WM_APP_THUMB_READY, (WPARAM)task->itemIndex, 0);
+        } else {
+            pPic->lpVtbl->Release(pPic);
+        }
+    }
+
+    free(task);
+    OleUninitialize();
     return 0;
 }
 
@@ -219,13 +244,11 @@ static void ChooseFolderDialog(HWND hWnd) {
 static void DrawRoundedCard(HDC hdc, const RECT *rc, COLORREF bg, COLORREF border, int radius) {
     HBRUSH hBr = CreateSolidBrush(bg);
     HPEN hPen = CreatePen(PS_SOLID, 1, border);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-
+    HBRUSH oldB = (HBRUSH)SelectObject(hdc, hBr);
+    HPEN oldP = (HPEN)SelectObject(hdc, hPen);
     RoundRect(hdc, rc->left, rc->top, rc->right, rc->bottom, radius, radius);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
+    SelectObject(hdc, oldB);
+    SelectObject(hdc, oldP);
     DeleteObject(hBr);
     DeleteObject(hPen);
 }
@@ -302,7 +325,7 @@ static void LayoutSearchControls(HWND hWnd) {
     int listH = statY - listY - MulDiv(8, dpi, 96);
     if (g_hListResults) MoveWindow(g_hListResults, leftX, listY, leftW, listH, TRUE);
 
-    // Sağ Hero Kart içindeki İndir Butonu (Kartın en altına yapışık)
+    // Sağ Hero Kart içindeki İndir Butonu
     int cardPad  = MulDiv(14, dpi, 96);
     int btnDownH = MulDiv(46, dpi, 96);
     int btnDownW = cardW - (cardPad * 2);
@@ -311,14 +334,105 @@ static void LayoutSearchControls(HWND hWnd) {
     if (g_hBtnDownload) MoveWindow(g_hBtnDownload, btnDownX, btnDownY, btnDownW, btnDownH, TRUE);
 }
 
-static LRESULT CALLBACK SearchEditSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
-    if (msg == WM_KEYDOWN && wParam == VK_RETURN) {
-        HWND hDlg = (HWND)dwRefData;
-        if (hDlg && g_hBtnSearch) {
-            SendMessageW(hDlg, WM_COMMAND, MAKEWPARAM(IDC_SEARCH_BTN, BN_CLICKED), (LPARAM)g_hBtnSearch);
+// Panodaki metni (Ctrl+V veya sağ tık ile) temiz ve satır atlamasız yapıştıran fonksiyon
+static void DoPaste(HWND hEdit) {
+    if (OpenClipboard(NULL)) {
+        HANDLE hData = GetClipboardData(CF_UNICODETEXT);
+        if (hData) {
+            const wchar_t *pText = (const wchar_t*)GlobalLock(hData);
+            if (pText) {
+                size_t len = wcslen(pText);
+                wchar_t *clean = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
+                if (clean) {
+                    for (size_t i = 0; i <= len; i++) {
+                        if (pText[i] == L'\r' || pText[i] == L'\n') {
+                            clean[i] = L' ';
+                        } else {
+                            clean[i] = pText[i];
+                        }
+                    }
+                    SendMessageW(hEdit, EM_REPLACESEL, TRUE, (LPARAM)clean);
+                    free(clean);
+                }
+                GlobalUnlock(hData);
+            }
         }
+        CloseClipboard();
+    }
+}
+
+static LRESULT CALLBACK SearchEditSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
+    HWND hDlg = (HWND)dwRefData;
+
+    if (msg == WM_KEYDOWN) {
+        if (wParam == VK_RETURN) {
+            if (hDlg && g_hBtnSearch) {
+                SendMessageW(hDlg, WM_COMMAND, MAKEWPARAM(IDC_SEARCH_BTN, BN_CLICKED), (LPARAM)g_hBtnSearch);
+            }
+            return 0;
+        }
+        // Ctrl+V (Yapıştır)
+        if (wParam == 'V' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+            DoPaste(hWnd);
+            return 0;
+        }
+        // Ctrl+A (Tümünü Seç)
+        if (wParam == 'A' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+            SendMessageW(hWnd, EM_SETSEL, 0, -1);
+            return 0;
+        }
+        // Ctrl+C (Kopyala)
+        if (wParam == 'C' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+            SendMessageW(hWnd, WM_COPY, 0, 0);
+            return 0;
+        }
+        // Ctrl+X (Kes)
+        if (wParam == 'X' && (GetKeyState(VK_CONTROL) & 0x8000)) {
+            SendMessageW(hWnd, WM_CUT, 0, 0);
+            return 0;
+        }
+    }
+    else if (msg == WM_CHAR) {
+        // Kontrol tuşlarının Windows Edit kutusunda bip sesi çıkarmasını engelle
+        if (wParam == 1 || wParam == 22 || wParam == 3 || wParam == 24) {
+            return 0;
+        }
+    }
+    else if (msg == WM_CONTEXTMENU) {
+        POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
+        if (pt.x == -1 && pt.y == -1) {
+            RECT rc;
+            GetWindowRect(hWnd, &rc);
+            pt.x = rc.left;
+            pt.y = rc.bottom;
+        }
+        HMENU hMenu = CreatePopupMenu();
+        AppendMenuW(hMenu, MF_STRING, 1, L"Kes\tCtrl+X");
+        AppendMenuW(hMenu, MF_STRING, 2, L"Kopyala\tCtrl+C");
+        AppendMenuW(hMenu, MF_STRING, 3, L"Yapıştır\tCtrl+V");
+        AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+        AppendMenuW(hMenu, MF_STRING, 4, L"Tümünü Seç\tCtrl+A");
+
+        DWORD sel = (DWORD)SendMessageW(hWnd, EM_GETSEL, 0, 0);
+        BOOL hasSel = (LOWORD(sel) != HIWORD(sel));
+        if (!hasSel) {
+            EnableMenuItem(hMenu, 1, MF_BYCOMMAND | MF_GRAYED);
+            EnableMenuItem(hMenu, 2, MF_BYCOMMAND | MF_GRAYED);
+        }
+        if (!IsClipboardFormatAvailable(CF_UNICODETEXT) && !IsClipboardFormatAvailable(CF_TEXT)) {
+            EnableMenuItem(hMenu, 3, MF_BYCOMMAND | MF_GRAYED);
+        }
+
+        int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
+        DestroyMenu(hMenu);
+
+        if (cmd == 1) SendMessageW(hWnd, WM_CUT, 0, 0);
+        else if (cmd == 2) SendMessageW(hWnd, WM_COPY, 0, 0);
+        else if (cmd == 3) DoPaste(hWnd);
+        else if (cmd == 4) SendMessageW(hWnd, EM_SETSEL, 0, -1);
         return 0;
     }
+
     return DefSubclassProc(hWnd, msg, wParam, lParam);
 }
 
@@ -332,11 +446,12 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
     switch (msg) {
         case WM_CREATE: {
-            BOOL useDark = TRUE;
-            DwmSetWindowAttribute(hWnd, 20, &useDark, sizeof(useDark));
-            DwmSetWindowAttribute(hWnd, 19, &useDark, sizeof(useDark));
-
+            g_hDlg = hWnd;
             int dpi = GetSearchWindowDpi(hWnd);
+
+            BOOL useDark = TRUE;
+            DwmSetWindowAttribute(hWnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &useDark, sizeof(useDark));
+            DwmSetWindowAttribute(hWnd, 19, &useDark, sizeof(useDark));
 
             hBrBg   = CreateSolidBrush(RGB(16, 16, 18));
             hBrBox  = CreateSolidBrush(RGB(28, 28, 34));
@@ -361,15 +476,15 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             g_hBtnFolder = CreateWindowExW(0, L"BUTTON", L"Klasör Seç...", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_FOLDER_BTN, GetModuleHandle(NULL), NULL);
 
             g_hListResults = CreateWindowExW(0, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_HASSTRINGS, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_LIST, GetModuleHandle(NULL), NULL);
-            SendMessageW(g_hListResults, LB_SETITEMHEIGHT, 0, MulDiv(46, dpi, 96));
+            // YouTube tarzı 16:9 thumbnail içeren şık satır yüksekliği
+            SendMessageW(g_hListResults, LB_SETITEMHEIGHT, 0, MulDiv(58, dpi, 96));
 
             g_hLblStatus = CreateWindowExW(0, L"STATIC", L"Şarkı veya sanatçı adı yazıp Ara'ya basın.", WS_CHILD | WS_VISIBLE | SS_LEFT | SS_ENDELLIPSIS, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_STAT, GetModuleHandle(NULL), NULL);
 
-            // Sağ paneldeki Apple İndirme Butonu (Geniş, Tok ve Saf Düz Vurgu)
             g_hBtnDownload = CreateWindowExW(0, L"BUTTON", L"📥  İndir ve Ekle", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 10, 10, hWnd, (HMENU)IDC_SEARCH_DOWN, GetModuleHandle(NULL), NULL);
 
             SendMessageW(g_hEditQuery, WM_SETFONT, (WPARAM)hFont, TRUE);
-            SendMessageW(g_hEditQuery, 0x1501 /* EM_SETCUEBANNER */, TRUE, (LPARAM)L"Şarkı veya sanatçı adı yazın...");
+            SendMessageW(g_hEditQuery, 0x1501 /* EM_SETCUEBANNER */, TRUE, (LPARAM)L"Şarkı veya sanatçı adı yazın (veya Ctrl+V ile yapıştırın)...");
             SendMessageW(g_hLblFolder, WM_SETFONT, (WPARAM)hFontSmall, TRUE);
             SendMessageW(g_hLblStatus, WM_SETFONT, (WPARAM)hFontSmall, TRUE);
 
@@ -390,8 +505,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
         case WM_GETMINMAXINFO: {
             MINMAXINFO *mmi = (MINMAXINFO*)lParam;
             int dpi = GetSearchWindowDpi(hWnd);
-            mmi->ptMinTrackSize.x = MulDiv(640, dpi, 96);
-            mmi->ptMinTrackSize.y = MulDiv(440, dpi, 96);
+            mmi->ptMinTrackSize.x = MulDiv(680, dpi, 96);
+            mmi->ptMinTrackSize.y = MulDiv(460, dpi, 96);
             return 0;
         }
 
@@ -484,41 +599,63 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
                 if (idx < g_resultCount) {
                     SearchItem *si = &g_results[idx];
-
+                    int dpi = GetSearchWindowDpi(hWnd);
                     int rowH = rcRow.bottom - rcRow.top;
-                    int badgeW = 30;
-                    int badgeH = 20;
-                    int badgeY = rcRow.top + (rowH - badgeH) / 2;
-                    RECT rcBadge = { rcRow.left + 8, badgeY, rcRow.left + 8 + badgeW, badgeY + badgeH };
-                    COLORREF badgeBg = RGB(60, 16, 22);
-                    COLORREF badgeTxt = RGB(255, 85, 95);
-                    DrawRoundedCard(dis->hDC, &rcBadge, badgeBg, badgeBg, 4);
-                    SetBkMode(dis->hDC, TRANSPARENT);
-                    SelectObject(dis->hDC, hFontSmall);
-                    SetTextColor(dis->hDC, badgeTxt);
-                    DrawTextW(dis->hDC, L"YT", -1, &rcBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                    int durW = 60;
-                    RECT rcDur = { rcRow.right - durW - 8, rcRow.top, rcRow.right - 8, rcRow.bottom };
+                    // 16:9 Oranında Gerçek YouTube Thumbnail Boyutu (76x44)
+                    int thumbW = MulDiv(76, dpi, 96);
+                    int thumbH = MulDiv(44, dpi, 96);
+                    int thumbX = rcRow.left + MulDiv(6, dpi, 96);
+                    int thumbY = rcRow.top + (rowH - thumbH) / 2;
+                    RECT rcThumb = { thumbX, thumbY, thumbX + thumbW, thumbY + thumbH };
 
-                    int midY = rcRow.top + rowH / 2;
-                    RECT rcTitle = { rcRow.left + badgeW + 16, rcRow.top + 3, rcRow.right - durW - 12, midY + 1 };
-                    RECT rcSub = { rcRow.left + badgeW + 16, midY + 1, rcRow.right - durW - 12, rcRow.bottom - 3 };
+                    // Küçük resim arka plan kartı
+                    DrawRoundedCard(dis->hDC, &rcThumb, RGB(16, 16, 20), RGB(38, 38, 44), 4);
 
-                    SelectObject(dis->hDC, hFontBold);
-                    SetTextColor(dis->hDC, isSel ? RGB(255, 255, 255) : RGB(240, 240, 245));
-                    DrawTextW(dis->hDC, si->cleanTitle, -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+                    if (si->pThumb) {
+                        OLE_XSIZE_HIMETRIC cx;
+                        OLE_YSIZE_HIMETRIC cy;
+                        si->pThumb->lpVtbl->get_Width(si->pThumb, &cx);
+                        si->pThumb->lpVtbl->get_Height(si->pThumb, &cy);
+                        si->pThumb->lpVtbl->Render(si->pThumb, dis->hDC, rcThumb.left + 1, rcThumb.top + 1, thumbW - 2, thumbH - 2, 0, cy, cx, -cy, NULL);
+                    } else {
+                        // Resim henüz inerken zarif YouTube play ikonu
+                        SetBkMode(dis->hDC, TRANSPARENT);
+                        SelectObject(dis->hDC, hFontSmall);
+                        SetTextColor(dis->hDC, RGB(110, 110, 120));
+                        DrawTextW(dis->hDC, L"▶", -1, &rcThumb, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                    }
 
-                    SelectObject(dis->hDC, hFontSmall);
-                    SetTextColor(dis->hDC, isSel ? RGB(200, 200, 210) : RGB(145, 145, 150));
-                    DrawTextW(dis->hDC, si->uploader, -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-
+                    // YouTube Tarzı Süre Rozeti (Thumbnail'in sağ alt köşesinde siyah rozet)
                     if (si->duration > 0) {
                         wchar_t durBuf[16];
                         wsprintfW(durBuf, L"%02d:%02d", si->duration / 60, si->duration % 60);
-                        SetTextColor(dis->hDC, isSel ? RGB(220, 220, 230) : RGB(130, 130, 135));
-                        DrawTextW(dis->hDC, durBuf, -1, &rcDur, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+                        int badgeW = MulDiv(38, dpi, 96);
+                        int badgeH = MulDiv(15, dpi, 96);
+                        RECT rcDurBadge = { rcThumb.right - badgeW - 2, rcThumb.bottom - badgeH - 2, rcThumb.right - 2, rcThumb.bottom - 2 };
+                        DrawRoundedCard(dis->hDC, &rcDurBadge, RGB(10, 10, 12), RGB(10, 10, 12), 3);
+                        SetBkMode(dis->hDC, TRANSPARENT);
+                        SelectObject(dis->hDC, hFontSmall);
+                        SetTextColor(dis->hDC, RGB(255, 255, 255));
+                        DrawTextW(dis->hDC, durBuf, -1, &rcDurBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                     }
+
+                    // Şarkı Başlığı ve Sanatçı/Kanal Bilgisi
+                    int textLeft = rcThumb.right + MulDiv(10, dpi, 96);
+                    int textRight = rcRow.right - MulDiv(10, dpi, 96);
+
+                    int midY = rcRow.top + rowH / 2;
+                    RECT rcTitle = { textLeft, rcRow.top + MulDiv(5, dpi, 96), textRight, midY + MulDiv(2, dpi, 96) };
+                    RECT rcSub   = { textLeft, midY + MulDiv(2, dpi, 96), textRight, rcRow.bottom - MulDiv(5, dpi, 96) };
+
+                    SetBkMode(dis->hDC, TRANSPARENT);
+                    SelectObject(dis->hDC, hFontBold);
+                    SetTextColor(dis->hDC, isSel ? RGB(255, 255, 255) : RGB(238, 238, 242));
+                    DrawTextW(dis->hDC, si->cleanTitle, -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                    SelectObject(dis->hDC, hFontSmall);
+                    SetTextColor(dis->hDC, isSel ? RGB(200, 200, 210) : RGB(140, 140, 148));
+                    DrawTextW(dis->hDC, si->uploader, -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                 }
                 return TRUE;
             }
@@ -535,14 +672,9 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             int clientH = rcClient.bottom - rcClient.top;
 
             int dpi = GetSearchWindowDpi(hWnd);
-
-            // Tüm pencere zeminini Apple Deep Dark (#101012) ile doldur (Sıfır beyazlık)
-            HBRUSH hBrAll = CreateSolidBrush(RGB(16, 16, 18));
-            FillRect(hdc, &rcClient, hBrAll);
-            DeleteObject(hBrAll);
-
             int pad = MulDiv(16, dpi, 96);
             int gap = MulDiv(14, dpi, 96);
+
             int cardW = MulDiv(280, dpi, 96);
             if (cardW > clientW / 2) cardW = clientW / 2;
             if (cardW < MulDiv(240, dpi, 96)) cardW = MulDiv(240, dpi, 96);
@@ -560,7 +692,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             int searchH    = MulDiv(34, dpi, 96);
             int editW      = leftW - btnSearchW - MulDiv(8, dpi, 96);
 
-            // Arama kutusu etrafına zarif Apple çerçeve
+            // Arama kutusu çerçevesi
             RECT rcEditBorder = { leftX, pad, leftX + editW, pad + searchH };
             HPEN hPenEB = CreatePen(PS_SOLID, 1, RGB(48, 48, 54));
             HBRUSH oldB1 = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
@@ -570,7 +702,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             SelectObject(hdc, oldP1);
             DeleteObject(hPenEB);
 
-            // ListBox etrafına zarif Apple çerçeve
+            // ListBox çerçevesi
             int row2Y = pad + searchH + MulDiv(8, dpi, 96);
             int row2H = MulDiv(28, dpi, 96);
             int statH = MulDiv(22, dpi, 96);
@@ -600,17 +732,18 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
             int sel = (int)SendMessageW(g_hListResults, LB_GETCURSEL, 0, 0);
 
-            if (g_pThumbPic) {
+            IPicture *curPic = (sel >= 0 && sel < g_resultCount) ? g_results[sel].pThumb : NULL;
+            if (curPic) {
                 OLE_XSIZE_HIMETRIC cx;
                 OLE_YSIZE_HIMETRIC cy;
-                g_pThumbPic->lpVtbl->get_Width(g_pThumbPic, &cx);
-                g_pThumbPic->lpVtbl->get_Height(g_pThumbPic, &cy);
-                g_pThumbPic->lpVtbl->Render(g_pThumbPic, hdc, rcThumb.left + 1, rcThumb.top + 1, thumbW - 2, thumbH - 2, 0, cy, cx, -cy, NULL);
+                curPic->lpVtbl->get_Width(curPic, &cx);
+                curPic->lpVtbl->get_Height(curPic, &cy);
+                curPic->lpVtbl->Render(curPic, hdc, rcThumb.left + 1, rcThumb.top + 1, thumbW - 2, thumbH - 2, 0, cy, cx, -cy, NULL);
             } else {
                 SetBkMode(hdc, TRANSPARENT);
                 SelectObject(hdc, hFontSmall);
                 SetTextColor(hdc, RGB(120, 120, 128));
-                const wchar_t *holderTxt = g_isThumbLoading ? L"Kapak resmi yükleniyor..." : L"🎵 Şarkı Seçildiğinde Kapak Burada Görünür";
+                const wchar_t *holderTxt = (sel >= 0) ? L"Kapak resmi yükleniyor..." : L"🎵 Şarkı Seçildiğinde Kapak Burada Görünür";
                 DrawTextW(hdc, holderTxt, -1, &rcThumb, DT_CENTER | DT_VCENTER | DT_WORDBREAK);
             }
 
@@ -662,11 +795,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 GetWindowTextW(g_hEditQuery, query, 512);
                 if (wcslen(query) == 0) break;
 
-                if (g_pThumbPic) {
-                    g_pThumbPic->lpVtbl->Release(g_pThumbPic);
-                    g_pThumbPic = NULL;
-                }
-                g_thumbSelIndex = -1;
+                FreeSearchResults();
+                InterlockedIncrement(&g_searchGen);
 
                 g_isSearching = TRUE;
                 EnableWindow(g_hBtnSearch, FALSE);
@@ -683,26 +813,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     int sel = (int)SendMessageW(g_hListResults, LB_GETCURSEL, 0, 0);
                     BOOL hasSel = (sel >= 0 && sel < g_resultCount);
                     EnableWindow(g_hBtnDownload, hasSel && !g_isDownloading);
-
-                    // Kapak resmini arka planda yükle
-                    if (hasSel && sel != g_thumbSelIndex) {
-                        g_thumbSelIndex = sel;
-                        if (g_pThumbPic) {
-                            g_pThumbPic->lpVtbl->Release(g_pThumbPic);
-                            g_pThumbPic = NULL;
-                        }
-
-                        InvalidateRect(hWnd, NULL, FALSE);
-
-                        ThumbParam *tp = (ThumbParam*)malloc(sizeof(ThumbParam));
-                        tp->selIndex = sel;
-                        wsprintfW(tp->thumbUrl, L"https://i.ytimg.com/vi/%s/mqdefault.jpg", g_results[sel].id);
-
-                        g_isThumbLoading = TRUE;
-                        CreateThread(NULL, 0, ThumbLoadThread, tp, 0, NULL);
-                    }
+                    InvalidateRect(hWnd, NULL, FALSE);
                 } else if (wmEvent == LBN_DBLCLK) {
-                    // Çift tıklama doğrudan indirmeyi başlatır
                     SendMessageW(hWnd, WM_COMMAND, MAKEWPARAM(IDC_SEARCH_DOWN, BN_CLICKED), (LPARAM)g_hBtnDownload);
                 }
             }
@@ -748,25 +860,36 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     SendMessageW(g_hListResults, LB_ADDSTRING, 0, (LPARAM)itemText);
                 }
                 wchar_t stat[128];
-                wsprintfW(stat, L"%d müzik bulundu. Şarkı seçtiğinizde sağda önizleme açılır.", g_resultCount);
+                wsprintfW(stat, L"%d müzik bulundu. Doğrudan tıklayıp indirebilirsiniz.", g_resultCount);
                 SetWindowTextW(g_hLblStatus, stat);
+
+                // İlk şarkıyı otomatik seç
+                SendMessageW(g_hListResults, LB_SETCURSEL, 0, 0);
+                EnableWindow(g_hBtnDownload, TRUE);
+
+                // Bütün YouTube küçük resimlerini (thumbnails) hemen arka planda paralel çekmeye başla
+                LONG curGen = g_searchGen;
+                for (int i = 0; i < g_resultCount; i++) {
+                    SingleThumbTask *task = (SingleThumbTask*)malloc(sizeof(SingleThumbTask));
+                    task->itemIndex = i;
+                    task->searchGen = curGen;
+                    wcsncpy(task->id, g_results[i].id, 63);
+                    task->id[63] = L'\0';
+                    HANDLE hT = CreateThread(NULL, 0, SingleThumbThread, task, 0, NULL);
+                    if (hT) CloseHandle(hT);
+                }
             }
+            InvalidateRect(hWnd, NULL, FALSE);
             break;
         }
 
         case WM_APP_THUMB_READY: {
-            IPicture *pPic = (IPicture*)wParam;
-            int selIdx = (int)lParam;
-            g_isThumbLoading = FALSE;
-
-            if (selIdx == g_thumbSelIndex && pPic) {
-                if (g_pThumbPic) {
-                    g_pThumbPic->lpVtbl->Release(g_pThumbPic);
-                }
-                g_pThumbPic = pPic;
-                InvalidateRect(hWnd, NULL, FALSE);
-            } else {
-                if (pPic) pPic->lpVtbl->Release(pPic);
+            int readyIdx = (int)wParam;
+            if (IsWindow(g_hListResults)) {
+                InvalidateRect(g_hListResults, NULL, FALSE);
+            }
+            int sel = (int)SendMessageW(g_hListResults, LB_GETCURSEL, 0, 0);
+            if (sel == readyIdx) {
                 InvalidateRect(hWnd, NULL, FALSE);
             }
             break;
@@ -779,31 +902,19 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
             BOOL success = (BOOL)wParam;
             if (success) {
-                SetWindowTextW(g_hLblStatus, L"İndirme tamamlandı! Şarkı ve kapak resmi klasöre kaydedildi.");
-                if (g_hParent) {
+                SetWindowTextW(g_hLblStatus, L"İndirme tamamlandı! Şarkı çalma listesinin en üstüne eklendi.");
+                if (IsWindow(g_hParent)) {
                     PostMessageW(g_hParent, WM_APP_FILE_DOWNLOADED, 0, 0);
                 }
             } else {
-                SetWindowTextW(g_hLblStatus, L"İndirme başarısız oldu.");
+                SetWindowTextW(g_hLblStatus, L"İndirme başarısız oldu! Lütfen tekrar deneyin.");
             }
             break;
         }
 
-        case WM_CLOSE: {
-            if (g_pThumbPic) {
-                g_pThumbPic->lpVtbl->Release(g_pThumbPic);
-                g_pThumbPic = NULL;
-            }
-            DestroyWindow(hWnd);
-            return 0;
-        }
-
         case WM_DESTROY: {
             RemoveWindowSubclass(g_hEditQuery, SearchEditSubclassProc, 1);
-            if (g_pThumbPic) {
-                g_pThumbPic->lpVtbl->Release(g_pThumbPic);
-                g_pThumbPic = NULL;
-            }
+            FreeSearchResults();
             if (hBrBg) DeleteObject(hBrBg);
             if (hBrBox) DeleteObject(hBrBox);
             if (hBrList) DeleteObject(hBrList);
@@ -825,6 +936,7 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
     }
 
     g_hParent = hParentWnd;
+
     if (downloadFolder && downloadFolder[0]) {
         wcsncpy(g_downloadFolder, downloadFolder, MAX_PATH - 1);
         g_downloadFolder[MAX_PATH - 1] = L'\0';
@@ -866,7 +978,7 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
     g_hDlg = CreateWindowExW(
         WS_EX_TOPMOST,
         L"SeloPlayerSearch",
-        L"Müzik Ara & İndir (Apple Music Tasarım)",
+        L"Müzik Ara & İndir (YouTube Tasarım)",
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         x, y, dlgW, dlgH,
         hParentWnd, NULL, hInst, NULL

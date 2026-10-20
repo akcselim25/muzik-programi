@@ -1,3 +1,5 @@
-1.0.0
+1.0.1
 https://raw.githubusercontent.com/akcselim25/muzik-programi/main/SeloPlayer.exe
-SeloPlayer v1.0.0 İlk resmi sürüm.
+- YouTube tarzı canlı küçük resimler (thumbnails) doğrudan sonuç listesinde gösteriliyor.
+- Arama kutusuna kopyala/yapıştır (Ctrl+V ve sağ tık menüsü) eklendi.
+- Yeni indirilen müzikler artık çalma listesinin en üstüne ekleniyor.

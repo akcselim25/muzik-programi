@@ -1061,21 +1061,17 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     ApplyFilter(L"");
                 }
 
-                if (newCount > 0) {
-                    int targetIdx = (newCount > oldCount) ? (newCount - 1) : g_selectedTrack;
-                    if (targetIdx < 0) targetIdx = 0;
-                    g_selectedTrack = targetIdx;
-
-                    RECT rcClient;
-                    GetClientRect(hWnd, &rcClient);
-                    int visible = (rcClient.bottom - 105 - 65) / GetItemHeight();
-                    if (visible > 0) {
-                        g_scrollOffset = targetIdx - visible / 2;
-                        int maxScroll = newCount - visible;
-                        if (maxScroll < 0) maxScroll = 0;
-                        if (g_scrollOffset < 0) g_scrollOffset = 0;
-                        if (g_scrollOffset > maxScroll) g_scrollOffset = maxScroll;
+                if (newCount > oldCount) {
+                    int addedCount = newCount - oldCount;
+                    // YENİ İNDİRİLEN ŞARKILARI EN ÜSTE (0. SIRAYA) TAŞI
+                    for (int i = 0; i < addedCount; i++) {
+                        Playlist_Move(oldCount + i, 0);
                     }
+                    if (g_currentTrack >= 0) {
+                        g_currentTrack += addedCount;
+                    }
+                    g_selectedTrack = 0;
+                    g_scrollOffset = 0;
                 }
                 InvalidateRect(hWnd, NULL, FALSE);
             }
