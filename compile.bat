@@ -1,8 +1,8 @@
 @echo off
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /r:System.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:WindowsBase.dll /r:PresentationCore.dll /r:PresentationFramework.dll /out:MYTPlayer.exe Program.cs
+zig rc /fo resource.res resource.rc
+zig cc -Os -ffunction-sections -fdata-sections "-Wl,--gc-sections" -s src/main.c src/player.c src/playlist.c src/config.c src/search.c src/updater.c resource.res -o SeloPlayer.exe -luser32 -lgdi32 -lcomctl32 -lcomdlg32 -lshell32 -lshlwapi -lole32 -loleaut32 -lmfplay -ldwmapi -lurlmon "-Wl,--subsystem,windows"
 if %errorlevel% equ 0 (
-    echo Derleme basarili! MYTPlayer.exe olusturuldu.
+    echo Derleme basarili! SeloPlayer.exe olusturuldu.
 ) else (
     echo Derleme sirasinda hata olustu!
 )
-pause

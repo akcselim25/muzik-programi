@@ -1,3 +1,0 @@
-customtkinter
-yt-dlp
-pywin32
