@@ -129,7 +129,7 @@ static POINT g_mouseDownPt = {0};
 // Buton koordinat bölgeleri
 static RECT rcHamburger;
 static RECT rcSearchBox;
-static RECT rcPrev, rcPlay, rcNext;
+static RECT rcShuffle, rcPrev, rcPlay, rcNext, rcRepeat;
 static RECT rcSeekBar, rcVolBar;
 
 static void TrimProcessMemory(void) {
@@ -347,6 +347,110 @@ static void DrawIconNext(HDC hdc, int cx, int cy, COLORREF col) {
     POINT pts[3] = { { cx - 5, cy - 6 }, { cx - 5, cy + 6 }, { cx + 2, cy } };
     Polygon(hdc, pts, 3);
     Rectangle(hdc, cx + 4, cy - 6, cx + 6, cy + 7);
+
+    SelectObject(hdc, oldBr);
+    SelectObject(hdc, oldPen);
+    DeleteObject(hBr);
+    DeleteObject(hPen);
+}
+
+static void DrawIconShuffle(HDC hdc, int cx, int cy, COLORREF col, BOOL active) {
+    HPEN hPen = CreatePen(PS_SOLID, 2, col);
+    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
+    HBRUSH hBr = CreateSolidBrush(col);
+    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
+
+    // Üst hat: Sol üstten sağ alta çapraz
+    MoveToEx(hdc, cx - 6, cy - 4, NULL);
+    LineTo(hdc, cx - 2, cy - 4);
+    LineTo(hdc, cx + 2, cy + 4);
+    LineTo(hdc, cx + 5, cy + 4);
+
+    // Sağ alt ok ucu
+    POINT arrowBottom[3] = {
+        { cx + 3, cy + 1 },
+        { cx + 7, cy + 4 },
+        { cx + 3, cy + 7 }
+    };
+    Polygon(hdc, arrowBottom, 3);
+
+    // Alt hat: Sol alttan sağ üste çapraz (kesişim boşluğu ile)
+    MoveToEx(hdc, cx - 6, cy + 4, NULL);
+    LineTo(hdc, cx - 2, cy + 4);
+    LineTo(hdc, cx - 1, cy + 2);
+
+    MoveToEx(hdc, cx + 1, cy - 2, NULL);
+    LineTo(hdc, cx + 2, cy - 4);
+    LineTo(hdc, cx + 5, cy - 4);
+
+    // Sağ üst ok ucu
+    POINT arrowTop[3] = {
+        { cx + 3, cy - 7 },
+        { cx + 7, cy - 4 },
+        { cx + 3, cy - 1 }
+    };
+    Polygon(hdc, arrowTop, 3);
+
+    // Aktif durum gösterge noktası
+    if (active) {
+        Ellipse(hdc, cx - 1, cy + 9, cx + 2, cy + 12);
+    }
+
+    SelectObject(hdc, oldBr);
+    SelectObject(hdc, oldPen);
+    DeleteObject(hBr);
+    DeleteObject(hPen);
+}
+
+static void DrawIconRepeat(HDC hdc, int cx, int cy, COLORREF col, int mode) {
+    HPEN hPen = CreatePen(PS_SOLID, 2, col);
+    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
+    HBRUSH hBr = CreateSolidBrush(col);
+    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
+
+    // Üst döngü hattı (sağa akış)
+    MoveToEx(hdc, cx - 6, cy + 1, NULL);
+    LineTo(hdc, cx - 6, cy - 4);
+    LineTo(hdc, cx + 4, cy - 4);
+
+    // Sağ üst ok ucu
+    POINT arrowRight[3] = {
+        { cx + 2, cy - 7 },
+        { cx + 7, cy - 4 },
+        { cx + 2, cy - 1 }
+    };
+    Polygon(hdc, arrowRight, 3);
+
+    // Alt döngü hattı (sola akış)
+    MoveToEx(hdc, cx + 6, cy - 1, NULL);
+    LineTo(hdc, cx + 6, cy + 4);
+    LineTo(hdc, cx - 4, cy + 4);
+
+    // Sol alt ok ucu
+    POINT arrowLeft[3] = {
+        { cx - 2, cy + 1 },
+        { cx - 7, cy + 4 },
+        { cx - 2, cy + 7 }
+    };
+    Polygon(hdc, arrowLeft, 3);
+
+    // Tekrar 1 (Repeat One) için merkezde ince 1 sayısı
+    if (mode == 2) {
+        HPEN hPen1 = CreatePen(PS_SOLID, 1, col);
+        SelectObject(hdc, hPen1);
+        MoveToEx(hdc, cx - 2, cy - 1, NULL);
+        LineTo(hdc, cx, cy - 3);
+        LineTo(hdc, cx, cy + 3);
+        MoveToEx(hdc, cx - 2, cy + 3, NULL);
+        LineTo(hdc, cx + 2, cy + 3);
+        SelectObject(hdc, hPen);
+        DeleteObject(hPen1);
+    }
+
+    // Aktifse (Tümü veya Tek Şarkı) mini gösterge noktası
+    if (mode > 0) {
+        Ellipse(hdc, cx - 1, cy + 9, cx + 2, cy + 12);
+    }
 
     SelectObject(hdc, oldBr);
     SelectObject(hdc, oldPen);
@@ -691,8 +795,8 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         }
 
         const wchar_t *dash = wcsstr(cur->title, L" - ");
-        RECT rcTrackInfo = { 68, btnY, centerX - 80, btnY + 18 };
-        RECT rcTrackSub  = { 68, btnY + 18, centerX - 80, btnY + 36 };
+        RECT rcTrackInfo = { 68, btnY, centerX - 112, btnY + 18 };
+        RECT rcTrackSub  = { 68, btnY + 18, centerX - 112, btnY + 36 };
 
         SetBkColor(hdc, COLOR_HEADER);
         if (dash) {
@@ -725,8 +829,8 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         if (g_hAppIcon) {
             DrawIconEx(hdc, rcThumbBox.left + 2, rcThumbBox.top + 2, g_hAppIcon, 36, 36, 0, NULL, DI_NORMAL);
         }
-        RECT rcTrackInfo = { 68, btnY, centerX - 80, btnY + 18 };
-        RECT rcTrackSub  = { 68, btnY + 18, centerX - 80, btnY + 36 };
+        RECT rcTrackInfo = { 68, btnY, centerX - 112, btnY + 18 };
+        RECT rcTrackSub  = { 68, btnY + 18, centerX - 112, btnY + 36 };
         SetBkColor(hdc, COLOR_HEADER);
         SelectObject(hdc, g_hFontBold);
         SetTextColor(hdc, COLOR_TEXT_WHITE);
@@ -736,16 +840,23 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         DrawTextW(hdc, L"Müzik seçin", -1, &rcTrackSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
     }
 
-    // Bölge 2 (Merkez): Önceki - Oynat/Duraklat - Sonraki (Apple Music Standardı)
-    rcPrev = (RECT){ centerX - 66, btnY + 1, centerX - 30, btnY + 37 };
-    rcPlay = (RECT){ centerX - 22, btnY - 3, centerX + 22, btnY + 41 };
-    rcNext = (RECT){ centerX + 30, btnY + 1, centerX + 66, btnY + 37 };
+    // Bölge 2 (Merkez): Karıştır - Önceki - Oynat/Duraklat - Sonraki - Tekrar (Spotify & Apple Standardı)
+    rcShuffle = (RECT){ centerX - 104, btnY + 2, centerX - 72, btnY + 34 };
+    rcPrev    = (RECT){ centerX - 66,  btnY + 1, centerX - 30, btnY + 37 };
+    rcPlay    = (RECT){ centerX - 22,  btnY - 3, centerX + 22, btnY + 41 };
+    rcNext    = (RECT){ centerX + 30,  btnY + 1, centerX + 66, btnY + 37 };
+    rcRepeat  = (RECT){ centerX + 72,  btnY + 2, centerX + 104, btnY + 34 };
+
+    // Karıştırma Butonu (Shuffle)
+    COLORREF shuffleCol = g_cfg.shuffle ? COLOR_ACCENT : COLOR_TEXT_MUTED;
+    DrawRoundedCard(hdc, &rcShuffle, COLOR_CARD, g_cfg.shuffle ? COLOR_ACCENT : COLOR_BORDER, 8);
+    DrawIconShuffle(hdc, (rcShuffle.left + rcShuffle.right) / 2, (rcShuffle.top + rcShuffle.bottom) / 2, shuffleCol, g_cfg.shuffle);
 
     // Önceki Butonu
     DrawRoundedCard(hdc, &rcPrev, COLOR_CARD, COLOR_BORDER, 8);
     DrawIconPrev(hdc, (rcPrev.left + rcPrev.right) / 2, (rcPrev.top + rcPrev.bottom) / 2, COLOR_TEXT_WHITE);
 
-    // Oynat/Duraklat Butonu (44x44 Tam Daire Apple Kırmızı - Saf Beyaz İkon)
+    // Oynat/Duraklat Butonu (44x44 Tam Daire Spotify Yeşili - Saf Beyaz İkon)
     HBRUSH hBrPlay = CreateSolidBrush(COLOR_ACCENT);
     HPEN hPenPlay = CreatePen(PS_SOLID, 1, COLOR_ACCENT_HOV);
     HBRUSH oldB = (HBRUSH)SelectObject(hdc, hBrPlay);
@@ -768,10 +879,15 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     DrawRoundedCard(hdc, &rcNext, COLOR_CARD, COLOR_BORDER, 8);
     DrawIconNext(hdc, (rcNext.left + rcNext.right) / 2, (rcNext.top + rcNext.bottom) / 2, COLOR_TEXT_WHITE);
 
+    // Tekrar Butonu (Repeat: 0=Kapalı, 1=Tüm Liste, 2=Tek Şarkı)
+    COLORREF repeatCol = (g_cfg.repeat > 0) ? COLOR_ACCENT : COLOR_TEXT_MUTED;
+    DrawRoundedCard(hdc, &rcRepeat, COLOR_CARD, (g_cfg.repeat > 0) ? COLOR_ACCENT : COLOR_BORDER, 8);
+    DrawIconRepeat(hdc, (rcRepeat.left + rcRepeat.right) / 2, (rcRepeat.top + rcRepeat.bottom) / 2, repeatCol, g_cfg.repeat);
+
     // Bölge 3 (Sağ): Ses Kontrolü (Sağa yaslı, asla butonlarla çakışmaz)
     int volRight = w - 15;
-    int volW = MulDiv(80, g_dpi, 96);
-    int txtW = MulDiv(38, g_dpi, 96);
+    int volW = MulDiv(70, g_dpi, 96);
+    int txtW = MulDiv(36, g_dpi, 96);
     int volBarRight = volRight - txtW;
     int volBarLeft = volBarRight - volW;
     int barH = MulDiv(6, g_dpi, 96);
@@ -1363,6 +1479,12 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             }
 
             // 4. Oynatma Kontrolleri
+            if (PtInRect(&rcShuffle, pt)) {
+                g_cfg.shuffle = !g_cfg.shuffle;
+                Config_Save(&g_cfg, L"config.json");
+                InvalidateRect(hWnd, NULL, FALSE);
+                return 0;
+            }
             if (PtInRect(&rcPlay, pt)) {
                 if (Player_IsPlaying()) {
                     Player_Pause();
@@ -1382,8 +1504,14 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
             if (PtInRect(&rcNext, pt)) {
-                int next = Playlist_FindNext(g_currentTrack, g_cfg.shuffle, g_cfg.repeat);
+                int next = Playlist_FindNext(g_currentTrack, g_cfg.shuffle, g_cfg.repeat == 2 ? 1 : g_cfg.repeat);
                 if (next >= 0) PlayTrack(next);
+                return 0;
+            }
+            if (PtInRect(&rcRepeat, pt)) {
+                g_cfg.repeat = (g_cfg.repeat + 1) % 3;
+                Config_Save(&g_cfg, L"config.json");
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
 
@@ -1485,6 +1613,20 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         }
 
         case WM_KEYDOWN: {
+            if (GetKeyState(VK_CONTROL) < 0) {
+                if (wParam == 'R' || wParam == 'r') {
+                    g_cfg.repeat = (g_cfg.repeat + 1) % 3;
+                    Config_Save(&g_cfg, L"config.json");
+                    InvalidateRect(hWnd, NULL, FALSE);
+                    return 0;
+                }
+                if (wParam == 'S' || wParam == 's') {
+                    g_cfg.shuffle = !g_cfg.shuffle;
+                    Config_Save(&g_cfg, L"config.json");
+                    InvalidateRect(hWnd, NULL, FALSE);
+                    return 0;
+                }
+            }
             switch (wParam) {
                 case VK_SPACE: {
                     if (Player_IsPlaying()) Player_Pause();
@@ -1574,7 +1716,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_GETMINMAXINFO: {
             MINMAXINFO *mmi = (MINMAXINFO*)lParam;
-            mmi->ptMinTrackSize.x = 420;
+            mmi->ptMinTrackSize.x = 480;
             mmi->ptMinTrackSize.y = 520;
             return 0;
         }
