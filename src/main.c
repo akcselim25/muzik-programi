@@ -10,6 +10,7 @@
 #include <dwmapi.h>
 #include <olectl.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include "player.h"
 #include "playlist.h"
@@ -67,6 +68,8 @@ static HFONT g_hFontTitle = NULL;
 static HFONT g_hFontMain = NULL;
 static HFONT g_hFontBold = NULL;
 static HFONT g_hFontSmall = NULL;
+static HFONT g_hFontIcons = NULL;
+static HFONT g_hFontIconsLarge = NULL;
 
 static void InitDpiFonts(int dpi) {
     if (dpi <= 0) dpi = 96;
@@ -89,6 +92,15 @@ static void InitDpiFonts(int dpi) {
     g_hFontBold  = CreateFontW(sBold,  0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
     g_hFontMain  = CreateFontW(sMain,  0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
     g_hFontSmall = CreateFontW(sSmall, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
+
+    if (g_hFontIcons) DeleteObject(g_hFontIcons);
+    if (g_hFontIconsLarge) DeleteObject(g_hFontIconsLarge);
+
+    int sIcon      = -MulDiv(14, dpi, 72);
+    int sIconLarge = -MulDiv(18, dpi, 72);
+
+    g_hFontIcons      = CreateFontW(sIcon,      0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
+    g_hFontIconsLarge = CreateFontW(sIconLarge, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
 }
 
 static IPicture *g_pMainThumb = NULL;
@@ -278,6 +290,80 @@ static void ExportM3UDialog(void) {
     }
 }
 
+static void DrawAACircle(HDC hdc, int cx, int cy, int radius, COLORREF color) {
+    int diam = radius * 2;
+    BITMAPINFO bi = {0};
+    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth = diam;
+    bi.bmiHeader.biHeight = -diam; // Top-down
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+
+    RGBQUAD *pixels = NULL;
+    HDC memDC = CreateCompatibleDC(hdc);
+    HBITMAP hBitmap = CreateDIBSection(memDC, &bi, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
+    if (!hBitmap || !pixels) {
+        if (memDC) DeleteDC(memDC);
+        HBRUSH hBr = CreateSolidBrush(color);
+        HPEN hPen = CreatePen(PS_SOLID, 1, color);
+        HBRUSH oldB = (HBRUSH)SelectObject(hdc, hBr);
+        HPEN oldP = (HPEN)SelectObject(hdc, hPen);
+        Ellipse(hdc, cx - radius, cy - radius, cx + radius, cy + radius);
+        SelectObject(hdc, oldB);
+        SelectObject(hdc, oldP);
+        DeleteObject(hBr);
+        DeleteObject(hPen);
+        return;
+    }
+
+    HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, hBitmap);
+
+    BYTE r = GetRValue(color);
+    BYTE g = GetGValue(color);
+    BYTE b = GetBValue(color);
+
+    float fRadius = (float)radius - 0.5f;
+    float center = (float)radius - 0.5f;
+
+    for (int y = 0; y < diam; y++) {
+        float dy = (float)y - center;
+        float dy2 = dy * dy;
+        RGBQUAD *row = &pixels[y * diam];
+        for (int x = 0; x < diam; x++) {
+            float dx = (float)x - center;
+            float dist = sqrtf(dx * dx + dy2);
+            float alpha = 0.0f;
+            if (dist <= fRadius - 0.75f) {
+                alpha = 1.0f;
+            } else if (dist >= fRadius + 0.75f) {
+                alpha = 0.0f;
+            } else {
+                alpha = (fRadius + 0.75f - dist) / 1.5f;
+            }
+
+            if (alpha > 0.0f) {
+                row[x].rgbReserved = (BYTE)(alpha * 255.0f);
+                row[x].rgbRed      = (BYTE)(r * alpha);
+                row[x].rgbGreen    = (BYTE)(g * alpha);
+                row[x].rgbBlue     = (BYTE)(b * alpha);
+            } else {
+                row[x].rgbReserved = 0;
+                row[x].rgbRed      = 0;
+                row[x].rgbGreen    = 0;
+                row[x].rgbBlue     = 0;
+            }
+        }
+    }
+
+    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+    AlphaBlend(hdc, cx - radius, cy - radius, diam, diam, memDC, 0, 0, diam, diam, bf);
+
+    SelectObject(memDC, oldBmp);
+    DeleteObject(hBitmap);
+    DeleteDC(memDC);
+}
+
 static void DrawRoundedCard(HDC hdc, const RECT *rc, COLORREF bg, COLORREF border, int radius) {
     HBRUSH hBr = CreateSolidBrush(bg);
     HPEN hPen = CreatePen(PS_SOLID, 1, border);
@@ -289,204 +375,6 @@ static void DrawRoundedCard(HDC hdc, const RECT *rc, COLORREF bg, COLORREF borde
     SelectObject(hdc, oldBr);
     SelectObject(hdc, oldPen);
     DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-static void DrawIconPlay(HDC hdc, int cx, int cy, COLORREF col) {
-    HBRUSH hBr = CreateSolidBrush(col);
-    HPEN hPen = CreatePen(PS_SOLID, 1, col);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-
-    POINT pts[3] = { { cx - 3, cy - 7 }, { cx - 3, cy + 7 }, { cx + 6, cy } };
-    Polygon(hdc, pts, 3);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-static void DrawIconPause(HDC hdc, int cx, int cy, COLORREF col) {
-    HBRUSH hBr = CreateSolidBrush(col);
-    HPEN hPen = CreatePen(PS_SOLID, 1, col);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-
-    Rectangle(hdc, cx - 4, cy - 6, cx - 1, cy + 7);
-    Rectangle(hdc, cx + 2, cy - 6, cx + 5, cy + 7);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-static void DrawIconPrev(HDC hdc, int cx, int cy, COLORREF col) {
-    HBRUSH hBr = CreateSolidBrush(col);
-    HPEN hPen = CreatePen(PS_SOLID, 1, col);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-
-    Rectangle(hdc, cx - 6, cy - 6, cx - 4, cy + 7);
-    POINT pts[3] = { { cx + 5, cy - 6 }, { cx + 5, cy + 6 }, { cx - 2, cy } };
-    Polygon(hdc, pts, 3);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-static void DrawIconNext(HDC hdc, int cx, int cy, COLORREF col) {
-    HBRUSH hBr = CreateSolidBrush(col);
-    HPEN hPen = CreatePen(PS_SOLID, 1, col);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-
-    POINT pts[3] = { { cx - 5, cy - 6 }, { cx - 5, cy + 6 }, { cx + 2, cy } };
-    Polygon(hdc, pts, 3);
-    Rectangle(hdc, cx + 4, cy - 6, cx + 6, cy + 7);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-static void DrawIconShuffle(HDC hdc, int cx, int cy, COLORREF col, BOOL active) {
-    HPEN hPen = CreatePen(PS_SOLID, 2, col);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-    HBRUSH hBr = CreateSolidBrush(col);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-
-    // Üst hat: Sol üstten sağ alta çapraz
-    MoveToEx(hdc, cx - 6, cy - 4, NULL);
-    LineTo(hdc, cx - 2, cy - 4);
-    LineTo(hdc, cx + 2, cy + 4);
-    LineTo(hdc, cx + 5, cy + 4);
-
-    // Sağ alt ok ucu
-    POINT arrowBottom[3] = {
-        { cx + 3, cy + 1 },
-        { cx + 7, cy + 4 },
-        { cx + 3, cy + 7 }
-    };
-    Polygon(hdc, arrowBottom, 3);
-
-    // Alt hat: Sol alttan sağ üste çapraz (kesişim boşluğu ile)
-    MoveToEx(hdc, cx - 6, cy + 4, NULL);
-    LineTo(hdc, cx - 2, cy + 4);
-    LineTo(hdc, cx - 1, cy + 2);
-
-    MoveToEx(hdc, cx + 1, cy - 2, NULL);
-    LineTo(hdc, cx + 2, cy - 4);
-    LineTo(hdc, cx + 5, cy - 4);
-
-    // Sağ üst ok ucu
-    POINT arrowTop[3] = {
-        { cx + 3, cy - 7 },
-        { cx + 7, cy - 4 },
-        { cx + 3, cy - 1 }
-    };
-    Polygon(hdc, arrowTop, 3);
-
-    // Aktif durum gösterge noktası
-    if (active) {
-        Ellipse(hdc, cx - 1, cy + 9, cx + 2, cy + 12);
-    }
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-static void DrawIconRepeat(HDC hdc, int cx, int cy, COLORREF col, int mode) {
-    HPEN hPen = CreatePen(PS_SOLID, 2, col);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-    HBRUSH hBr = CreateSolidBrush(col);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-
-    // Üst döngü hattı (sağa akış)
-    MoveToEx(hdc, cx - 6, cy + 1, NULL);
-    LineTo(hdc, cx - 6, cy - 4);
-    LineTo(hdc, cx + 4, cy - 4);
-
-    // Sağ üst ok ucu
-    POINT arrowRight[3] = {
-        { cx + 2, cy - 7 },
-        { cx + 7, cy - 4 },
-        { cx + 2, cy - 1 }
-    };
-    Polygon(hdc, arrowRight, 3);
-
-    // Alt döngü hattı (sola akış)
-    MoveToEx(hdc, cx + 6, cy - 1, NULL);
-    LineTo(hdc, cx + 6, cy + 4);
-    LineTo(hdc, cx - 4, cy + 4);
-
-    // Sol alt ok ucu
-    POINT arrowLeft[3] = {
-        { cx - 2, cy + 1 },
-        { cx - 7, cy + 4 },
-        { cx - 2, cy + 7 }
-    };
-    Polygon(hdc, arrowLeft, 3);
-
-    // Tekrar 1 (Repeat One) için merkezde ince 1 sayısı
-    if (mode == 2) {
-        HPEN hPen1 = CreatePen(PS_SOLID, 1, col);
-        SelectObject(hdc, hPen1);
-        MoveToEx(hdc, cx - 2, cy - 1, NULL);
-        LineTo(hdc, cx, cy - 3);
-        LineTo(hdc, cx, cy + 3);
-        MoveToEx(hdc, cx - 2, cy + 3, NULL);
-        LineTo(hdc, cx + 2, cy + 3);
-        SelectObject(hdc, hPen);
-        DeleteObject(hPen1);
-    }
-
-    // Aktifse (Tümü veya Tek Şarkı) mini gösterge noktası
-    if (mode > 0) {
-        Ellipse(hdc, cx - 1, cy + 9, cx + 2, cy + 12);
-    }
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-
-
-static void DrawIconSpeaker(HDC hdc, int cx, int cy, COLORREF col) {
-    HBRUSH hBr = CreateSolidBrush(col);
-    HPEN hPen = CreatePen(PS_SOLID, 1, col);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-
-    Rectangle(hdc, cx - 6, cy - 3, cx - 2, cy + 4);
-    POINT pts[4] = { { cx - 2, cy - 3 }, { cx + 2, cy - 6 }, { cx + 2, cy + 7 }, { cx - 2, cy + 4 } };
-    Polygon(hdc, pts, 4);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
-}
-
-static void DrawIconMagnifier(HDC hdc, int cx, int cy, COLORREF col) {
-    HPEN hPen = CreatePen(PS_SOLID, 2, col);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, GetStockObject(NULL_BRUSH));
-
-    Ellipse(hdc, cx - 6, cy - 6, cx + 4, cy + 4);
-    MoveToEx(hdc, cx + 2, cy + 2, NULL);
-    LineTo(hdc, cx + 7, cy + 7);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
     DeleteObject(hPen);
 }
 
@@ -515,24 +403,21 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     // Hamburger Menü Butonu (Sol: 15, Üst: 13, 34x34)
     rcHamburger = (RECT){ 15, 13, 49, 47 };
     DrawRoundedCard(hdc, &rcHamburger, g_sidebarOpen ? COLOR_ACCENT : COLOR_CARD, COLOR_BORDER, 6);
-    
-    COLORREF burgerCol = g_sidebarOpen ? COLOR_BG : COLOR_TEXT_WHITE;
-    HPEN hPenBurger = CreatePen(PS_SOLID, 2, burgerCol);
-    HPEN oldP = (HPEN)SelectObject(hdc, hPenBurger);
-    int bx = 23, by = 22;
-    for (int line = 0; line < 3; line++) {
-        MoveToEx(hdc, bx, by + line * 6, NULL);
-        LineTo(hdc, bx + 18, by + line * 6);
-    }
-    SelectObject(hdc, oldP);
-    DeleteObject(hPenBurger);
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, g_sidebarOpen ? COLOR_BG : COLOR_TEXT_WHITE);
+    DrawTextW(hdc, L"\uE700", -1, &rcHamburger, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     // Sağ Üst: Şarkı Arama Çubuğu (0 FPS drop yerine gelen modern arama kutusu)
     int searchW = 195;
     int searchX = w - searchW - 15;
     rcSearchBox = (RECT){ searchX, 14, searchX + searchW, 46 };
     DrawRoundedCard(hdc, &rcSearchBox, RGB(36, 36, 40), COLOR_BORDER, 8);
-    DrawIconMagnifier(hdc, searchX + 14, 30, COLOR_TEXT_MUTED);
+    RECT rcMag = { searchX + 6, 14, searchX + 28, 46 };
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, COLOR_TEXT_MUTED);
+    DrawTextW(hdc, L"\uE721", -1, &rcMag, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     // Başlık ve Çalan Şarkı Bilgisi (Sol taraf)
     SetBkMode(hdc, TRANSPARENT);
@@ -621,13 +506,10 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             RECT rcNum = { rcItem.left + MulDiv(6, g_dpi, 96), rcItem.top, rcItem.left + numW, rcItem.bottom };
             SetBkColor(hdc, itemBg);
             if (actualTrackIdx == g_currentTrack) {
-                int cx = (rcNum.left + rcNum.right) / 2;
-                int cy = (rcNum.top + rcNum.bottom) / 2;
-                if (Player_IsPlaying()) {
-                    DrawIconPlay(hdc, cx, cy, COLOR_ACCENT);
-                } else {
-                    DrawIconPause(hdc, cx, cy, COLOR_ACCENT);
-                }
+                SelectObject(hdc, g_hFontIcons);
+                SetTextColor(hdc, COLOR_ACCENT);
+                SetBkMode(hdc, TRANSPARENT);
+                DrawTextW(hdc, Player_IsPlaying() ? L"\uE768" : L"\uE769", -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             } else {
                 SelectObject(hdc, g_hFontSmall);
                 SetTextColor(hdc, COLOR_TEXT_DIM);
@@ -847,42 +729,58 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     rcNext    = (RECT){ centerX + 30,  btnY + 1, centerX + 66, btnY + 37 };
     rcRepeat  = (RECT){ centerX + 72,  btnY + 2, centerX + 104, btnY + 34 };
 
-    // Karıştırma Butonu (Shuffle)
+    // Karıştırma Butonu (Shuffle - ClearType Vector Subpixel Anti-Aliased)
     COLORREF shuffleCol = g_cfg.shuffle ? COLOR_ACCENT : COLOR_TEXT_MUTED;
     DrawRoundedCard(hdc, &rcShuffle, COLOR_CARD, g_cfg.shuffle ? COLOR_ACCENT : COLOR_BORDER, 8);
-    DrawIconShuffle(hdc, (rcShuffle.left + rcShuffle.right) / 2, (rcShuffle.top + rcShuffle.bottom) / 2, shuffleCol, g_cfg.shuffle);
-
-    // Önceki Butonu
-    DrawRoundedCard(hdc, &rcPrev, COLOR_CARD, COLOR_BORDER, 8);
-    DrawIconPrev(hdc, (rcPrev.left + rcPrev.right) / 2, (rcPrev.top + rcPrev.bottom) / 2, COLOR_TEXT_WHITE);
-
-    // Oynat/Duraklat Butonu (44x44 Tam Daire Spotify Yeşili - Saf Beyaz İkon)
-    HBRUSH hBrPlay = CreateSolidBrush(COLOR_ACCENT);
-    HPEN hPenPlay = CreatePen(PS_SOLID, 1, COLOR_ACCENT_HOV);
-    HBRUSH oldB = (HBRUSH)SelectObject(hdc, hBrPlay);
-    HPEN oldP2 = (HPEN)SelectObject(hdc, hPenPlay);
-    Ellipse(hdc, rcPlay.left, rcPlay.top, rcPlay.right, rcPlay.bottom);
-    SelectObject(hdc, oldB);
-    SelectObject(hdc, oldP2);
-    DeleteObject(hBrPlay);
-    DeleteObject(hPenPlay);
-
-    int playCx = (rcPlay.left + rcPlay.right) / 2;
-    int playCy = (rcPlay.top + rcPlay.bottom) / 2;
-    if (Player_IsPlaying()) {
-        DrawIconPause(hdc, playCx, playCy, COLOR_TEXT_WHITE);
-    } else {
-        DrawIconPlay(hdc, playCx, playCy, COLOR_TEXT_WHITE);
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, shuffleCol);
+    DrawTextW(hdc, L"\uE8B1", -1, &rcShuffle, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    if (g_cfg.shuffle) {
+        DrawAACircle(hdc, (rcShuffle.left + rcShuffle.right) / 2, rcShuffle.bottom - 4, 2, COLOR_ACCENT);
     }
 
-    // Sonraki Butonu
-    DrawRoundedCard(hdc, &rcNext, COLOR_CARD, COLOR_BORDER, 8);
-    DrawIconNext(hdc, (rcNext.left + rcNext.right) / 2, (rcNext.top + rcNext.bottom) / 2, COLOR_TEXT_WHITE);
+    // Önceki Butonu (Previous - ClearType Vector)
+    DrawRoundedCard(hdc, &rcPrev, COLOR_CARD, COLOR_BORDER, 8);
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, COLOR_TEXT_WHITE);
+    DrawTextW(hdc, L"\uE892", -1, &rcPrev, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    // Tekrar Butonu (Repeat: 0=Kapalı, 1=Tüm Liste, 2=Tek Şarkı)
+    // Oynat/Duraklat Butonu (44x44 Tam Anti-Aliased Subpixel Pürüzsüz Daire & Vektör İkon)
+    int playCx = (rcPlay.left + rcPlay.right) / 2;
+    int playCy = (rcPlay.top + rcPlay.bottom) / 2;
+    DrawAACircle(hdc, playCx, playCy, 22, COLOR_ACCENT);
+
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIconsLarge);
+    SetTextColor(hdc, COLOR_TEXT_WHITE);
+    if (Player_IsPlaying()) {
+        DrawTextW(hdc, L"\uE769", -1, &rcPlay, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    } else {
+        RECT rcPlayIcon = rcPlay;
+        OffsetRect(&rcPlayIcon, 1, 0); // Üçgenin optik merkezini tam ortala
+        DrawTextW(hdc, L"\uE768", -1, &rcPlayIcon, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
+
+    // Sonraki Butonu (Next - ClearType Vector)
+    DrawRoundedCard(hdc, &rcNext, COLOR_CARD, COLOR_BORDER, 8);
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, COLOR_TEXT_WHITE);
+    DrawTextW(hdc, L"\uE893", -1, &rcNext, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+    // Tekrar Butonu (Repeat: E8EE=Tümü, E8ED=Tek Şarkı ClearType Vektör)
     COLORREF repeatCol = (g_cfg.repeat > 0) ? COLOR_ACCENT : COLOR_TEXT_MUTED;
     DrawRoundedCard(hdc, &rcRepeat, COLOR_CARD, (g_cfg.repeat > 0) ? COLOR_ACCENT : COLOR_BORDER, 8);
-    DrawIconRepeat(hdc, (rcRepeat.left + rcRepeat.right) / 2, (rcRepeat.top + rcRepeat.bottom) / 2, repeatCol, g_cfg.repeat);
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, repeatCol);
+    const wchar_t *repGlyph = (g_cfg.repeat == 2) ? L"\uE8ED" : L"\uE8EE";
+    DrawTextW(hdc, repGlyph, -1, &rcRepeat, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    if (g_cfg.repeat > 0) {
+        DrawAACircle(hdc, (rcRepeat.left + rcRepeat.right) / 2, rcRepeat.bottom - 4, 2, COLOR_ACCENT);
+    }
 
     // Bölge 3 (Sağ): Ses Kontrolü (Sağa yaslı, asla butonlarla çakışmaz)
     int volRight = w - 15;
@@ -895,10 +793,14 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     int barY = btnY + MulDiv(16, g_dpi, 96);
     rcVolBar = (RECT){ volBarLeft, barY, volBarRight, barY + barH };
 
-    DrawIconSpeaker(hdc, volBarLeft - MulDiv(14, g_dpi, 96), (rcVolBar.top + rcVolBar.bottom) / 2, COLOR_TEXT_MUTED);
+    int curVol = Player_GetVolume();
+    RECT rcSpeaker = { volBarLeft - MulDiv(26, g_dpi, 96), btnY, volBarLeft - MulDiv(4, g_dpi, 96), btnY + MulDiv(38, g_dpi, 96) };
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, COLOR_TEXT_MUTED);
+    DrawTextW(hdc, (curVol == 0) ? L"\uE74F" : L"\uE767", -1, &rcSpeaker, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     DrawRoundedCard(hdc, &rcVolBar, COLOR_BAR_BG, COLOR_BAR_BG, barH / 2);
-    int curVol = Player_GetVolume();
     if (curVol < 0) curVol = 0;
     if (curVol > 100) curVol = 100;
     int volFillW = (int)((rcVolBar.right - rcVolBar.left) * (curVol / 100.0f));
@@ -915,17 +817,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     int thumbRadius = MulDiv(5, g_dpi, 96);
     if (thumbRadius < 5) thumbRadius = 5;
 
-    HBRUSH hBrThumb = CreateSolidBrush(COLOR_TEXT_WHITE);
-    HPEN hPenThumb = CreatePen(PS_SOLID, 1, COLOR_ACCENT);
-    HBRUSH oldBVol = (HBRUSH)SelectObject(hdc, hBrThumb);
-    HPEN oldPVol = (HPEN)SelectObject(hdc, hPenThumb);
-
-    Ellipse(hdc, thumbX - thumbRadius, thumbY - thumbRadius, thumbX + thumbRadius, thumbY + thumbRadius);
-
-    SelectObject(hdc, oldBVol);
-    SelectObject(hdc, oldPVol);
-    DeleteObject(hBrThumb);
-    DeleteObject(hPenThumb);
+DrawAACircle(hdc, thumbX, thumbY, thumbRadius, COLOR_TEXT_WHITE);
 
     wchar_t volTxt[16];
     wsprintfW(volTxt, L"%%%d", curVol);
@@ -1765,6 +1657,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             if (g_hFontBold) DeleteObject(g_hFontBold);
             if (g_hFontMain) DeleteObject(g_hFontMain);
             if (g_hFontSmall) DeleteObject(g_hFontSmall);
+            if (g_hFontIcons) DeleteObject(g_hFontIcons);
+            if (g_hFontIconsLarge) DeleteObject(g_hFontIconsLarge);
             if (g_hBrSearchEdit) DeleteObject(g_hBrSearchEdit);
             if (g_pMainThumb) {
                 g_pMainThumb->lpVtbl->Release(g_pMainThumb);
