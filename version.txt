@@ -1,6 +1,6 @@
-1.0.7
+1.0.8
 https://raw.githubusercontent.com/akcselim25/muzik-programi/main/SeloPlayer.exe
-- Sarki ve sanatci isimlerindeki kirpilma hatasi ile Turkce/YouTube baslik temizligi tamamen duzeltildi.
-- Apple Design standardinda 60 FPS yay (spring) fizigiyle akici kaydirma, yan cekmece ve karartma katmani eklendi.
-- Sifir gecikmeli tiklama tepkisi, kenarliksiz sade tasarim, net kapak gorselleri (HALFTONE) ve anlik sessize alma eklendi.
-- Ses motoru tekil asenkron oturum mimarisine gecirildi: 0% bosta CPU, sifir arayuz donmasi ve ultra dusuk RAM kullanimi.
+- Bastan asagi yenilenmis modern obsidyen cam arayuz: Anti-aliased puruzsuz kartlar, cift satirli parca/sanatci gorunumu, canli ekolayzir ve yuzen oynatici paneli.
+- Canli Jam Sahne Cubugu eklendi: Davet bekleme, canli senkronizasyon durumu ve Jam'de oldugunu aninda gosteren zumrut isiltili ozel katman.
+- Jam sarki eslestirme hatasi giderildi: Yanlis sarki acma sorunu sifirlandi; karsi tarafta olup sende olmayan sarki otomatik indirilir ve canli saniyeye esitlenir.
+- Cevrimici durumu anlik PING/PONG mimarisine gecirildi: Yalnizca Arkadaslar sekmesi acikken veya Jam'deyken yenilenir, bosta sifir ag ve islemci tuketir.

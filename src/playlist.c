@@ -647,3 +647,270 @@ int Playlist_FindByPrefix(wchar_t prefixChar, int startIndex) {
     }
     return -1;
 }
+
+void Playlist_SplitArtistSong(const wchar_t *fullTitle, wchar_t *outArtist, int artistMax, wchar_t *outSong, int songMax) {
+    if (outArtist && artistMax > 0) outArtist[0] = L'\0';
+    if (outSong && songMax > 0) outSong[0] = L'\0';
+    if (!fullTitle || !fullTitle[0]) return;
+
+    const wchar_t *dash = wcsstr(fullTitle, L" - ");
+    if (dash && dash > fullTitle && *(dash + 3) != L'\0') {
+        if (outArtist && artistMax > 0) {
+            int aLen = (int)(dash - fullTitle);
+            if (aLen >= artistMax) aLen = artistMax - 1;
+            wcsncpy(outArtist, fullTitle, aLen);
+            outArtist[aLen] = L'\0';
+            StrTrimW(outArtist, L" \t");
+        }
+        if (outSong && songMax > 0) {
+            wcsncpy(outSong, dash + 3, songMax - 1);
+            outSong[songMax - 1] = L'\0';
+            StrTrimW(outSong, L" \t");
+        }
+    } else {
+        if (outSong && songMax > 0) {
+            wcsncpy(outSong, fullTitle, songMax - 1);
+            outSong[songMax - 1] = L'\0';
+            StrTrimW(outSong, L" \t");
+        }
+    }
+}
+
+void Playlist_ExtractYouTubeId(const wchar_t *filePath, wchar_t *outId, int maxLen) {
+    if (!outId || maxLen <= 0) return;
+    outId[0] = L'\0';
+    if (!filePath || !filePath[0] || maxLen < 12) return;
+
+    const wchar_t *fn = PathFindFileNameW(filePath);
+    const wchar_t *p = fn;
+    while (*p) {
+        if (*p == L'[' || *p == L'(') {
+            wchar_t closeCh = (*p == L'[') ? L']' : L')';
+            const wchar_t *end = wcschr(p + 1, closeCh);
+            if (end) {
+                int len = (int)(end - (p + 1));
+                if (LooksLikeYouTubeId(p + 1, len, *p)) {
+                    if (len == 13 && p[1] == L'_' && p[13] == L'_') {
+                        wcsncpy(outId, p + 2, 11);
+                        outId[11] = L'\0';
+                        return;
+                    } else if (len == 11) {
+                        wcsncpy(outId, p + 1, 11);
+                        outId[11] = L'\0';
+                        return;
+                    }
+                }
+            }
+        }
+        p++;
+    }
+}
+
+static wchar_t FoldAsciiCharW(wchar_t ch) {
+    switch (ch) {
+        case 0x0130: case 0x0131: case L'I': case L'i': case 0x00CE: case 0x00EE: return L'i';
+        case 0x015E: case 0x015F: return L's';
+        case 0x011E: case 0x011F: return L'g';
+        case 0x00DC: case 0x00FC: case 0x00DB: case 0x00FB: return L'u';
+        case 0x00D6: case 0x00F6: case 0x00D4: case 0x00F4: return L'o';
+        case 0x00C7: case 0x00E7: return L'c';
+        case 0x00C2: case 0x00E2: case 0x00C4: case 0x00E4: case 0x00C1: case 0x00E1: case 0x00C0: case 0x00E0: return L'a';
+        case 0x00C9: case 0x00E9: case 0x00C8: case 0x00E8: case 0x00CA: case 0x00EA: return L'e';
+        default: break;
+    }
+    if (ch >= L'A' && ch <= L'Z') return (wchar_t)(ch - L'A' + L'a');
+    if ((ch >= L'a' && ch <= L'z') || (ch >= L'0' && ch <= L'9')) return ch;
+    wchar_t low = TurkishToLowerChar(ch);
+    if ((low >= L'a' && low <= L'z') || (low >= L'0' && low <= L'9')) return low;
+    return L' ';
+}
+
+static void FoldForMatchW(const wchar_t *src, wchar_t *out, int maxLen) {
+    if (!out || maxLen <= 0) return;
+    out[0] = L'\0';
+    if (!src || !src[0]) return;
+
+    int w = 0;
+    BOOL inSpace = TRUE;
+    for (int r = 0; src[r] && w < maxLen - 1; r++) {
+        if (src[r] == 0x0307) continue; // Combining dot above
+        wchar_t fc = FoldAsciiCharW(src[r]);
+        if (fc == L' ') {
+            if (!inSpace) {
+                out[w++] = L' ';
+                inSpace = TRUE;
+            }
+        } else {
+            out[w++] = fc;
+            inSpace = FALSE;
+        }
+    }
+    if (w > 0 && out[w - 1] == L' ') w--;
+    out[w] = L'\0';
+}
+
+static int SplitFoldedTokens(const wchar_t *folded, wchar_t tokens[][48], int maxTokens, BOOL skipEditionWords) {
+    if (!folded || !folded[0]) return 0;
+    wchar_t buf[256];
+    wcsncpy(buf, folded, 255);
+    buf[255] = L'\0';
+
+    int count = 0;
+    wchar_t *ctx = NULL;
+    wchar_t *tok = wcstok(buf, L" ", &ctx);
+    while (tok && count < maxTokens) {
+        BOOL skip = FALSE;
+        if (skipEditionWords) {
+            if (wcscmp(tok, L"feat") == 0 || wcscmp(tok, L"ft") == 0 ||
+                wcscmp(tok, L"ile") == 0 || wcscmp(tok, L"ve") == 0) {
+                skip = TRUE;
+            }
+        }
+        if (!skip && tok[0]) {
+            wcsncpy(tokens[count], tok, 47);
+            tokens[count][47] = L'\0';
+            count++;
+        }
+        tok = wcstok(NULL, L" ", &ctx);
+    }
+    return count;
+}
+
+static BOOL SongTokensEquivalent(const wchar_t *songA, const wchar_t *songB) {
+    if (!songA[0] || !songB[0]) return FALSE;
+    if (wcscmp(songA, songB) == 0) return TRUE;
+
+    wchar_t tokA[16][48], tokB[16][48];
+    int nA = SplitFoldedTokens(songA, tokA, 16, TRUE);
+    int nB = SplitFoldedTokens(songB, tokB, 16, TRUE);
+    if (nA == 0 || nB == 0) return FALSE;
+
+    // Kısa olan tarafın TÜM kelimeleri uzun olan tarafta tam kelime olarak bulunmalı
+    // ve kelime sayısı farkı en fazla 2 olmalı (ör: "mavi mavi" vs "mavi mavi akustik")
+    if (abs(nA - nB) > 2) return FALSE;
+
+    int minN = (nA < nB) ? nA : nB;
+    int matched = 0;
+    for (int i = 0; i < nA; i++) {
+        for (int j = 0; j < nB; j++) {
+            if (wcscmp(tokA[i], tokB[j]) == 0) {
+                matched++;
+                break;
+            }
+        }
+    }
+    return (matched >= minN);
+}
+
+static BOOL ArtistTokensShareIdentity(const wchar_t *artA, const wchar_t *artB) {
+    if (!artA[0] || !artB[0]) return FALSE;
+    if (wcscmp(artA, artB) == 0) return TRUE;
+
+    wchar_t tokA[12][48], tokB[12][48];
+    int nA = SplitFoldedTokens(artA, tokA, 12, TRUE);
+    int nB = SplitFoldedTokens(artB, tokB, 12, TRUE);
+    if (nA == 0 || nB == 0) return FALSE;
+
+    for (int i = 0; i < nA; i++) {
+        if (wcslen(tokA[i]) < 3) continue;
+        for (int j = 0; j < nB; j++) {
+            if (wcscmp(tokA[i], tokB[j]) == 0) return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+int Playlist_FindBestMatch(const wchar_t *targetTitle, const wchar_t *targetYtId) {
+    if (g_count <= 0) return -1;
+
+    // 1. Katman: YouTube 11 haneli Video ID tam eşleşmesi (%100 kesinlik)
+    if (targetYtId && wcslen(targetYtId) == 11) {
+        for (int i = 0; i < g_count; i++) {
+            wchar_t itemYtId[16] = {0};
+            Playlist_ExtractYouTubeId(g_items[i].filePath, itemYtId, 16);
+            if (itemYtId[0] && wcscmp(itemYtId, targetYtId) == 0) {
+                return i;
+            }
+        }
+    }
+
+    if (!targetTitle || !targetTitle[0]) return -1;
+
+    // 2. Katman: Birebir başlık veya Türkçe/ASCII normalize edilmiş tam başlık eşleşmesi
+    wchar_t tFoldFull[256];
+    FoldForMatchW(targetTitle, tFoldFull, 256);
+    if (!tFoldFull[0]) return -1;
+
+    for (int i = 0; i < g_count; i++) {
+        if (_wcsicmp(g_items[i].title, targetTitle) == 0) return i;
+    }
+
+    for (int i = 0; i < g_count; i++) {
+        wchar_t cFoldFull[256];
+        FoldForMatchW(g_items[i].title, cFoldFull, 256);
+        if (wcscmp(cFoldFull, tFoldFull) == 0) return i;
+    }
+
+    // 3. Katman: Sanatçı + Şarkı yapısal kelime eşleşmesi (Yanlış şarkı açmayı %100 engeller!)
+    wchar_t tArtRaw[128], tSongRaw[128];
+    wchar_t tArt[128], tSong[128];
+    Playlist_SplitArtistSong(targetTitle, tArtRaw, 128, tSongRaw, 128);
+    FoldForMatchW(tArtRaw, tArt, 128);
+    FoldForMatchW(tSongRaw, tSong, 128);
+
+    int bestIdx = -1;
+    int bestScore = 0;
+
+    for (int i = 0; i < g_count; i++) {
+        wchar_t cArtRaw[128], cSongRaw[128];
+        wchar_t cArt[128], cSong[128];
+        Playlist_SplitArtistSong(g_items[i].title, cArtRaw, 128, cSongRaw, 128);
+        FoldForMatchW(cArtRaw, cArt, 128);
+        FoldForMatchW(cSongRaw, cSong, 128);
+
+        int score = 0;
+        if (tArt[0] && cArt[0]) {
+            // Normal yön: Sanatçı == Sanatçı VE Şarkı == Şarkı
+            if (SongTokensEquivalent(tSong, cSong) && ArtistTokensShareIdentity(tArt, cArt)) {
+                score = (wcscmp(tSong, cSong) == 0) ? 920 : 880;
+            }
+            // Ters yön ("Şarkı - Sanatçı" vs "Sanatçı - Şarkı")
+            else if (SongTokensEquivalent(tSong, cArt) && ArtistTokensShareIdentity(tArt, cSong)) {
+                score = 870;
+            }
+        } else if (tArt[0] && !cArt[0]) {
+            if (wcslen(cSong) >= 5 && wcscmp(tSong, cSong) == 0) {
+                score = 820;
+            }
+        } else if (!tArt[0] && cArt[0]) {
+            if (wcslen(tSong) >= 5 && wcscmp(tSong, cSong) == 0) {
+                score = 820;
+            }
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestIdx = i;
+        }
+    }
+
+    return (bestScore >= 800) ? bestIdx : -1;
+}
+
+BOOL Playlist_IsSameTrack(int index, const wchar_t *targetTitle, const wchar_t *targetYtId) {
+    if (index < 0 || index >= g_count) return FALSE;
+    if (targetYtId && wcslen(targetYtId) == 11) {
+        wchar_t itemYtId[16] = {0};
+        Playlist_ExtractYouTubeId(g_items[index].filePath, itemYtId, 16);
+        if (itemYtId[0] && wcscmp(itemYtId, targetYtId) == 0) return TRUE;
+    }
+    if (!targetTitle || !targetTitle[0]) return FALSE;
+    if (_wcsicmp(g_items[index].title, targetTitle) == 0) return TRUE;
+
+    wchar_t f1[256], f2[256];
+    FoldForMatchW(g_items[index].title, f1, 256);
+    FoldForMatchW(targetTitle, f2, 256);
+    if (f1[0] && wcscmp(f1, f2) == 0) return TRUE;
+
+    return (Playlist_FindBestMatch(targetTitle, targetYtId) == index);
+}

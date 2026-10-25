@@ -14,11 +14,11 @@
 #define SPOTIFY_GREEN_HOV   RGB(30, 215, 96)    // #1ED760
 #define SPOTIFY_GREEN_DARK  RGB(22, 156, 70)    // #169C46
 
-#define COLOR_SEARCH_BG     RGB(16, 16, 18)     // Saf Koyu Tuval
-#define COLOR_SEARCH_CARD   RGB(24, 24, 28)     // Apple Yükseltilmiş Hero Kart
-#define COLOR_SEARCH_BOX    RGB(30, 30, 35)     // Arama Kutusu Yüzeyi
-#define COLOR_SEARCH_LIST   RGB(20, 20, 23)     // Liste Arka Planı
-#define COLOR_SEARCH_BORDER RGB(40, 40, 46)     // İnce Ayırıcı Çizgi
+#define COLOR_SEARCH_BG     RGB(10, 12, 16)     // Saf Derin Obsidyen Tuval
+#define COLOR_SEARCH_CARD   RGB(18, 21, 28)     // Modern Yükseltilmiş Kart
+#define COLOR_SEARCH_BOX    RGB(24, 28, 37)     // Arama Kutusu Yüzeyi
+#define COLOR_SEARCH_LIST   RGB(15, 18, 24)     // Liste Arka Planı
+#define COLOR_SEARCH_BORDER RGB(38, 44, 58)     // İnce Ayırıcı Çizgi
 
 #define MAX_SEARCH_RESULTS  30
 
@@ -1008,4 +1008,12 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
 
     if (s_hMainIcon) SendMessageW(g_hDlg, WM_SETICON, ICON_BIG, (LPARAM)s_hMainIcon);
     if (s_hSmallIcon) SendMessageW(g_hDlg, WM_SETICON, ICON_SMALL, (LPARAM)s_hSmallIcon);
+}
+
+void Search_ShowDialogWithQuery(HWND hParentWnd, const wchar_t *downloadFolder, const wchar_t *initialQuery) {
+    Search_ShowDialog(hParentWnd, downloadFolder);
+    if (initialQuery && initialQuery[0] && g_hDlg && IsWindow(g_hDlg) && g_hEditQuery) {
+        SetWindowTextW(g_hEditQuery, initialQuery);
+        PostMessageW(g_hDlg, WM_COMMAND, MAKEWPARAM(IDC_SEARCH_BTN, BN_CLICKED), (LPARAM)g_hBtnSearch);
+    }
 }

@@ -318,7 +318,9 @@ void Network_TagToTopicKeyA(const char *tag, char *out, int maxLen) {
     int i = 0;
     for (; tag[i] && i < maxLen - 1; i++) {
         char c = tag[i];
-        if (c == '#' || c == '+' || c == '/' || c == '$' || (unsigned char)c <= 32) {
+        if (c >= 'A' && c <= 'Z') {
+            out[i] = (char)(c - 'A' + 'a');
+        } else if (c == '#' || c == '+' || c == '/' || c == '$' || (unsigned char)c <= 32) {
             out[i] = '_';
         } else {
             out[i] = c;
@@ -329,8 +331,11 @@ void Network_TagToTopicKeyA(const char *tag, char *out, int maxLen) {
 
 void Network_TagToTopicKeyW(const wchar_t *tag, char *out, int maxLen) {
     if (!tag || !out || maxLen <= 0) return;
-    char temp[128] = {0};
-    WideCharToMultiByte(CP_UTF8, 0, tag, -1, temp, sizeof(temp) - 1, NULL, NULL);
+    wchar_t wLower[128] = {0};
+    wcsncpy(wLower, tag, 127);
+    CharLowerBuffW(wLower, (DWORD)wcslen(wLower));
+    char temp[256] = {0};
+    WideCharToMultiByte(CP_UTF8, 0, wLower, -1, temp, sizeof(temp) - 1, NULL, NULL);
     Network_TagToTopicKeyA(temp, out, maxLen);
 }
 

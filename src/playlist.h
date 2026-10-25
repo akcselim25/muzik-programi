@@ -24,4 +24,9 @@ int  Playlist_ExportM3U(const wchar_t *filePath);
 int  Playlist_FindByPrefix(wchar_t prefixChar, int startIndex);
 void Playlist_CleanTitle(const wchar_t *path, wchar_t *outTitle, int maxLen);
 
+void Playlist_SplitArtistSong(const wchar_t *fullTitle, wchar_t *outArtist, int artistMax, wchar_t *outSong, int songMax);
+void Playlist_ExtractYouTubeId(const wchar_t *filePath, wchar_t *outId, int maxLen);
+int  Playlist_FindBestMatch(const wchar_t *targetTitle, const wchar_t *targetYtId);
+BOOL Playlist_IsSameTrack(int index, const wchar_t *targetTitle, const wchar_t *targetYtId);
+
 #endif // PLAYLIST_H
