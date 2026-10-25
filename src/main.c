@@ -17,6 +17,9 @@
 #include "config.h"
 #include "search.h"
 #include "updater.h"
+#include "network.h"
+#include "friends.h"
+#include "jam.h"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
@@ -139,6 +142,49 @@ static BOOL  g_isDraggingList = FALSE;
 static POINT g_mouseDownPt = {0};
 
 // Buton koordinat bölgeleri
+#define IDC_FRIEND_ADD_EDIT 1020
+
+typedef enum {
+    SIDEBAR_VIEW_MENU = 0,
+    SIDEBAR_VIEW_FRIENDS
+} SidebarView;
+
+typedef enum {
+    FRIENDS_TAB_LIST = 0,
+    FRIENDS_TAB_REQUESTS,
+    FRIENDS_TAB_ADD
+} FriendsTab;
+
+static SidebarView g_sidebarView = SIDEBAR_VIEW_MENU;
+static FriendsTab  g_friendsTab  = FRIENDS_TAB_LIST;
+static HWND        g_hFriendAddEdit = NULL;
+static WNDPROC     g_oldFriendAddEditProc = NULL;
+static wchar_t     g_friendAddMsg[128] = {0};
+static DWORD       g_copiedTagTick = 0;
+static BOOL        g_isSyncingFromRemote = FALSE;
+
+static RECT rcToastBox, rcToastAccept, rcToastReject;
+static RECT rcJamPill, rcJamLeave;
+static RECT rcFriendsBack, rcCopyTag;
+static RECT rcFriendsTab0, rcFriendsTab1, rcFriendsTab2;
+static RECT rcFriendSendBtn;
+static RECT rcFriendActionBtns[MAX_FRIENDS];
+static RECT rcReqAcceptBtns[MAX_REQUESTS];
+static RECT rcReqRejectBtns[MAX_REQUESTS];
+
+static void CopyToClipboard(HWND hWnd, const wchar_t *text) {
+    if (!text || !OpenClipboard(hWnd)) return;
+    EmptyClipboard();
+    size_t len = (wcslen(text) + 1) * sizeof(wchar_t);
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
+    if (hMem) {
+        memcpy(GlobalLock(hMem), text, len);
+        GlobalUnlock(hMem);
+        SetClipboardData(CF_UNICODETEXT, hMem);
+    }
+    CloseClipboard();
+}
+
 static RECT rcHamburger;
 static RECT rcSearchBox;
 static RECT rcShuffle, rcPrev, rcPlay, rcNext, rcRepeat;
@@ -219,7 +265,117 @@ static void PlayTrack(int index) {
     g_selectedTrack = index;
     LoadTrackThumbnail(item->filePath);
     Player_OpenFile(item->filePath);
+    if (Jam_IsActive() && !g_isSyncingFromRemote && item->title[0] != 0) {
+        Jam_BroadcastPlay(item->title, 0);
+    }
     InvalidateRect(g_hWnd, NULL, FALSE);
+}
+
+static void HandleJamSyncMessage(const char *topic, const char *payload) {
+    (void)topic;
+    if (!Jam_IsActive() || !payload) return;
+
+    wchar_t myTag[32] = {0};
+    Friends_GetMyTag(myTag, 32);
+    char uMyTag[128] = {0};
+    WideCharToMultiByte(CP_UTF8, 0, myTag, -1, uMyTag, 127, NULL, NULL);
+
+    if (strncmp(payload, "SYNC_PLAY|", 10) == 0) {
+        char sender[64] = {0};
+        char track[128] = {0};
+        int pos = 0;
+        const char *p1 = payload + 10;
+        const char *p2 = strchr(p1, '|');
+        if (p2) {
+            int sLen = (int)(p2 - p1);
+            if (sLen > 63) sLen = 63;
+            strncpy(sender, p1, sLen);
+            if (strcmp(sender, uMyTag) == 0) return;
+
+            const char *p3 = strchr(p2 + 1, '|');
+            if (p3) {
+                int tLen = (int)(p3 - (p2 + 1));
+                if (tLen > 127) tLen = 127;
+                strncpy(track, p2 + 1, tLen);
+                pos = atoi(p3 + 1);
+            } else {
+                strncpy(track, p2 + 1, 127);
+            }
+
+            wchar_t wTrack[128] = {0};
+            MultiByteToWideChar(CP_UTF8, 0, track, -1, wTrack, 127);
+
+            BOOL isSame = FALSE;
+            if (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) {
+                if (_wcsicmp(Playlist_Get(g_currentTrack)->title, wTrack) == 0) {
+                    isSame = TRUE;
+                }
+            }
+
+            g_isSyncingFromRemote = TRUE;
+            if (isSame) {
+                int curPos = Player_GetPosition();
+                if (abs(curPos - pos) > 2) {
+                    Player_SetPosition(pos);
+                }
+                if (!Player_IsPlaying()) {
+                    Player_Play();
+                }
+            } else {
+                int found = -1;
+                for (int i = 0; i < Playlist_Count(); i++) {
+                    if (_wcsicmp(Playlist_Get(i)->title, wTrack) == 0 ||
+                        wcsstr(Playlist_Get(i)->title, wTrack) != NULL ||
+                        wcsstr(wTrack, Playlist_Get(i)->title) != NULL) {
+                        found = i;
+                        break;
+                    }
+                }
+                if (found >= 0) {
+                    PlayTrack(found);
+                    if (pos > 0) Player_SetPosition(pos);
+                }
+            }
+            g_isSyncingFromRemote = FALSE;
+        }
+    }
+    else if (strncmp(payload, "SYNC_PAUSE|", 11) == 0) {
+        char sender[64] = {0};
+        const char *p1 = payload + 11;
+        const char *p2 = strchr(p1, '|');
+        if (p2) {
+            int sLen = (int)(p2 - p1);
+            if (sLen > 63) sLen = 63;
+            strncpy(sender, p1, sLen);
+            if (strcmp(sender, uMyTag) == 0) return;
+            int pos = atoi(p2 + 1);
+            g_isSyncingFromRemote = TRUE;
+            if (Player_IsPlaying()) Player_Pause();
+            if (pos >= 0) Player_SetPosition(pos);
+            g_isSyncingFromRemote = FALSE;
+        }
+    }
+    else if (strncmp(payload, "SYNC_SEEK|", 10) == 0) {
+        char sender[64] = {0};
+        const char *p1 = payload + 10;
+        const char *p2 = strchr(p1, '|');
+        if (p2) {
+            int sLen = (int)(p2 - p1);
+            if (sLen > 63) sLen = 63;
+            strncpy(sender, p1, sLen);
+            if (strcmp(sender, uMyTag) == 0) return;
+            int pos = atoi(p2 + 1);
+            g_isSyncingFromRemote = TRUE;
+            if (pos >= 0) Player_SetPosition(pos);
+            g_isSyncingFromRemote = FALSE;
+        }
+    }
+    else if (strncmp(payload, "SYNC_LEAVE|", 11) == 0) {
+        const char *sender = payload + 11;
+        if (strcmp(sender, uMyTag) != 0) {
+            Jam_Leave();
+        }
+    }
 }
 
 static void SelectFolderDialog(void) {
@@ -528,7 +684,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
 
                 const wchar_t *dash = wcsstr(item->title, L" - ");
                 if (dash) {
-                    int artistLen = (int)(dash - item->title);
+                    int artistLen = (int)(dash - item->title[0] != 0);
                     wchar_t artistPart[256];
                     if (artistLen > 255) artistLen = 255;
                     wcsncpy(artistPart, item->title, artistLen);
@@ -674,6 +830,29 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             SetTextColor(hdc, COLOR_TEXT_MUTED);
             SetBkMode(hdc, TRANSPARENT);
             DrawTextW(hdc, L"🎵", -1, &rcThumbBox, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        }
+
+        // Jam Durum Hapı
+        if (Jam_IsActive()) {
+            wchar_t pName[64] = {0};
+            Jam_GetPartnerName(pName, 64);
+            wchar_t jamTxt[128];
+            wsprintfW(jamTxt, L"🟢 Jam: %s", pName[0] ? pName : L"Arkadaş");
+
+            rcJamPill = (RECT){ 68, btnY - 15, 215, btnY + 1 };
+            DrawRoundedCard(hdc, &rcJamPill, RGB(20, 32, 24), COLOR_ACCENT, 4);
+
+            RECT rcJamTxt = { rcJamPill.left + 8, rcJamPill.top, rcJamPill.right - 44, rcJamPill.bottom };
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_ACCENT);
+            SetBkMode(hdc, TRANSPARENT);
+            DrawTextW(hdc, jamTxt, -1, &rcJamTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+            rcJamLeave = (RECT){ rcJamPill.right - 42, rcJamPill.top + 1, rcJamPill.right - 4, rcJamPill.bottom - 1 };
+            SetTextColor(hdc, RGB(255, 120, 120));
+            DrawTextW(hdc, L"Ayrıl", -1, &rcJamLeave, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        } else {
+            rcJamPill = (RECT){0};
         }
 
         const wchar_t *dash = wcsstr(cur->title, L" - ");
@@ -828,7 +1007,7 @@ DrawAACircle(hdc, thumbX, thumbY, thumbRadius, COLOR_TEXT_WHITE);
     SetTextColor(hdc, COLOR_TEXT_MUTED);
     DrawTextW(hdc, volTxt, -1, &rcVolTxt, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-    // 4. HAMBURGER YAN PANEL
+    // 4. HAMBURGER YAN PANEL (Sol Bölüm - Menü & Arkadaşlar)
     if (g_sidebarOpen) {
         RECT rcSide = { 0, 60, SIDEBAR_WIDTH, h };
         HBRUSH hBrSide = CreateSolidBrush(COLOR_SIDEBAR);
@@ -842,27 +1021,243 @@ DrawAACircle(hdc, thumbX, thumbY, thumbRadius, COLOR_TEXT_WHITE);
         SelectObject(hdc, oldPen);
         DeleteObject(hPenSide);
 
-        const wchar_t *menuItems[] = {
-            L"📁  Klasör Seç",
-            L"📥  M3U İçe Aktar",
-            L"📤  M3U Dışa Aktar",
-            L"🔍  Müzik Ara & İndir (MYT)",
-            L"🧹  Listeyi Temizle",
-            L"🔄  Güncellemeleri Denetle"
-        };
-        int menuCount = 6;
+        if (g_sidebarView == SIDEBAR_VIEW_MENU) {
+            const wchar_t *menuItems[] = {
+                L"📁  Klasör Seç",
+                L"📥  M3U İçe Aktar",
+                L"📤  M3U Dışa Aktar",
+                L"🔍  Müzik Ara & İndir (MYT)",
+                L"👥  Arkadaşlar & Jam",
+                L"🧹  Listeyi Temizle",
+                L"🔄  Güncellemeleri Denetle"
+            };
+            int menuCount = 7;
 
-        for (int m = 0; m < menuCount; m++) {
-            RECT rcMenu = { 10, 75 + m * 48, SIDEBAR_WIDTH - 10, 75 + m * 48 + 40 };
-            COLORREF mBg = (m == g_sidebarHoverItem) ? COLOR_CARD_HOVER : COLOR_SIDEBAR;
-            DrawRoundedCard(hdc, &rcMenu, mBg, (m == g_sidebarHoverItem) ? COLOR_BORDER : COLOR_SIDEBAR, 6);
+            for (int m = 0; m < menuCount; m++) {
+                RECT rcMenu = { 10, 75 + m * 48, SIDEBAR_WIDTH - 10, 75 + m * 48 + 40 };
+                COLORREF mBg = (m == g_sidebarHoverItem) ? COLOR_CARD_HOVER : COLOR_SIDEBAR;
+                DrawRoundedCard(hdc, &rcMenu, mBg, (m == g_sidebarHoverItem) ? COLOR_BORDER : COLOR_SIDEBAR, 6);
 
-            SetBkColor(hdc, mBg);
-            SelectObject(hdc, g_hFontMain);
-            SetTextColor(hdc, (m == 3) ? COLOR_ACCENT : COLOR_TEXT_WHITE);
-            RECT rcText = { rcMenu.left + 14, rcMenu.top, rcMenu.right, rcMenu.bottom };
-            DrawTextW(hdc, menuItems[m], -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                SetBkColor(hdc, mBg);
+                SelectObject(hdc, g_hFontMain);
+                SetTextColor(hdc, (m == 3 || m == 4) ? COLOR_ACCENT : COLOR_TEXT_WHITE);
+                RECT rcText = { rcMenu.left + 14, rcMenu.top, rcMenu.right - 35, rcMenu.bottom };
+                DrawTextW(hdc, menuItems[m], -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+                // Gelen istek rozeti
+                if (m == 4 && Friends_GetPendingCount() > 0) {
+                    wchar_t bTxt[16];
+                    wsprintfW(bTxt, L"%d", Friends_GetPendingCount());
+                    RECT rcBadge = { rcMenu.right - 30, rcMenu.top + 11, rcMenu.right - 10, rcMenu.bottom - 11 };
+                    DrawRoundedCard(hdc, &rcBadge, COLOR_ACCENT, COLOR_ACCENT, 8);
+                    SetBkMode(hdc, TRANSPARENT);
+                    SelectObject(hdc, g_hFontSmall);
+                    SetTextColor(hdc, COLOR_BG);
+                    DrawTextW(hdc, bTxt, -1, &rcBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                }
+            }
         }
+        else if (g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
+            // Header: Geri Butonu ve Başlık
+            rcFriendsBack = (RECT){ 10, 68, 70, 96 };
+            DrawRoundedCard(hdc, &rcFriendsBack, COLOR_CARD, COLOR_BORDER, 6);
+            SetBkMode(hdc, TRANSPARENT);
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, L"◀ Geri", -1, &rcFriendsBack, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            RECT rcFTitle = { 76, 68, SIDEBAR_WIDTH - 10, 96 };
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, L"Arkadaşlar & Jam", -1, &rcFTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+            // Profil Kartı
+            wchar_t myTag[32] = {0};
+            Friends_GetMyTag(myTag, 32);
+
+            RECT rcProfile = { 10, 104, SIDEBAR_WIDTH - 10, 144 };
+            DrawRoundedCard(hdc, &rcProfile, RGB(28, 28, 32), COLOR_BORDER, 6);
+
+            DrawAACircle(hdc, rcProfile.left + 14, 124, 4, Network_IsConnected() ? COLOR_ACCENT : COLOR_TEXT_MUTED);
+
+            RECT rcTagText = { rcProfile.left + 24, 106, rcProfile.right - 64, 142 };
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, myTag, -1, &rcTagText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+            rcCopyTag = (RECT){ rcProfile.right - 62, 112, rcProfile.right - 6, 136 };
+            DrawRoundedCard(hdc, &rcCopyTag, COLOR_CARD, COLOR_BORDER, 4);
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_ACCENT);
+            BOOL copiedRecently = (g_copiedTagTick > 0 && GetTickCount() - g_copiedTagTick < 2000);
+            DrawTextW(hdc, copiedRecently ? L"Kopya!" : L"Kopyala", -1, &rcCopyTag, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            // 3 Sekme
+            int tabW = (SIDEBAR_WIDTH - 20) / 3;
+            rcFriendsTab0 = (RECT){ 10, 150, 10 + tabW, 178 };
+            rcFriendsTab1 = (RECT){ 10 + tabW, 150, 10 + tabW * 2, 178 };
+            rcFriendsTab2 = (RECT){ 10 + tabW * 2, 150, SIDEBAR_WIDTH - 10, 178 };
+
+            DrawRoundedCard(hdc, &rcFriendsTab0, (g_friendsTab == FRIENDS_TAB_LIST) ? COLOR_CARD_HOVER : COLOR_SIDEBAR, (g_friendsTab == FRIENDS_TAB_LIST) ? COLOR_ACCENT : COLOR_BORDER, 4);
+            DrawRoundedCard(hdc, &rcFriendsTab1, (g_friendsTab == FRIENDS_TAB_REQUESTS) ? COLOR_CARD_HOVER : COLOR_SIDEBAR, (g_friendsTab == FRIENDS_TAB_REQUESTS) ? COLOR_ACCENT : COLOR_BORDER, 4);
+            DrawRoundedCard(hdc, &rcFriendsTab2, (g_friendsTab == FRIENDS_TAB_ADD) ? COLOR_CARD_HOVER : COLOR_SIDEBAR, (g_friendsTab == FRIENDS_TAB_ADD) ? COLOR_ACCENT : COLOR_BORDER, 4);
+
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_LIST) ? COLOR_ACCENT : COLOR_TEXT_MUTED);
+            wchar_t t0Buf[32];
+            wsprintfW(t0Buf, L"Liste (%d)", Friends_GetFriendCount());
+            DrawTextW(hdc, t0Buf, -1, &rcFriendsTab0, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_REQUESTS) ? COLOR_ACCENT : (Friends_GetPendingCount() > 0 ? COLOR_ACCENT : COLOR_TEXT_MUTED));
+            wchar_t t1Buf[32];
+            wsprintfW(t1Buf, L"İstek (%d)", Friends_GetPendingCount());
+            DrawTextW(hdc, t1Buf, -1, &rcFriendsTab1, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_ADD) ? COLOR_ACCENT : COLOR_TEXT_MUTED);
+            DrawTextW(hdc, L"+ Ekle", -1, &rcFriendsTab2, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            // Sekme İçerikleri
+            if (g_friendsTab == FRIENDS_TAB_LIST) {
+                int fCount = Friends_GetFriendCount();
+                if (fCount == 0) {
+                    RECT rcEmpty = { 15, 220, SIDEBAR_WIDTH - 15, 340 };
+                    SelectObject(hdc, g_hFontSmall);
+                    SetTextColor(hdc, COLOR_TEXT_MUTED);
+                    DrawTextW(hdc, L"Henüz arkadaşınız yok.\n\n'+ Ekle' sekmesinden\narkadaşınızın etiketini yazarak\nistek gönderebilirsiniz.", -1, &rcEmpty, DT_CENTER | DT_WORDBREAK);
+                } else {
+                    for (int i = 0; i < fCount; i++) {
+                        const FriendItem *fi = Friends_GetFriend(i);
+                        if (!fi) continue;
+
+                        int itemY = 186 + i * 50;
+                        RECT rcCard = { 10, itemY, SIDEBAR_WIDTH - 10, itemY + 44 };
+                        DrawRoundedCard(hdc, &rcCard, COLOR_CARD, COLOR_BORDER, 6);
+
+                        DrawAACircle(hdc, rcCard.left + 12, itemY + 22, 4, fi->isOnline ? COLOR_ACCENT : COLOR_TEXT_MUTED);
+
+                        RECT rcName = { rcCard.left + 22, itemY + 4, rcCard.right - 64, itemY + 24 };
+                        SelectObject(hdc, g_hFontBold);
+                        SetTextColor(hdc, COLOR_TEXT_WHITE);
+                        DrawTextW(hdc, fi->name, -1, &rcName, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                        RECT rcStatus = { rcCard.left + 22, itemY + 22, rcCard.right - 64, itemY + 40 };
+                        SelectObject(hdc, g_hFontSmall);
+                        SetTextColor(hdc, fi->isOnline ? COLOR_TEXT_MUTED : COLOR_TEXT_DIM);
+                        DrawTextW(hdc, fi->currentTrack[0] ? fi->currentTrack : (fi->isOnline ? L"Boşta" : L"Çevrimdışı"), -1, &rcStatus, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                        rcFriendActionBtns[i] = (RECT){ rcCard.right - 60, itemY + 8, rcCard.right - 6, itemY + 36 };
+                        wchar_t partnerTag[32] = {0};
+                        Jam_GetPartnerTag(partnerTag, 32);
+                        BOOL isJammingWithThis = (Jam_IsActive() && _wcsicmp(partnerTag, fi->tag) == 0);
+
+                        if (isJammingWithThis) {
+                            DrawRoundedCard(hdc, &rcFriendActionBtns[i], RGB(45, 25, 25), RGB(180, 50, 50), 4);
+                            SetTextColor(hdc, RGB(255, 100, 100));
+                            DrawTextW(hdc, L"Ayrıl", -1, &rcFriendActionBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        } else if (fi->isOnline) {
+                            DrawRoundedCard(hdc, &rcFriendActionBtns[i], COLOR_CARD_HOVER, COLOR_ACCENT, 4);
+                            SetTextColor(hdc, COLOR_ACCENT);
+                            DrawTextW(hdc, L"🎧 Jam", -1, &rcFriendActionBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        }
+                    }
+                }
+            }
+            else if (g_friendsTab == FRIENDS_TAB_REQUESTS) {
+                int pCount = Friends_GetPendingCount();
+                if (pCount == 0) {
+                    RECT rcEmpty = { 15, 230, SIDEBAR_WIDTH - 15, 300 };
+                    SelectObject(hdc, g_hFontSmall);
+                    SetTextColor(hdc, COLOR_TEXT_MUTED);
+                    DrawTextW(hdc, L"Bekleyen arkadaşlık isteği yok.", -1, &rcEmpty, DT_CENTER | DT_SINGLELINE);
+                } else {
+                    for (int i = 0; i < pCount; i++) {
+                        const FriendRequest *rq = Friends_GetPending(i);
+                        if (!rq) continue;
+
+                        int itemY = 186 + i * 52;
+                        RECT rcCard = { 10, itemY, SIDEBAR_WIDTH - 10, itemY + 46 };
+                        DrawRoundedCard(hdc, &rcCard, COLOR_CARD, COLOR_BORDER, 6);
+
+                        RECT rcName = { rcCard.left + 10, itemY + 4, rcCard.right - 70, itemY + 24 };
+                        SelectObject(hdc, g_hFontBold);
+                        SetTextColor(hdc, COLOR_TEXT_WHITE);
+                        DrawTextW(hdc, rq->name, -1, &rcName, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                        RECT rcTag = { rcCard.left + 10, itemY + 22, rcCard.right - 70, itemY + 42 };
+                        SelectObject(hdc, g_hFontSmall);
+                        SetTextColor(hdc, COLOR_TEXT_MUTED);
+                        DrawTextW(hdc, rq->tag, -1, &rcTag, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                        rcReqAcceptBtns[i] = (RECT){ rcCard.right - 64, itemY + 9, rcCard.right - 36, itemY + 37 };
+                        DrawRoundedCard(hdc, &rcReqAcceptBtns[i], COLOR_ACCENT, COLOR_ACCENT, 4);
+                        SelectObject(hdc, g_hFontBold);
+                        SetTextColor(hdc, RGB(0, 0, 0));
+                        DrawTextW(hdc, L"✓", -1, &rcReqAcceptBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                        rcReqRejectBtns[i] = (RECT){ rcCard.right - 32, itemY + 9, rcCard.right - 6, itemY + 37 };
+                        DrawRoundedCard(hdc, &rcReqRejectBtns[i], COLOR_CARD_HOVER, COLOR_BORDER, 4);
+                        SetTextColor(hdc, COLOR_TEXT_MUTED);
+                        DrawTextW(hdc, L"✕", -1, &rcReqRejectBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                    }
+                }
+            }
+            else if (g_friendsTab == FRIENDS_TAB_ADD) {
+                RECT rcLbl = { 14, 192, SIDEBAR_WIDTH - 14, 212 };
+                SelectObject(hdc, g_hFontBold);
+                SetTextColor(hdc, COLOR_TEXT_WHITE);
+                DrawTextW(hdc, L"Arkadaşının Etiketi:", -1, &rcLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+                RECT rcSub = { 14, 212, SIDEBAR_WIDTH - 14, 230 };
+                SelectObject(hdc, g_hFontSmall);
+                SetTextColor(hdc, COLOR_TEXT_MUTED);
+                DrawTextW(hdc, L"Örn: Selim#8421", -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+                rcFriendSendBtn = (RECT){ 12, 275, SIDEBAR_WIDTH - 12, 308 };
+                DrawRoundedCard(hdc, &rcFriendSendBtn, COLOR_ACCENT, COLOR_ACCENT, 6);
+                SelectObject(hdc, g_hFontBold);
+                SetTextColor(hdc, RGB(0, 0, 0));
+                DrawTextW(hdc, L"İstek Gönder", -1, &rcFriendSendBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                if (g_friendAddMsg[0]) {
+                    RECT rcMsg = { 14, 320, SIDEBAR_WIDTH - 14, 370 };
+                    SelectObject(hdc, g_hFontSmall);
+                    SetTextColor(hdc, wcsstr(g_friendAddMsg, L"gönderildi") ? COLOR_ACCENT : RGB(255, 120, 120));
+                    DrawTextW(hdc, g_friendAddMsg, -1, &rcMsg, DT_LEFT | DT_WORDBREAK);
+                }
+            }
+        }
+    }
+
+    // 5. CANLI JAM DAVETİ BİLDİRİMİ (TOAST)
+    if (Jam_HasPendingInvite()) {
+        wchar_t invName[64] = {0};
+        wchar_t invTag[32] = {0};
+        Jam_GetPendingInviteInfo(invName, invTag);
+
+        rcToastBox = (RECT){ centerX - 180, 12, centerX + 180, 56 };
+        DrawRoundedCard(hdc, &rcToastBox, RGB(28, 28, 34), COLOR_ACCENT, 8);
+
+        wchar_t toastMsg[128];
+        wsprintfW(toastMsg, L"🎧 %s seni Jam'e davet etti!", invName[0] ? invName : invTag);
+
+        RECT rcToastTxt = { rcToastBox.left + 14, rcToastBox.top, rcToastBox.right - 100, rcToastBox.bottom };
+        SelectObject(hdc, g_hFontBold);
+        SetTextColor(hdc, COLOR_TEXT_WHITE);
+        DrawTextW(hdc, toastMsg, -1, &rcToastTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+        rcToastAccept = (RECT){ rcToastBox.right - 92, rcToastBox.top + 8, rcToastBox.right - 42, rcToastBox.bottom - 8 };
+        DrawRoundedCard(hdc, &rcToastAccept, COLOR_ACCENT, COLOR_ACCENT, 4);
+        SelectObject(hdc, g_hFontBold);
+        SetTextColor(hdc, RGB(0, 0, 0));
+        DrawTextW(hdc, L"Katıl", -1, &rcToastAccept, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+        rcToastReject = (RECT){ rcToastBox.right - 36, rcToastBox.top + 8, rcToastBox.right - 10, rcToastBox.bottom - 8 };
+        DrawRoundedCard(hdc, &rcToastReject, COLOR_CARD, COLOR_BORDER, 4);
+        SelectObject(hdc, g_hFontSmall);
+        SetTextColor(hdc, COLOR_TEXT_MUTED);
+        DrawTextW(hdc, L"✕", -1, &rcToastReject, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    } else {
+        rcToastBox = (RECT){0};
     }
 }
 
@@ -922,6 +1317,40 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             Player_Init(hWnd);
             Playlist_Init();
 
+            Friends_Init();
+            Jam_Init();
+
+            wchar_t myInitTag[32] = {0};
+            Friends_GetMyTag(myInitTag, 32);
+            char myInitKey[64] = {0};
+            Network_TagToTopicKeyW(myInitTag, myInitKey, sizeof(myInitKey));
+
+            Network_Init(hWnd, myInitKey);
+
+            char myInboxTopic[256];
+            snprintf(myInboxTopic, sizeof(myInboxTopic), "seloplayer/u/%s", myInitKey);
+            Network_Subscribe(myInboxTopic);
+
+            for (int fi = 0; fi < Friends_GetFriendCount(); fi++) {
+                const FriendItem *fItem = Friends_GetFriend(fi);
+                if (fItem) {
+                    char fKey[64] = {0};
+                    Network_TagToTopicKeyW(fItem->tag, fKey, sizeof(fKey));
+                    char sTopic[256];
+                    snprintf(sTopic, sizeof(sTopic), "seloplayer/status/%s", fKey);
+                    Network_Subscribe(sTopic);
+                }
+            }
+
+            g_hFriendAddEdit = CreateWindowExW(
+                0, L"EDIT", L"",
+                WS_CHILD | ES_AUTOHSCROLL,
+                0, 0, 0, 0,
+                hWnd, (HMENU)IDC_FRIEND_ADD_EDIT, GetModuleHandle(NULL), NULL
+            );
+            SendMessageW(g_hFriendAddEdit, WM_SETFONT, (WPARAM)g_hFontMain, TRUE);
+            SendMessageW(g_hFriendAddEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Etiket yazın (Örn: Selim#8421)");
+
             Config_Load(&g_cfg, L"config.json");
             Player_SetVolume(g_cfg.volume);
 
@@ -964,7 +1393,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_CTLCOLOREDIT: {
             HWND hCtrl = (HWND)lParam;
-            if (hCtrl == g_hSearchEdit) {
+            if (hCtrl == g_hSearchEdit || hCtrl == g_hFriendAddEdit) {
                 HDC hdcEdit = (HDC)wParam;
                 SetBkColor(hdcEdit, RGB(36, 36, 40));
                 SetTextColor(hdcEdit, COLOR_TEXT_WHITE);
@@ -1026,6 +1455,14 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     TrimProcessMemory();
                 }
 
+                static int s_friendsStatusCounter = 0;
+                if (++s_friendsStatusCounter >= 16) {
+                    s_friendsStatusCounter = 0;
+                    Friends_CheckTimeouts();
+                    const wchar_t *curTitle = (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) ? Playlist_Get(g_currentTrack)->title : L"";
+                    Friends_PublishMyStatus(Player_IsPlaying(), curTitle, Player_GetPosition());
+                }
+
                 if (Player_IsPlaying() || g_isDraggingSeek) {
                     RECT rcClient;
                     GetClientRect(hWnd, &rcClient);
@@ -1044,6 +1481,20 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 PlayTrack(nextIdx);
             } else {
                 Player_Stop();
+                InvalidateRect(hWnd, NULL, FALSE);
+            }
+            return 0;
+        }
+
+        case WM_APP_NETWORK_EVENT: {
+            NetEvent *evt = (NetEvent*)wParam;
+            if (evt) {
+                if (evt->type == NET_EVENT_MESSAGE) {
+                    Friends_HandleNetworkMessage(evt->topic, evt->payload);
+                    Jam_HandleNetworkMessage(evt->topic, evt->payload);
+                    HandleJamSyncMessage(evt->topic, evt->payload);
+                }
+                free(evt);
                 InvalidateRect(hWnd, NULL, FALSE);
             }
             return 0;
@@ -1304,39 +1755,178 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             POINT pt = { LOWORD(lParam), HIWORD(lParam) };
             SetCapture(hWnd);
 
+            // 0. Canlı Jam Toast tıklamaları
+            if (Jam_HasPendingInvite()) {
+                if (PtInRect(&rcToastAccept, pt)) {
+                    Jam_AcceptInvite();
+                    InvalidateRect(hWnd, NULL, FALSE);
+                    return 0;
+                }
+                if (PtInRect(&rcToastReject, pt)) {
+                    Jam_RejectInvite();
+                    InvalidateRect(hWnd, NULL, FALSE);
+                    return 0;
+                }
+            }
+
+            // 0.1 Jam Durum Ayrıl tıklaması
+            if (Jam_IsActive() && PtInRect(&rcJamLeave, pt)) {
+                Jam_Leave();
+                InvalidateRect(hWnd, NULL, FALSE);
+                return 0;
+            }
+
             // 1. Hamburger Aç / Kapa Butonu
             if (PtInRect(&rcHamburger, pt)) {
                 g_sidebarOpen = !g_sidebarOpen;
+                if (!g_sidebarOpen && g_hFriendAddEdit) {
+                    ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                }
                 InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
 
             // 2. Sidebar açıkken tıklama kontrolü
             if (g_sidebarOpen) {
-                if (pt.x < SIDEBAR_WIDTH && pt.y >= 75) {
-                    int item = (pt.y - 75) / 48;
-                    g_sidebarOpen = FALSE;
-                    InvalidateRect(hWnd, NULL, FALSE);
-
-                    if (item == 0) SelectFolderDialog();
-                    else if (item == 1) ImportM3UDialog();
-                    else if (item == 2) ExportM3UDialog();
-                    else if (item == 3) Search_ShowDialog(hWnd, g_cfg.lastFolder);
-                    else if (item == 4) {
-                        Playlist_Clear();
-                        Player_Stop();
-                        g_currentTrack = -1;
-                        g_selectedTrack = -1;
-                        ApplyFilter(L"");
+                if (g_sidebarView == SIDEBAR_VIEW_MENU) {
+                    if (pt.x < SIDEBAR_WIDTH && pt.y >= 75) {
+                        int item = (pt.y - 75) / 48;
+                        if (item == 0) { g_sidebarOpen = FALSE; SelectFolderDialog(); }
+                        else if (item == 1) { g_sidebarOpen = FALSE; ImportM3UDialog(); }
+                        else if (item == 2) { g_sidebarOpen = FALSE; ExportM3UDialog(); }
+                        else if (item == 3) { g_sidebarOpen = FALSE; Search_ShowDialog(hWnd, g_cfg.lastFolder); }
+                        else if (item == 4) {
+                            g_sidebarView = SIDEBAR_VIEW_FRIENDS;
+                            InvalidateRect(hWnd, NULL, FALSE);
+                            return 0;
+                        }
+                        else if (item == 5) {
+                            g_sidebarOpen = FALSE;
+                            Playlist_Clear();
+                            Player_Stop();
+                            g_currentTrack = -1;
+                            g_selectedTrack = -1;
+                            ApplyFilter(L"");
+                        }
+                        else if (item == 6) {
+                            g_sidebarOpen = FALSE;
+                            Updater_CheckAsync(hWnd, TRUE);
+                        }
                         InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
+                    } else if (pt.x >= SIDEBAR_WIDTH) {
+                        g_sidebarOpen = FALSE;
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
                     }
-                    else if (item == 5) {
-                        Updater_CheckAsync(hWnd, TRUE);
+                }
+                else if (g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
+                    if (pt.x >= SIDEBAR_WIDTH) {
+                        g_sidebarOpen = FALSE;
+                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
                     }
-                    return 0;
-                } else if (pt.x >= SIDEBAR_WIDTH) {
-                    g_sidebarOpen = FALSE;
-                    InvalidateRect(hWnd, NULL, FALSE);
+
+                    // Geri butonu
+                    if (PtInRect(&rcFriendsBack, pt)) {
+                        g_sidebarView = SIDEBAR_VIEW_MENU;
+                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
+                    }
+
+                    // Kopyala butonu
+                    if (PtInRect(&rcCopyTag, pt)) {
+                        wchar_t myTag[32] = {0};
+                        Friends_GetMyTag(myTag, 32);
+                        CopyToClipboard(hWnd, myTag);
+                        g_copiedTagTick = GetTickCount();
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
+                    }
+
+                    // Sekmeler
+                    if (PtInRect(&rcFriendsTab0, pt)) {
+                        g_friendsTab = FRIENDS_TAB_LIST;
+                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
+                    }
+                    if (PtInRect(&rcFriendsTab1, pt)) {
+                        g_friendsTab = FRIENDS_TAB_REQUESTS;
+                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
+                    }
+                    if (PtInRect(&rcFriendsTab2, pt)) {
+                        g_friendsTab = FRIENDS_TAB_ADD;
+                        if (g_hFriendAddEdit) {
+                            MoveWindow(g_hFriendAddEdit, 14, 238, SIDEBAR_WIDTH - 28, 28, TRUE);
+                            ShowWindow(g_hFriendAddEdit, SW_SHOW);
+                            SetFocus(g_hFriendAddEdit);
+                        }
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
+                    }
+
+                    // Liste içi butonlar
+                    if (g_friendsTab == FRIENDS_TAB_LIST) {
+                        for (int fi = 0; fi < Friends_GetFriendCount(); fi++) {
+                            if (PtInRect(&rcFriendActionBtns[fi], pt)) {
+                                const FriendItem *fItem = Friends_GetFriend(fi);
+                                if (fItem) {
+                                    wchar_t partnerTag[32] = {0};
+                                    Jam_GetPartnerTag(partnerTag, 32);
+                                    if (Jam_IsActive() && _wcsicmp(partnerTag, fItem->tag) == 0) {
+                                        Jam_Leave();
+                                    } else if (fItem->isOnline) {
+                                        Jam_InviteFriend(fItem->tag, fItem->name);
+                                    }
+                                }
+                                InvalidateRect(hWnd, NULL, FALSE);
+                                return 0;
+                            }
+                        }
+                    }
+                    else if (g_friendsTab == FRIENDS_TAB_REQUESTS) {
+                        for (int pi = 0; pi < Friends_GetPendingCount(); pi++) {
+                            if (PtInRect(&rcReqAcceptBtns[pi], pt)) {
+                                const FriendRequest *rq = Friends_GetPending(pi);
+                                if (rq) Friends_AcceptRequest(rq->tag);
+                                InvalidateRect(hWnd, NULL, FALSE);
+                                return 0;
+                            }
+                            if (PtInRect(&rcReqRejectBtns[pi], pt)) {
+                                const FriendRequest *rq = Friends_GetPending(pi);
+                                if (rq) Friends_RejectRequest(rq->tag);
+                                InvalidateRect(hWnd, NULL, FALSE);
+                                return 0;
+                            }
+                        }
+                    }
+                    else if (g_friendsTab == FRIENDS_TAB_ADD) {
+                        if (PtInRect(&rcFriendSendBtn, pt)) {
+                            wchar_t inTag[64] = {0};
+                            GetWindowTextW(g_hFriendAddEdit, inTag, 63);
+                            while (inTag[0] == L' ') memmove(inTag, inTag + 1, (wcslen(inTag) + 1) * sizeof(wchar_t));
+                            int tlen = (int)wcslen(inTag);
+                            while (tlen > 0 && inTag[tlen - 1] == L' ') inTag[--tlen] = 0;
+
+                            if (tlen == 0) {
+                                wsprintfW(g_friendAddMsg, L"Lütfen bir etiket girin!");
+                            } else if (wcschr(inTag, L'#') == NULL) {
+                                wsprintfW(g_friendAddMsg, L"Etiket '#' içermeli (Örn: Selim#8421)");
+                            } else if (Friends_SendRequest(inTag)) {
+                                wsprintfW(g_friendAddMsg, L"İstek başarıyla gönderildi!");
+                                SetWindowTextW(g_hFriendAddEdit, L"");
+                            } else {
+                                wsprintfW(g_friendAddMsg, L"İstek gönderilemedi. Etiketi kontrol edin.");
+                            }
+                            InvalidateRect(hWnd, NULL, FALSE);
+                            return 0;
+                        }
+                    }
                     return 0;
                 }
             }
@@ -1380,9 +1970,11 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             if (PtInRect(&rcPlay, pt)) {
                 if (Player_IsPlaying()) {
                     Player_Pause();
+                    if (Jam_IsActive()) Jam_BroadcastPause(Player_GetPosition());
                 } else {
                     if (g_currentTrack >= 0) {
                         Player_Play();
+                        if (Jam_IsActive()) Jam_BroadcastPlay(Playlist_Get(g_currentTrack)->title, Player_GetPosition());
                     } else if (Playlist_Count() > 0) {
                         PlayTrack(g_selectedTrack >= 0 ? g_selectedTrack : 0);
                     }
@@ -1417,6 +2009,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     g_seekDragSec = (int)(ratio * duration);
                     g_isDraggingSeek = TRUE;
                     Player_SetPosition(g_seekDragSec);
+                    if (Jam_IsActive()) Jam_BroadcastSeek(g_seekDragSec);
 
                     RECT rcClient;
                     GetClientRect(hWnd, &rcClient);
@@ -1669,6 +2262,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 g_hAppIcon = NULL;
             }
 
+                        Jam_Leave();
+            Network_Close();
             PostQuitMessage(0);
             return 0;
         }

@@ -3,7 +3,7 @@
 
 #include <windows.h>
 
-#define APP_VERSION_STR L"1.0.5"
+#define APP_VERSION_STR L"1.0.6"
 
 // Pencereye gonderilecek bildirim mesaji
 #define WM_APP_UPDATE_CHECK_DONE (WM_APP + 301)
