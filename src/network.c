@@ -61,8 +61,9 @@ static BOOL RawConnect(SOCKET s, const char *clientId) {
     return FALSE;
 }
 
-static BOOL RawSubscribe(SOCKET s, const char *topic) {
+static BOOL RawSendSubscribe(SOCKET s, const char *topic) {
     int topLen = (int)strlen(topic);
+    if (topLen <= 0 || topLen > 200) return FALSE;
     unsigned char pkt[256];
     int idx = 0;
     pkt[idx++] = 0x82; // SUBSCRIBE
@@ -75,11 +76,7 @@ static BOOL RawSubscribe(SOCKET s, const char *topic) {
     idx += topLen;
     pkt[idx++] = 0x00; // QoS 0
 
-    if (SendAll(s, (char*)pkt, idx) <= 0) return FALSE;
-
-    unsigned char suback[5];
-    int r = recv(s, (char*)suback, 5, 0);
-    return (r == 5 && suback[0] == 0x90);
+    return (SendAll(s, (char*)pkt, idx) > 0);
 }
 
 static BOOL RawPublish(SOCKET s, const char *topic, const char *payload) {
@@ -190,7 +187,7 @@ static DWORD WINAPI NetworkThreadProc(LPVOID lpParam) {
 
         // Auto resubscribe to all active topics
         for (int i = 0; i < g_topicCount; i++) {
-            RawSubscribe(s, g_topics[i]);
+            RawSendSubscribe(s, g_topics[i]);
         }
         LeaveCriticalSection(&g_cs);
 
@@ -266,8 +263,17 @@ static DWORD WINAPI NetworkThreadProc(LPVOID lpParam) {
                             free(buf);
                         }
                     }
-                } else if ((header & 0xF0) == 0xD0) { // PINGRESP
-                    // PING reply received
+                } else if (remLen > 0) {
+                    // Drain payload of non-PUBLISH packets (e.g. SUBACK 0x90) so TCP framing stays aligned
+                    char drain[64];
+                    int left = remLen;
+                    while (left > 0) {
+                        int chunk = (left > (int)sizeof(drain)) ? (int)sizeof(drain) : left;
+                        int got = recv(s, drain, chunk, 0);
+                        if (got <= 0) { left = -1; break; }
+                        left -= got;
+                    }
+                    if (left < 0) break;
                 }
             }
         }
@@ -363,7 +369,7 @@ BOOL Network_Subscribe(const char *topic) {
 
     BOOL ok = FALSE;
     if (g_connected && g_socket != INVALID_SOCKET) {
-        ok = RawSubscribe(g_socket, safeTopic);
+        ok = RawSendSubscribe(g_socket, safeTopic);
     }
     LeaveCriticalSection(&g_cs);
 

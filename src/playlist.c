@@ -40,7 +40,85 @@ const PlaylistItem* Playlist_Get(int index) {
 
 static void CleanTrimW(wchar_t *str) {
     if (!str) return;
-    StrTrimW(str, L" -_\t");
+    StrTrimW(str, L" -_\t|\uFF5C");
+}
+
+static void NormalizeUnicodeTurkishW(wchar_t *str) {
+    if (!str) return;
+    int r = 0, w = 0;
+    while (str[r]) {
+        // Decomposed 'I' + combining dot above (U+0307) -> 'İ' (U+0130)
+        if (str[r] == L'I' && str[r + 1] == 0x0307) {
+            str[w++] = 0x0130;
+            r += 2;
+            continue;
+        }
+        // Decomposed 'i' + combining dot above (U+0307) -> 'i'
+        if (str[r] == L'i' && str[r + 1] == 0x0307) {
+            str[w++] = L'i';
+            r += 2;
+            continue;
+        }
+        // Fullwidth pipe / slash replacements from yt-dlp
+        if (str[r] == 0xFF5C) { // ｜ -> |
+            str[w++] = L'|';
+            r++;
+            continue;
+        }
+        if (str[r] == 0x29F8 || str[r] == 0xFF0F) { // ⧸ or ／ -> /
+            str[w++] = L'/';
+            r++;
+            continue;
+        }
+        str[w++] = str[r++];
+    }
+    str[w] = L'\0';
+}
+
+static wchar_t TurkishToUpperChar(wchar_t ch) {
+    if (ch == L'i') return 0x0130; // İ
+    if (ch == 0x0131) return L'I'; // ı -> I
+    wchar_t out = ch;
+    if (LCMapStringW(0x041F /* tr-TR */, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &ch, 1, &out, 1) > 0) {
+        return out;
+    }
+    CharUpperBuffW(&out, 1);
+    return out;
+}
+
+static wchar_t TurkishToLowerChar(wchar_t ch) {
+    if (ch == 0x0130) return L'i'; // İ -> i
+    if (ch == L'I') return 0x0131; // I -> ı
+    wchar_t out = ch;
+    if (LCMapStringW(0x041F /* tr-TR */, LCMAP_LOWERCASE | LCMAP_LINGUISTIC_CASING, &ch, 1, &out, 1) > 0) {
+        return out;
+    }
+    CharLowerBuffW(&out, 1);
+    return out;
+}
+
+static BOOL IsLetterW(wchar_t ch) {
+    WORD ctype = 0;
+    if (GetStringTypeW(CT_CTYPE1, &ch, 1, &ctype)) {
+        return (ctype & C1_ALPHA) != 0;
+    }
+    return iswalpha(ch) != 0;
+}
+
+static BOOL IsUpperLetterW(wchar_t ch) {
+    WORD ctype = 0;
+    if (GetStringTypeW(CT_CTYPE1, &ch, 1, &ctype)) {
+        return (ctype & C1_UPPER) != 0;
+    }
+    return iswupper(ch) != 0;
+}
+
+static BOOL IsLowerLetterW(wchar_t ch) {
+    WORD ctype = 0;
+    if (GetStringTypeW(CT_CTYPE1, &ch, 1, &ctype)) {
+        return (ctype & C1_LOWER) != 0;
+    }
+    return iswlower(ch) != 0;
 }
 
 static void StrCollapseSpacesW(wchar_t *str) {
@@ -54,8 +132,21 @@ static void StrCollapseSpacesW(wchar_t *str) {
                 inSpace = 1;
             }
         } else {
+            // Parantez içi kenar boşluklarını düzelt: "( ORJİNAL )" -> "(ORJİNAL)"
+            if ((str[r] == L')' || str[r] == L']') && w > 0 && str[w - 1] == L' ') {
+                w--;
+            }
             str[w++] = str[r];
-            inSpace = 0;
+            if (str[r] == L'(' || str[r] == L'[') {
+                inSpace = 1; // Açılış parantezinden hemen sonraki boşluğu yut
+            } else {
+                inSpace = 0;
+            }
+            // Kapanış parantezinden hemen sonra harf geliyorsa araya boşluk koy: ")Yüreğime" -> ") Yüreğime"
+            if ((str[r] == L')' || str[r] == L']') && str[r + 1] && IsLetterW(str[r + 1])) {
+                str[w++] = L' ';
+                inSpace = 1;
+            }
         }
         r++;
     }
@@ -72,6 +163,36 @@ static void RemoveSubstrW(wchar_t *str, const wchar_t *sub) {
     }
 }
 
+static BOOL LooksLikeYouTubeId(const wchar_t *s, int len, wchar_t openCh) {
+    // Biçim 1: (_6zej_upJhvE_) -> 13 karakter, başta ve sonda '_'
+    if (len == 13 && s[0] == L'_' && s[12] == L'_') {
+        for (int i = 1; i < 12; i++) {
+            wchar_t c = s[i];
+            if (!((c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z') ||
+                  (c >= L'0' && c <= L'9') || c == L'_' || c == L'-')) {
+                return FALSE;
+            }
+        }
+        return TRUE;
+    }
+    // Biçim 2: [6LM_mYcwTpM] veya [yeUQ9mjVp4k] -> tam 11 karakter ASCII YouTube ID
+    if (len == 11) {
+        int hasDigitOrSym = 0;
+        int hasUpper = 0, hasLower = 0;
+        for (int i = 0; i < 11; i++) {
+            wchar_t c = s[i];
+            if (c >= L'0' && c <= L'9') hasDigitOrSym = 1;
+            else if (c == L'_' || c == L'-') hasDigitOrSym = 1;
+            else if (c >= L'A' && c <= L'Z') hasUpper = 1;
+            else if (c >= L'a' && c <= L'z') hasLower = 1;
+            else return FALSE; // Türkçe/boşluk karakteri varsa YouTube ID değildir
+        }
+        if (openCh == L'[' && (hasDigitOrSym || (hasUpper && hasLower))) return TRUE;
+        if (hasDigitOrSym && hasUpper && hasLower) return TRUE;
+    }
+    return FALSE;
+}
+
 static void RemovePatternInBracketsW(wchar_t *str, wchar_t openCh, wchar_t closeCh, const wchar_t **keywords, int kwCount) {
     wchar_t *start = str;
     while (*start) {
@@ -81,30 +202,21 @@ static void RemovePatternInBracketsW(wchar_t *str, wchar_t openCh, wchar_t close
                 int len = (int)(end - start - 1);
                 int shouldRemove = 0;
 
-                // YouTube ID: (_oK1fFvwSDaM_) veya [6LM_mYcwTpM] (10-16 karakter)
-                if (len >= 10 && len <= 16) {
-                    int allIdChars = 1;
-                    for (int i = 1; i <= len; i++) {
-                        wchar_t c = start[i];
-                        if (!iswalnum(c) && c != L'_' && c != L'-') {
-                            allIdChars = 0;
-                            break;
-                        }
-                    }
-                    if (allIdChars) shouldRemove = 1;
+                if (LooksLikeYouTubeId(start + 1, len, openCh)) {
+                    shouldRemove = 1;
                 }
 
-                // Anahtar kelime kontrolü
-                if (!shouldRemove && keywords) {
+                // Anahtar kelime kontrolü (Sadece gerçek çöp etiketler; Cover/Remix/Akustik/Live korunur!)
+                if (!shouldRemove && keywords && len > 0 && len < 255) {
                     wchar_t inside[256];
-                    if (len < 255) {
-                        wcsncpy(inside, start + 1, len);
-                        inside[len] = L'\0';
-                        for (int k = 0; k < kwCount; k++) {
-                            if (StrStrIW(inside, keywords[k]) != NULL) {
-                                shouldRemove = 1;
-                                break;
-                            }
+                    for (int i = 0; i < len; i++) {
+                        inside[i] = TurkishToLowerChar(start[1 + i]);
+                    }
+                    inside[len] = L'\0';
+                    for (int k = 0; k < kwCount; k++) {
+                        if (wcsstr(inside, keywords[k]) != NULL) {
+                            shouldRemove = 1;
+                            break;
                         }
                     }
                 }
@@ -176,7 +288,8 @@ static void FixHyphenatedNameW(wchar_t *str, int maxLen) {
 
     if (tokenCount >= 4) {
         wchar_t threeWords[256];
-        wsprintfW(threeWords, L"%s %s %s", tokens[0], tokens[1], tokens[2]);
+        _snwprintf(threeWords, 255, L"%s %s %s", tokens[0], tokens[1], tokens[2]);
+        threeWords[255] = L'\0';
         for (int i = 0; i < threeWordCount; i++) {
             if (_wcsicmp(threeWords, threeWordArtists[i]) == 0) {
                 artistTokens = 3;
@@ -222,7 +335,18 @@ void Playlist_CleanTitle(const wchar_t *path, wchar_t *outTitle, int maxLen) {
     wchar_t buf[512];
     wcsncpy(buf, fileName, 511);
     buf[511] = L'\0';
-    PathRemoveExtensionW(buf);
+
+    // Sadece gerçek ses/video uzantısı ise uzantıyı sil (örn: "ÜZÜLECEKSİN 2.0" bozulmasın!)
+    const wchar_t *ext = PathFindExtensionW(buf);
+    if (ext && (_wcsicmp(ext, L".mp3") == 0 || _wcsicmp(ext, L".m4a") == 0 ||
+                _wcsicmp(ext, L".wav") == 0 || _wcsicmp(ext, L".flac") == 0 ||
+                _wcsicmp(ext, L".ogg") == 0 || _wcsicmp(ext, L".wma") == 0 ||
+                _wcsicmp(ext, L".aac") == 0 || _wcsicmp(ext, L".opus") == 0 ||
+                _wcsicmp(ext, L".webm") == 0)) {
+        PathRemoveExtensionW(buf);
+    }
+
+    NormalizeUnicodeTurkishW(buf);
 
     // 1. İndirme sitesi öneklerini temizle
     static const wchar_t *prefixes[] = {
@@ -240,17 +364,17 @@ void Playlist_CleanTitle(const wchar_t *path, wchar_t *outTitle, int maxLen) {
     // 2. Başlangıç temizliği
     CleanTrimW(buf);
 
-    // 3. Parantez içindeki gereksiz YouTube etiketlerini temizle
+    // 3. Parantez içindeki gereksiz YouTube/kalite etiketlerini temizle (Cover, Akustik, Remix, Live KORUNUR!)
     static const wchar_t *kw[] = {
-        L"official", L"video", L"audio", L"lyrics", L"klip", L"remix",
-        L"cover", L"akustik", L"live", L"edit", L"4k", L"remaster",
-        L"esen m", L"netd"
+        L"official", L"video", L"audio", L"lyrics", L"lyric", L"klip",
+        L"visualizer", L"4k", L"8k", L"1080p", L"720p",
+        L"orjinal", L"orijinal", L"esen m", L"netd", L"dokuz sekiz", L"poll production"
     };
     int kwCount = sizeof(kw) / sizeof(kw[0]);
     RemovePatternInBracketsW(buf, L'(', L')', kw, kwCount);
     RemovePatternInBracketsW(buf, L'[', L']', kw, kwCount);
 
-    // 4. Yalın etiketleri ve prod.@... kısımlarını temizle
+    // 4. Yalın etiketleri (#hashtag) ve prod.@... kısımlarını temizle
     wchar_t *pProd;
     while ((pProd = StrStrIW(buf, L"prod.@")) != NULL) {
         wchar_t *end = pProd + 6;
@@ -261,8 +385,14 @@ void Playlist_CleanTitle(const wchar_t *path, wchar_t *outTitle, int maxLen) {
     wchar_t *pHash;
     while ((pHash = wcschr(buf, L'#')) != NULL) {
         wchar_t *end = pHash + 1;
-        while (*end && *end != L' ' && *end != L'-') end++;
+        while (*end && *end != L' ') end++;
         wmemmove(pHash, end, wcslen(end) + 1);
+    }
+
+    // " | 8K", " | 4K", " | Official..." gibi dikey çizgi sonrası çöp bilgileri temizle
+    wchar_t *pPipe = wcschr(buf, L'|');
+    if (pPipe) {
+        *pPipe = L'\0';
     }
 
     // " _ isim" (örnek: " _ nursena yener") temizle
@@ -271,35 +401,45 @@ void Playlist_CleanTitle(const wchar_t *path, wchar_t *outTitle, int maxLen) {
         *pUploader = L'\0';
     }
 
-    // Yalın "Official Video", "Official Audio" temizle
+    // Yalın kanal/video eklerini temizle
     static const wchar_t *bareKw[] = {
         L"Official Music Video", L"Official Video", L"Official Audio",
-        L"Music Video", L"Video Klip", L"Lyric Video"
+        L"Official Lyric Video", L"Music Video", L"Video Klip", L"Lyric Video",
+        L"- Esen Müzik", L"- Netd Müzik", L"- Kalan Müzik"
     };
     for (int i = 0; i < (int)(sizeof(bareKw)/sizeof(bareKw[0])); i++) {
         RemoveSubstrW(buf, bareKw[i]);
     }
 
+    // Sonda tek başına kalan " Lyrics" ifadesini kaldır (ör: "Gökhan Türkmen - Taş Lyrics")
+    CleanTrimW(buf);
+    int bLen = (int)wcslen(buf);
+    if (bLen > 7 && _wcsicmp(buf + bLen - 7, L" Lyrics") == 0) {
+        buf[bLen - 7] = L'\0';
+    }
+
     // 5. Tire ile birleşik isimleri düzenle
     FixHyphenatedNameW(buf, 512);
 
-    // 6. Boşlukları ve tireleri normalize et
+    // 6. Boşlukları ve kenarları normalize et
     StrCollapseSpacesW(buf);
     CleanTrimW(buf);
 
-    // 7. Hepsi küçük harfse her kelimenin ilk harfini büyüt
+    // 7. Tamamı küçük harf olan dosya adlarında Türkçe duyarlı Baş Harf Büyütme (i -> İ, ş -> Ş, ç -> Ç)
     int lowerCount = 0, upperCount = 0;
     for (int i = 0; buf[i]; i++) {
-        if (iswlower(buf[i])) lowerCount++;
-        else if (iswupper(buf[i])) upperCount++;
+        if (IsUpperLetterW(buf[i])) upperCount++;
+        else if (IsLowerLetterW(buf[i])) lowerCount++;
     }
     if (upperCount == 0 && lowerCount > 0) {
         int newWord = 1;
         for (int i = 0; buf[i]; i++) {
-            if (iswspace(buf[i]) || buf[i] == L'-' || buf[i] == L'(') {
+            if (iswspace(buf[i]) || buf[i] == L'-' || buf[i] == L'(' || buf[i] == L'[') {
                 newWord = 1;
-            } else if (newWord && iswalpha(buf[i])) {
-                buf[i] = towupper(buf[i]);
+            } else if (newWord && IsLetterW(buf[i])) {
+                buf[i] = TurkishToUpperChar(buf[i]);
+                newWord = 0;
+            } else if (newWord && iswdigit(buf[i])) {
                 newWord = 0;
             }
         }
@@ -309,18 +449,19 @@ void Playlist_CleanTitle(const wchar_t *path, wchar_t *outTitle, int maxLen) {
     outTitle[maxLen - 1] = L'\0';
 }
 
-int Playlist_Add(const wchar_t *filePath) {
+static int Playlist_AddInternal(const wchar_t *filePath, BOOL checkDuplicate) {
     if (!filePath || !filePath[0]) return -1;
 
-    // Tekrar eklemeyi önlemek için kontrol et
-    for (int i = 0; i < g_count; i++) {
-        if (_wcsicmp(g_items[i].filePath, filePath) == 0) {
-            return i;
+    if (checkDuplicate) {
+        for (int i = 0; i < g_count; i++) {
+            if (_wcsicmp(g_items[i].filePath, filePath) == 0) {
+                return i;
+            }
         }
     }
 
     if (g_count >= g_capacity) {
-        int newCap = (g_capacity == 0) ? 64 : g_capacity * 2;
+        int newCap = (g_capacity == 0) ? 256 : g_capacity * 2;
         PlaylistItem *newItems = (PlaylistItem*)realloc(g_items, newCap * sizeof(PlaylistItem));
         if (!newItems) return -1;
         g_items = newItems;
@@ -335,10 +476,14 @@ int Playlist_Add(const wchar_t *filePath) {
     return idx;
 }
 
+int Playlist_Add(const wchar_t *filePath) {
+    return Playlist_AddInternal(filePath, TRUE);
+}
+
 void Playlist_Remove(int index) {
     if (index < 0 || index >= g_count) return;
-    for (int i = index; i < g_count - 1; i++) {
-        g_items[i] = g_items[i + 1];
+    if (index < g_count - 1) {
+        memmove(&g_items[index], &g_items[index + 1], (g_count - 1 - index) * sizeof(PlaylistItem));
     }
     g_count--;
 }
@@ -349,13 +494,9 @@ void Playlist_Move(int fromIndex, int toIndex) {
     }
     PlaylistItem temp = g_items[fromIndex];
     if (fromIndex < toIndex) {
-        for (int i = fromIndex; i < toIndex; i++) {
-            g_items[i] = g_items[i + 1];
-        }
+        memmove(&g_items[fromIndex], &g_items[fromIndex + 1], (toIndex - fromIndex) * sizeof(PlaylistItem));
     } else {
-        for (int i = fromIndex; i > toIndex; i--) {
-            g_items[i] = g_items[i - 1];
-        }
+        memmove(&g_items[toIndex + 1], &g_items[toIndex], (fromIndex - toIndex) * sizeof(PlaylistItem));
     }
     g_items[toIndex] = temp;
 }
@@ -366,7 +507,7 @@ void Playlist_Clear(void) {
 
 int Playlist_FindNext(int currentIndex, int shuffle, int repeat) {
     if (g_count <= 0) return -1;
-    if (repeat == 2) { // Tekrar Çal (Repeat One)
+    if (repeat == 2) { // Tek Şarkı Tekrarla (Repeat One)
         return currentIndex >= 0 ? currentIndex : 0;
     }
     if (shuffle && g_count > 1) {
@@ -378,11 +519,7 @@ int Playlist_FindNext(int currentIndex, int shuffle, int repeat) {
     }
     int next = currentIndex + 1;
     if (next >= g_count) {
-        if (repeat == 1) { // Tümünü Tekrarla
-            return 0;
-        } else {
-            return -1; // Bitti
-        }
+        return (repeat == 1) ? 0 : -1;
     }
     return next;
 }
@@ -413,13 +550,20 @@ int Playlist_ScanFolder(const wchar_t *folderPath) {
     if (!folderPath || !folderPath[0]) return 0;
 
     wchar_t searchPattern[MAX_PATH];
-    wsprintfW(searchPattern, L"%s\\*.*", folderPath);
+    _snwprintf(searchPattern, MAX_PATH - 1, L"%s\\*.*", folderPath);
+    searchPattern[MAX_PATH - 1] = L'\0';
 
     WIN32_FIND_DATAW fd;
-    HANDLE hFind = FindFirstFileW(searchPattern, &fd);
-    if (hFind == INVALID_HANDLE_VALUE) return 0;
+    HANDLE hFind = FindFirstFileExW(searchPattern, FindExInfoBasic, &fd, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        hFind = FindFirstFileW(searchPattern, &fd);
+        if (hFind == INVALID_HANDLE_VALUE) return 0;
+    }
 
+    // Liste boşsa O(N^2) tekrar kontrolüne gerek yok — anında O(N) yükle!
+    BOOL checkDup = (g_count > 0);
     int added = 0;
+
     do {
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
             continue;
@@ -427,8 +571,9 @@ int Playlist_ScanFolder(const wchar_t *folderPath) {
         const wchar_t *ext = PathFindExtensionW(fd.cFileName);
         if (IsAudioExtension(ext)) {
             wchar_t fullPath[MAX_PATH];
-            wsprintfW(fullPath, L"%s\\%s", folderPath, fd.cFileName);
-            if (Playlist_Add(fullPath) >= 0) {
+            _snwprintf(fullPath, MAX_PATH - 1, L"%s\\%s", folderPath, fd.cFileName);
+            fullPath[MAX_PATH - 1] = L'\0';
+            if (Playlist_AddInternal(fullPath, checkDup) >= 0) {
                 added++;
             }
         }
@@ -441,7 +586,7 @@ int Playlist_ScanFolder(const wchar_t *folderPath) {
 int Playlist_ImportM3U(const wchar_t *filePath) {
     FILE *f = _wfopen(filePath, L"rt, ccs=UTF-8");
     if (!f) {
-        f = _wfopen(filePath, L"r"); // ANSI fallback
+        f = _wfopen(filePath, L"r");
         if (!f) return 0;
     }
 
@@ -453,7 +598,6 @@ int Playlist_ImportM3U(const wchar_t *filePath) {
     wchar_t line[1024];
     int added = 0;
     while (fgetws(line, 1024, f)) {
-        // Trim newline and whitespace
         int len = (int)wcslen(line);
         while (len > 0 && (line[len - 1] == L'\r' || line[len - 1] == L'\n' || line[len - 1] == L' ')) {
             line[--len] = L'\0';
@@ -493,11 +637,11 @@ int Playlist_ExportM3U(const wchar_t *filePath) {
 
 int Playlist_FindByPrefix(wchar_t prefixChar, int startIndex) {
     if (g_count <= 0) return -1;
-    wchar_t lowerP = towlower(prefixChar);
+    wchar_t lowerP = TurkishToLowerChar(prefixChar);
 
     for (int step = 0; step < g_count; step++) {
         int idx = (startIndex + 1 + step) % g_count;
-        if (g_items[idx].title[0] && towlower(g_items[idx].title[0]) == lowerP) {
+        if (g_items[idx].title[0] && TurkishToLowerChar(g_items[idx].title[0]) == lowerP) {
             return idx;
         }
     }

@@ -1,5 +1,5 @@
 #include "updater.h"
-#include <urlmon.h>
+#include <winhttp.h>
 #include <shlwapi.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +23,131 @@ static int CompareVersions(const wchar_t *v1, const wchar_t *v2) {
     return pat1 - pat2;
 }
 
+static HINTERNET OpenHttpRequest(const wchar_t *url, HINTERNET *pSession, HINTERNET *pConnect) {
+    *pSession = NULL;
+    *pConnect = NULL;
+
+    URL_COMPONENTS uc;
+    memset(&uc, 0, sizeof(uc));
+    uc.dwStructSize = sizeof(uc);
+
+    wchar_t host[256] = {0};
+    wchar_t path[1024] = {0};
+    uc.lpszHostName = host;
+    uc.dwHostNameLength = 255;
+    uc.lpszUrlPath = path;
+    uc.dwUrlPathLength = 1023;
+
+    if (!WinHttpCrackUrl(url, 0, 0, &uc)) return NULL;
+
+    HINTERNET hSession = WinHttpOpen(L"SeloPlayer/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) return NULL;
+
+    WinHttpSetTimeouts(hSession, 4000, 4000, 5000, 8000);
+
+    HINTERNET hConnect = WinHttpConnect(hSession, host, uc.nPort, 0);
+    if (!hConnect) {
+        WinHttpCloseHandle(hSession);
+        return NULL;
+    }
+
+    DWORD flags = (uc.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", path, NULL,
+                                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+    if (!hRequest) {
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return NULL;
+    }
+
+    if (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+        !WinHttpReceiveResponse(hRequest, NULL)) {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return NULL;
+    }
+
+    DWORD statusCode = 0;
+    DWORD statusSize = sizeof(statusCode);
+    WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
+    if (statusCode != 200) {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return NULL;
+    }
+
+    *pSession = hSession;
+    *pConnect = hConnect;
+    return hRequest;
+}
+
+static BOOL HttpDownloadTextUtf8(const wchar_t *url, char *outBuf, DWORD maxBytes) {
+    HINTERNET hSession = NULL, hConnect = NULL;
+    HINTERNET hRequest = OpenHttpRequest(url, &hSession, &hConnect);
+    if (!hRequest) return FALSE;
+
+    DWORD total = 0;
+    DWORD avail = 0;
+    while (WinHttpQueryDataAvailable(hRequest, &avail) && avail > 0 && total + 1 < maxBytes) {
+        DWORD toRead = avail;
+        if (total + toRead >= maxBytes) toRead = maxBytes - 1 - total;
+        DWORD got = 0;
+        if (!WinHttpReadData(hRequest, outBuf + total, toRead, &got) || got == 0) break;
+        total += got;
+    }
+    outBuf[total] = '\0';
+
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+    return (total > 0);
+}
+
+static BOOL HttpDownloadToFile(const wchar_t *url, const wchar_t *destPath) {
+    HINTERNET hSession = NULL, hConnect = NULL;
+    HINTERNET hRequest = OpenHttpRequest(url, &hSession, &hConnect);
+    if (!hRequest) return FALSE;
+
+    HANDLE hFile = CreateFileW(destPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return FALSE;
+    }
+
+    BYTE chunk[16384];
+    DWORD avail = 0;
+    BOOL ok = TRUE;
+    while (WinHttpQueryDataAvailable(hRequest, &avail) && avail > 0) {
+        while (avail > 0) {
+            DWORD toRead = (avail > sizeof(chunk)) ? sizeof(chunk) : avail;
+            DWORD got = 0;
+            if (!WinHttpReadData(hRequest, chunk, toRead, &got) || got == 0) {
+                ok = FALSE;
+                break;
+            }
+            DWORD written = 0;
+            if (!WriteFile(hFile, chunk, got, &written, NULL) || written != got) {
+                ok = FALSE;
+                break;
+            }
+            avail -= got;
+        }
+        if (!ok) break;
+    }
+
+    CloseHandle(hFile);
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+    return ok;
+}
+
 static DWORD WINAPI CheckUpdateThread(LPVOID param) {
     CheckParam *cp = (CheckParam*)param;
     HWND hWnd = cp->hWnd;
@@ -33,65 +158,55 @@ static DWORD WINAPI CheckUpdateThread(LPVOID param) {
     if (!info) return 0;
     info->isManual = isManual;
 
-    // Cache-busting: Tarayici veya Windows onbellegi eski dosyayi vermesin diye zaman damgasi ekle
     wchar_t urlWithTimestamp[1200];
-    wsprintfW(urlWithTimestamp, L"%s?t=%lu", GITHUB_VERSION_URL, (unsigned long)GetTickCount());
+    _snwprintf(urlWithTimestamp, 1199, L"%s?t=%lu", GITHUB_VERSION_URL, (unsigned long)GetTickCount());
+    urlWithTimestamp[1199] = L'\0';
 
-    wchar_t tempPath[MAX_PATH];
-    wchar_t tempFile[MAX_PATH];
-    GetTempPathW(MAX_PATH, tempPath);
-    GetTempFileNameW(tempPath, L"spv", 0, tempFile);
+    char utf8Buf[4096];
+    if (HttpDownloadTextUtf8(urlWithTimestamp, utf8Buf, sizeof(utf8Buf))) {
+        const char *src = utf8Buf;
+        // UTF-8 BOM varsa atla
+        if ((unsigned char)src[0] == 0xEF && (unsigned char)src[1] == 0xBB && (unsigned char)src[2] == 0xBF) {
+            src += 3;
+        }
 
-    HRESULT hr = URLDownloadToFileW(NULL, urlWithTimestamp, tempFile, 0, NULL);
-    if (SUCCEEDED(hr)) {
-        FILE *f = _wfopen(tempFile, L"r, ccs=UTF-8");
-        if (!f) f = _wfopen(tempFile, L"r");
+        wchar_t wText[4096] = {0};
+        MultiByteToWideChar(CP_UTF8, 0, src, -1, wText, 4095);
 
-        if (f) {
-            wchar_t lineVer[128] = {0};
-            wchar_t lineUrl[1024] = {0};
+        wchar_t *ctx = NULL;
+        wchar_t *line1 = wcstok(wText, L"\r\n", &ctx);
+        if (line1) {
+            StrTrimW(line1, L" \t");
+            wcsncpy(info->newVersion, line1, 63);
 
-            if (fgetws(lineVer, sizeof(lineVer)/sizeof(wchar_t), f)) {
-                // Trim trailing newline & whitespace
-                wchar_t *p = lineVer + wcslen(lineVer) - 1;
-                while (p >= lineVer && (*p == L'\r' || *p == L'\n' || *p == L' ')) {
-                    *p = L'\0';
-                    p--;
-                }
-                wcsncpy(info->newVersion, lineVer, 63);
-
-                // Satir 2: Indirme linki (opsiyonel)
-                if (fgetws(lineUrl, sizeof(lineUrl)/sizeof(wchar_t), f)) {
-                    p = lineUrl + wcslen(lineUrl) - 1;
-                    while (p >= lineUrl && (*p == L'\r' || *p == L'\n' || *p == L' ')) {
-                        *p = L'\0';
-                        p--;
-                    }
-                    if (wcsncmp(lineUrl, L"http", 4) == 0) {
-                        wcsncpy(info->downloadUrl, lineUrl, 1023);
-                    }
-                }
-
-                // Satir 3+: Yenilik notlari
-                wchar_t noteBuf[256];
-                while (fgetws(noteBuf, sizeof(noteBuf)/sizeof(wchar_t), f)) {
-                    if (wcslen(info->changelog) + wcslen(noteBuf) < 1020) {
-                        wcscat(info->changelog, noteBuf);
-                    }
-                }
-
-                if (info->downloadUrl[0] == L'\0') {
-                    wcscpy(info->downloadUrl, DEFAULT_EXE_URL);
-                }
-
-                info->checkSuccess = TRUE;
-                if (CompareVersions(info->newVersion, APP_VERSION_STR) > 0) {
-                    info->hasUpdate = TRUE;
+            wchar_t *line2 = wcstok(NULL, L"\r\n", &ctx);
+            if (line2) {
+                StrTrimW(line2, L" \t");
+                if (wcsncmp(line2, L"http", 4) == 0) {
+                    wcsncpy(info->downloadUrl, line2, 1023);
+                } else {
+                    wcsncpy(info->changelog, line2, 1020);
+                    wcscat(info->changelog, L"\n");
                 }
             }
-            fclose(f);
+
+            wchar_t *noteLine;
+            while ((noteLine = wcstok(NULL, L"\r\n", &ctx)) != NULL) {
+                if (wcslen(info->changelog) + wcslen(noteLine) + 2 < 1020) {
+                    wcscat(info->changelog, noteLine);
+                    wcscat(info->changelog, L"\n");
+                }
+            }
+
+            if (info->downloadUrl[0] == L'\0') {
+                wcscpy(info->downloadUrl, DEFAULT_EXE_URL);
+            }
+
+            info->checkSuccess = TRUE;
+            if (CompareVersions(info->newVersion, APP_VERSION_STR) > 0) {
+                info->hasUpdate = TRUE;
+            }
         }
-        DeleteFileW(tempFile);
     }
 
     if (IsWindow(hWnd)) {
@@ -108,11 +223,13 @@ void Updater_Init(void) {
     PathRemoveFileSpecW(szCurrentExe);
 
     wchar_t szOldExe[MAX_PATH];
-    wsprintfW(szOldExe, L"%s\\SeloPlayer_old.tmp", szCurrentExe);
+    _snwprintf(szOldExe, MAX_PATH - 1, L"%s\\SeloPlayer_old.tmp", szCurrentExe);
+    szOldExe[MAX_PATH - 1] = L'\0';
     DeleteFileW(szOldExe);
 
     wchar_t szNewExe[MAX_PATH];
-    wsprintfW(szNewExe, L"%s\\SeloPlayer_new.tmp", szCurrentExe);
+    _snwprintf(szNewExe, MAX_PATH - 1, L"%s\\SeloPlayer_new.tmp", szCurrentExe);
+    szNewExe[MAX_PATH - 1] = L'\0';
     DeleteFileW(szNewExe);
 }
 
@@ -141,19 +258,20 @@ BOOL Updater_PerformUpdate(HWND hWnd, const wchar_t *downloadUrl) {
     PathRemoveFileSpecW(szDir);
 
     wchar_t szNewExe[MAX_PATH];
-    wsprintfW(szNewExe, L"%s\\SeloPlayer_new.tmp", szDir);
+    _snwprintf(szNewExe, MAX_PATH - 1, L"%s\\SeloPlayer_new.tmp", szDir);
+    szNewExe[MAX_PATH - 1] = L'\0';
 
     wchar_t szOldExe[MAX_PATH];
-    wsprintfW(szOldExe, L"%s\\SeloPlayer_old.tmp", szDir);
+    _snwprintf(szOldExe, MAX_PATH - 1, L"%s\\SeloPlayer_old.tmp", szDir);
+    szOldExe[MAX_PATH - 1] = L'\0';
 
     DeleteFileW(szNewExe);
 
-    // Cache-busting URL
     wchar_t urlWithTs[1200];
-    wsprintfW(urlWithTs, L"%s?t=%lu", downloadUrl, (unsigned long)GetTickCount());
+    _snwprintf(urlWithTs, 1199, L"%s?t=%lu", downloadUrl, (unsigned long)GetTickCount());
+    urlWithTs[1199] = L'\0';
 
-    HRESULT hr = URLDownloadToFileW(NULL, urlWithTs, szNewExe, 0, NULL);
-    if (FAILED(hr)) {
+    if (!HttpDownloadToFile(urlWithTs, szNewExe)) {
         MessageBoxW(hWnd, L"Güncelleme dosyası indirilemedi!\nLütfen internet bağlantınızı kontrol edin.", L"Güncelleme Hatası", MB_OK | MB_ICONERROR);
         DeleteFileW(szNewExe);
         return FALSE;
@@ -166,7 +284,6 @@ BOOL Updater_PerformUpdate(HWND hWnd, const wchar_t *downloadUrl) {
         return FALSE;
     }
 
-    // Windows'ta calisan .exe silinemez ama adi degistirilebilir (rename).
     DeleteFileW(szOldExe);
     if (!MoveFileExW(szCurrentExe, szOldExe, MOVEFILE_REPLACE_EXISTING)) {
         MessageBoxW(hWnd, L"Mevcut program dosyası taşınamadı. Yönetici izinlerini kontrol edin.", L"Güncelleme Hatası", MB_OK | MB_ICONERROR);
@@ -180,7 +297,6 @@ BOOL Updater_PerformUpdate(HWND hWnd, const wchar_t *downloadUrl) {
         return FALSE;
     }
 
-    // Yeni surumu ac ve mevcut sureci kapat
     HINSTANCE hInst = ShellExecuteW(NULL, L"open", szCurrentExe, NULL, szDir, SW_SHOWNORMAL);
     if ((INT_PTR)hInst > 32) {
         ExitProcess(0);

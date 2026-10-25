@@ -15,12 +15,26 @@ typedef struct {
 } PlayerCallback;
 
 static HWND g_hWndNotify = NULL;
+static HMODULE g_hMfPlayDll = NULL;
 static IMFPMediaPlayer *g_pPlayer = NULL;
+
+typedef HRESULT (STDAPICALLTYPE *PFN_MFPCreateMediaPlayer)(
+    LPCWSTR pwszURL,
+    BOOL fStartPlayback,
+    MFP_CREATION_OPTIONS creationOptions,
+    IMFPMediaPlayerCallback *pCallback,
+    HWND hWnd,
+    IMFPMediaPlayer **ppMediaPlayer
+);
+static PFN_MFPCreateMediaPlayer g_pfnMFPCreate = NULL;
 static PlayerCallback *g_pCallback = NULL;
-static int g_isPlaying = 0;
-static int g_isPaused = 0;
+static volatile LONG g_openGen = 0;
+static volatile LONG g_mediaReady = 0;
+static volatile LONG g_pendingSeekSec = -1;
+static volatile int g_isPlaying = 0;
+static volatile int g_isPaused = 0;
 static int g_volume = 80; // 0 - 100
-static int g_durationCache = 0;
+static volatile int g_durationCache = 0;
 
 static HRESULT STDMETHODCALLTYPE Cb_QueryInterface(IMFPMediaPlayerCallback *this, REFIID riid, void **ppv) {
     if (IsEqualGUID(riid, &MY_IID_IUnknown) || IsEqualGUID(riid, &MY_IID_IMFPMediaPlayerCallback)) {
@@ -47,20 +61,51 @@ static ULONG STDMETHODCALLTYPE Cb_Release(IMFPMediaPlayerCallback *this) {
 }
 
 static void STDMETHODCALLTYPE Cb_OnMediaPlayerEvent(IMFPMediaPlayerCallback *this, MFP_EVENT_HEADER *pEventHeader) {
+    (void)this;
     if (!pEventHeader) return;
-    if (pEventHeader->eEventType == MFP_EVENT_TYPE_MEDIAITEM_SET) {
-        if (g_pPlayer) {
+
+    if (pEventHeader->eEventType == MFP_EVENT_TYPE_MEDIAITEM_CREATED) {
+        MFP_MEDIAITEM_CREATED_EVENT *ev = MFP_GET_MEDIAITEM_CREATED_EVENT(pEventHeader);
+        if (ev && ev->pMediaItem && SUCCEEDED(pEventHeader->hrEvent)) {
+            if (ev->dwUserData == (DWORD_PTR)g_openGen && g_pPlayer) {
+                g_pPlayer->lpVtbl->SetMediaItem(g_pPlayer, ev->pMediaItem);
+            }
+        }
+    }
+    else if (pEventHeader->eEventType == MFP_EVENT_TYPE_MEDIAITEM_SET) {
+        if (g_pPlayer && SUCCEEDED(pEventHeader->hrEvent)) {
+            InterlockedExchange(&g_mediaReady, 1);
+            g_pPlayer->lpVtbl->SetVolume(g_pPlayer, (float)g_volume / 100.0f);
+
             PROPVARIANT var;
             PropVariantInit(&var);
             if (SUCCEEDED(g_pPlayer->lpVtbl->GetDuration(g_pPlayer, &MFP_POSITION_UNIT_100NS, &var))) {
                 g_durationCache = (int)(var.hVal.QuadPart / 10000000LL);
                 PropVariantClear(&var);
             }
+
+            LONG seekTarget = InterlockedExchange(&g_pendingSeekSec, -1);
+            if (seekTarget >= 0) {
+                if (g_durationCache > 0 && seekTarget > g_durationCache) {
+                    seekTarget = g_durationCache;
+                }
+                PROPVARIANT posVar;
+                PropVariantInit(&posVar);
+                posVar.vt = VT_I8;
+                posVar.hVal.QuadPart = (LONGLONG)seekTarget * 10000000LL;
+                g_pPlayer->lpVtbl->SetPosition(g_pPlayer, &MFP_POSITION_UNIT_100NS, &posVar);
+                PropVariantClear(&posVar);
+            }
+
+            if (g_isPlaying && !g_isPaused) {
+                g_pPlayer->lpVtbl->Play(g_pPlayer);
+            }
         }
         if (g_hWndNotify) {
             InvalidateRect(g_hWndNotify, NULL, FALSE);
         }
-    } else if (pEventHeader->eEventType == MFP_EVENT_TYPE_PLAYBACK_ENDED) {
+    }
+    else if (pEventHeader->eEventType == MFP_EVENT_TYPE_PLAYBACK_ENDED) {
         if (g_hWndNotify) {
             PostMessageW(g_hWndNotify, WM_APP_TRACK_ENDED, 0, 0);
         }
@@ -76,7 +121,7 @@ static IMFPMediaPlayerCallbackVtbl g_cbVtbl = {
 
 int Player_Init(HWND hWndNotify) {
     g_hWndNotify = hWndNotify;
-    
+
     g_pCallback = (PlayerCallback*)malloc(sizeof(PlayerCallback));
     if (!g_pCallback) return 0;
     g_pCallback->cb.lpVtbl = &g_cbVtbl;
@@ -86,44 +131,59 @@ int Player_Init(HWND hWndNotify) {
 }
 
 void Player_Shutdown(void) {
-    Player_Stop();
+    InterlockedIncrement(&g_openGen);
+    if (g_pPlayer) {
+        g_pPlayer->lpVtbl->Stop(g_pPlayer);
+        g_pPlayer->lpVtbl->Shutdown(g_pPlayer);
+        g_pPlayer->lpVtbl->Release(g_pPlayer);
+        g_pPlayer = NULL;
+    }
+    g_isPlaying = 0;
+    g_isPaused = 0;
+    InterlockedExchange(&g_mediaReady, 0);
+    g_durationCache = 0;
     if (g_pCallback) {
         g_pCallback->cb.lpVtbl->Release((IMFPMediaPlayerCallback*)g_pCallback);
         g_pCallback = NULL;
+    }
+    if (g_hMfPlayDll) {
+        FreeLibrary(g_hMfPlayDll);
+        g_hMfPlayDll = NULL;
+        g_pfnMFPCreate = NULL;
     }
 }
 
 int Player_OpenFile(const wchar_t *path) {
     if (!path || !path[0]) return 0;
 
-    if (g_pPlayer) {
-        g_pPlayer->lpVtbl->Shutdown(g_pPlayer);
-        g_pPlayer->lpVtbl->Release(g_pPlayer);
-        g_pPlayer = NULL;
+    // Motor henüz oluşturulmadıysa mfplay.dll'i ilk şarkı açılışında yükle (açılışta sıfır DLL/RAM yükü!)
+    if (!g_pPlayer) {
+        if (!g_pfnMFPCreate) {
+            g_hMfPlayDll = LoadLibraryW(L"mfplay.dll");
+            if (!g_hMfPlayDll) return 0;
+            g_pfnMFPCreate = (PFN_MFPCreateMediaPlayer)GetProcAddress(g_hMfPlayDll, "MFPCreateMediaPlayer");
+            if (!g_pfnMFPCreate) return 0;
+        }
+        HRESULT hr = g_pfnMFPCreate(NULL, FALSE, 0, (IMFPMediaPlayerCallback*)g_pCallback, NULL, &g_pPlayer);
+        if (FAILED(hr) || !g_pPlayer) {
+            g_pPlayer = NULL;
+            return 0;
+        }
+        g_pPlayer->lpVtbl->SetVolume(g_pPlayer, (float)g_volume / 100.0f);
     }
 
-    g_isPlaying = 0;
-    g_isPaused = 0;
+    LONG gen = InterlockedIncrement(&g_openGen);
+    InterlockedExchange(&g_mediaReady, 0);
+    InterlockedExchange(&g_pendingSeekSec, -1);
     g_durationCache = 0;
-
-    // TRUE ile doğrudan başlatma başlatılır, topology kurulunca MEDIAITEM_SET gelir
-    HRESULT hr = MFPCreateMediaPlayer(path, TRUE, 0, (IMFPMediaPlayerCallback*)g_pCallback, NULL, &g_pPlayer);
-    if (FAILED(hr) || !g_pPlayer) {
-        return 0;
-    }
-
     g_isPlaying = 1;
     g_isPaused = 0;
 
-    // Ses seviyesini ayarla
-    Player_SetVolume(g_volume);
-
-    // İlk deneme olarak süreyi al
-    PROPVARIANT var;
-    PropVariantInit(&var);
-    if (SUCCEEDED(g_pPlayer->lpVtbl->GetDuration(g_pPlayer, &MFP_POSITION_UNIT_100NS, &var))) {
-        g_durationCache = (int)(var.hVal.QuadPart / 10000000LL);
-        PropVariantClear(&var);
+    // Asenkron yükleme: Arayüzü (UI Thread) 0.0 ms bile dondurmaz!
+    HRESULT hr = g_pPlayer->lpVtbl->CreateMediaItemFromURL(g_pPlayer, path, FALSE, (DWORD_PTR)gen, NULL);
+    if (FAILED(hr)) {
+        g_isPlaying = 0;
+        return 0;
     }
 
     return 1;
@@ -131,30 +191,34 @@ int Player_OpenFile(const wchar_t *path) {
 
 void Player_Play(void) {
     if (!g_pPlayer) return;
-    HRESULT hr = g_pPlayer->lpVtbl->Play(g_pPlayer);
-    if (SUCCEEDED(hr)) {
-        g_isPlaying = 1;
-        g_isPaused = 0;
+    g_isPlaying = 1;
+    g_isPaused = 0;
+    if (g_mediaReady) {
+        g_pPlayer->lpVtbl->Play(g_pPlayer);
     }
 }
 
 void Player_Pause(void) {
     if (!g_pPlayer) return;
     if (g_isPlaying && !g_isPaused) {
-        g_pPlayer->lpVtbl->Pause(g_pPlayer);
+        if (g_mediaReady) {
+            g_pPlayer->lpVtbl->Pause(g_pPlayer);
+        }
         g_isPaused = 1;
     } else if (g_isPaused) {
-        g_pPlayer->lpVtbl->Play(g_pPlayer);
         g_isPaused = 0;
+        if (g_mediaReady) {
+            g_pPlayer->lpVtbl->Play(g_pPlayer);
+        }
     }
 }
 
 void Player_Stop(void) {
+    InterlockedIncrement(&g_openGen);
+    InterlockedExchange(&g_mediaReady, 0);
+    InterlockedExchange(&g_pendingSeekSec, -1);
     if (g_pPlayer) {
         g_pPlayer->lpVtbl->Stop(g_pPlayer);
-        g_pPlayer->lpVtbl->Shutdown(g_pPlayer);
-        g_pPlayer->lpVtbl->Release(g_pPlayer);
-        g_pPlayer = NULL;
     }
     g_isPlaying = 0;
     g_isPaused = 0;
@@ -170,7 +234,7 @@ int Player_IsPaused(void) {
 }
 
 int Player_GetDuration(void) {
-    if (!g_pPlayer) return 0;
+    if (!g_pPlayer || !g_mediaReady) return 0;
     if (g_durationCache > 0) return g_durationCache;
 
     PROPVARIANT var;
@@ -184,7 +248,10 @@ int Player_GetDuration(void) {
 }
 
 int Player_GetPosition(void) {
-    if (!g_pPlayer) return 0;
+    if (!g_pPlayer || !g_mediaReady) {
+        LONG pending = g_pendingSeekSec;
+        return (pending >= 0) ? (int)pending : 0;
+    }
     PROPVARIANT var;
     PropVariantInit(&var);
     int posSec = 0;
@@ -197,11 +264,15 @@ int Player_GetPosition(void) {
 
 void Player_SetPosition(int seconds) {
     if (!g_pPlayer || seconds < 0) return;
+    if (!g_mediaReady) {
+        InterlockedExchange(&g_pendingSeekSec, (LONG)seconds);
+        return;
+    }
     int dur = Player_GetDuration();
     if (dur > 0 && seconds > dur) seconds = dur;
     PROPVARIANT var;
     PropVariantInit(&var);
-    var.vt = VT_I8; // Media Foundation MFP_POSITION_UNIT_100NS için şarttır
+    var.vt = VT_I8;
     var.hVal.QuadPart = (LONGLONG)seconds * 10000000LL;
     g_pPlayer->lpVtbl->SetPosition(g_pPlayer, &MFP_POSITION_UNIT_100NS, &var);
     PropVariantClear(&var);

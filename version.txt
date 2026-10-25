@@ -1,6 +1,6 @@
-1.0.6
+1.0.7
 https://raw.githubusercontent.com/akcselim25/muzik-programi/main/SeloPlayer.exe
-- Arkadaslik sistemi eklendi: Kullanici etiketleri (#PIN), istek gonderme ve kabul etme.
-- Canli Jam (Birlikte Dinleme) modu eklendi: Tek tikla arkadasini davet et, ayni anda senkronize muzik dinle (Oynat/Durdur/Sarma).
-- Sol panele Arkadaslar, Gelen Istekler ve Arkadas Ekle sekmeleri entegre edildi.
-- Ultra hafif mimari: Saf C ve Winsock ile sifir harici sunucu ve minimum bellek kullanimi korundu.
+- Sarki ve sanatci isimlerindeki kirpilma hatasi ile Turkce/YouTube baslik temizligi tamamen duzeltildi.
+- Apple Design standardinda 60 FPS yay (spring) fizigiyle akici kaydirma, yan cekmece ve karartma katmani eklendi.
+- Sifir gecikmeli tiklama tepkisi, kenarliksiz sade tasarim, net kapak gorselleri (HALFTONE) ve anlik sessize alma eklendi.
+- Ses motoru tekil asenkron oturum mimarisine gecirildi: 0% bosta CPU, sifir arayuz donmasi ve ultra dusuk RAM kullanimi.

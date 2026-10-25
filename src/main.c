@@ -21,128 +21,61 @@
 #include "friends.h"
 #include "jam.h"
 
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "gdi32.lib")
-#pragma comment(lib, "comctl32.lib")
-#pragma comment(lib, "comdlg32.lib")
-#pragma comment(lib, "shell32.lib")
-#pragma comment(lib, "shlwapi.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "oleaut32.lib")
-#pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "mfplay.lib")
-
 #ifndef EM_SETCUEBANNER
 #define EM_SETCUEBANNER 0x1501
 #endif
 
-// Renk Paleti (Spotify Green & Apple Minimalist Dark Mode - Saf, Canlı & Asil Katmanlar)
-#define COLOR_BG          RGB(18, 18, 18)     // Spotify Pure Dark Base (#121212)
-#define COLOR_HEADER      RGB(24, 24, 24)     // Spotify Navigation/Control Bars (#181818)
-#define COLOR_CARD        RGB(28, 28, 32)     // Apple Elevated Item Card
-#define COLOR_CARD_HOVER  RGB(40, 40, 46)     // Apple Interactive Hover
-#define COLOR_CARD_SEL    RGB(26, 42, 32)     // Selected Item (Spotify Subtle Green Glow)
-#define COLOR_ACCENT      RGB(29, 185, 84)    // Spotify Iconic Green (#1DB954)
-#define COLOR_ACCENT_HOV  RGB(30, 215, 96)    // Spotify Vibrant Green (#1ED760)
-#define COLOR_ACCENT_DARK RGB(22, 156, 70)    // Spotify Pressed Green (#169C46)
-#define COLOR_TEXT_WHITE  RGB(255, 255, 255)  // Apple Crisp White
-#define COLOR_TEXT_MUTED  RGB(167, 167, 167)  // Apple/Spotify Muted Gray (#A7A7A7)
-#define COLOR_TEXT_DIM    RGB(110, 110, 115)  // Apple/Spotify Subtle Gray
-#define COLOR_BAR_BG      RGB(42, 42, 46)     // Apple Scrubber Track Background
-#define COLOR_SIDEBAR     RGB(20, 20, 22)     // Apple macOS Sidebar
-#define COLOR_BORDER      RGB(44, 44, 48)     // Apple Hairline Separator
+// Renk Paleti — Apple Dark Materials & Spotify Iconic Green
+#define COLOR_BG            RGB(16, 16, 18)     // Saf Koyu Tuval (#101012)
+#define COLOR_HEADER        RGB(22, 22, 25)     // Üst Bar Katmanı (#161619)
+#define COLOR_DOCK          RGB(20, 20, 23)     // Alt Oynatıcı Dock (#141417)
+#define COLOR_SIDEBAR       RGB(22, 22, 26)     // Yan Çekmece Katmanı (#16161A)
+#define COLOR_CARD          RGB(28, 28, 33)     // Yükseltilmiş Kart
+#define COLOR_ROW_HOVER     RGB(28, 28, 34)     // Şarkı Satırı Hover (Çerçevesiz Yumuşak Katman)
+#define COLOR_ROW_ACTIVE    RGB(20, 38, 27)     // Çalan Şarkı Satırı (Spotify Yeşil Işıltılı Yüzey)
+#define COLOR_ROW_SEL       RGB(26, 26, 32)     // Seçili Satır
+#define COLOR_CTRL_HOVER    RGB(36, 36, 42)     // İkon Buton Hover Hapı
+#define COLOR_CTRL_PRESS    RGB(46, 46, 54)     // İkon Buton Basılı Hapı
+#define COLOR_ACCENT        RGB(29, 185, 84)    // Spotify Yeşili (#1DB954)
+#define COLOR_ACCENT_HOV    RGB(30, 215, 96)    // Parlak Yeşil Hover (#1ED760)
+#define COLOR_ACCENT_DARK   RGB(21, 148, 66)    // Basılı Koyu Yeşil (#159442)
+#define COLOR_TEXT_WHITE    RGB(248, 248, 250)  // Apple Kırık Beyaz (Göz Yormayan Netlik)
+#define COLOR_TEXT_MUTED    RGB(160, 160, 168)  // İkincil Sanatçı/Bilgi Metni
+#define COLOR_TEXT_DIM      RGB(108, 108, 116)  // Üçüncül Numara/Zaman Metni
+#define COLOR_BAR_BG        RGB(46, 46, 52)     // İlerleme/Ses Çubuğu Arka Planı
+#define COLOR_BAR_HOVER     RGB(62, 62, 70)     // Çubuk Hover Arka Planı
+#define COLOR_BORDER        RGB(38, 38, 44)     // Apple İnce Ayırıcı Çizgi (Hairline)
+#define COLOR_SEARCH_PILL   RGB(32, 32, 37)     // Arama Kutusu İç Yüzeyi
 
-#define IDT_UPDATE_TIMER   1001
-#define IDC_HEADER_SEARCH  1010
-#define SIDEBAR_WIDTH      240
-
-static int g_dpi = 96;
-
-static inline int GetItemHeight(void) {
-    return MulDiv(58, g_dpi, 96);
-}
-
-static HWND g_hWnd = NULL;
-static HWND g_hSearchEdit = NULL;
-static WNDPROC g_oldSearchEditProc = NULL;
-static HBRUSH g_hBrSearchEdit = NULL;
-
-static HFONT g_hFontTitle = NULL;
-static HFONT g_hFontMain = NULL;
-static HFONT g_hFontBold = NULL;
-static HFONT g_hFontSmall = NULL;
-static HFONT g_hFontIcons = NULL;
-static HFONT g_hFontIconsLarge = NULL;
-
-static void InitDpiFonts(int dpi) {
-    if (dpi <= 0) dpi = 96;
-    g_dpi = dpi;
-
-    if (g_hFontTitle) DeleteObject(g_hFontTitle);
-    if (g_hFontBold) DeleteObject(g_hFontBold);
-    if (g_hFontMain) DeleteObject(g_hFontMain);
-    if (g_hFontSmall) DeleteObject(g_hFontSmall);
-
-    // Font boyutları: Gerçek fiziksel DPI bazlı (Bulanıklık sıfır)
-    int sTitle = -MulDiv(15, dpi, 72);
-    int sBold  = -MulDiv(11, dpi, 72);
-    int sMain  = -MulDiv(11, dpi, 72);
-    int sSmall = -MulDiv(9,  dpi, 72);
-
-    const wchar_t *fontFamily = L"Segoe UI";
-
-    g_hFontTitle = CreateFontW(sTitle, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
-    g_hFontBold  = CreateFontW(sBold,  0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
-    g_hFontMain  = CreateFontW(sMain,  0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
-    g_hFontSmall = CreateFontW(sSmall, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
-
-    if (g_hFontIcons) DeleteObject(g_hFontIcons);
-    if (g_hFontIconsLarge) DeleteObject(g_hFontIconsLarge);
-
-    int sIcon      = -MulDiv(14, dpi, 72);
-    int sIconLarge = -MulDiv(18, dpi, 72);
-
-    g_hFontIcons      = CreateFontW(sIcon,      0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
-    g_hFontIconsLarge = CreateFontW(sIconLarge, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe MDL2 Assets");
-}
-
-static IPicture *g_pMainThumb = NULL;
-static HICON g_hAppIcon = NULL;
-static AppConfig g_cfg;
-static int g_currentTrack = -1;
-static int g_selectedTrack = -1;
-static int g_hoverTrack = -1;
-static int g_scrollOffset = 0;
-
-static BOOL g_sidebarOpen = FALSE;
-static int  g_sidebarHoverItem = -1;
-
-static BOOL g_isDraggingSeek = FALSE;
-static int  g_seekDragSec = 0;
-static BOOL g_isDraggingVol = FALSE;
-
-// Sağdaki kaydırma çubuğu durumu
-static BOOL g_isDraggingScrollbar = FALSE;
-static int  g_scrollbarDragStartY = 0;
-static int  g_scrollbarDragStartOffset = 0;
-static BOOL g_scrollbarHover = FALSE;
-static RECT rcScrollbarTrack;
-static RECT rcScrollbarThumb;
-
-// Canlı Şarkı Arama / Filtreleme
-static int  g_filterIndices[8192];
-static int  g_filterCount = 0;
-static BOOL g_isFiltered = FALSE;
-static wchar_t g_searchQuery[128] = {0};
-
-// Liste içi sürükle-bırak (sıralama değiştirme)
-static int   g_dragFromIndex = -1;
-static int   g_dragTargetIndex = -1;
-static BOOL  g_isDraggingList = FALSE;
-static POINT g_mouseDownPt = {0};
-
-// Buton koordinat bölgeleri
+#define IDT_UPDATE_TIMER    1001
+#define IDT_ANIM_TIMER      1002
+#define IDC_HEADER_SEARCH   1010
 #define IDC_FRIEND_ADD_EDIT 1020
+
+// Etkileşim Bölgeleri (Anında Pointer-Down & Hover Tepkisi İçin)
+typedef enum {
+    ZONE_NONE = 0,
+    ZONE_HAMBURGER,
+    ZONE_QUICK_DOWNLOAD,
+    ZONE_SEARCH_CLEAR,
+    ZONE_SHUFFLE,
+    ZONE_PREV,
+    ZONE_PLAY,
+    ZONE_NEXT,
+    ZONE_REPEAT,
+    ZONE_SPEAKER,
+    ZONE_SEEK,
+    ZONE_VOL,
+    ZONE_JAM_LEAVE,
+    ZONE_TOAST_ACCEPT,
+    ZONE_TOAST_REJECT,
+    ZONE_FRIENDS_BACK,
+    ZONE_COPY_TAG,
+    ZONE_FTAB0,
+    ZONE_FTAB1,
+    ZONE_FTAB2,
+    ZONE_FRIEND_SEND
+} UiZone;
 
 typedef enum {
     SIDEBAR_VIEW_MENU = 0,
@@ -155,6 +88,87 @@ typedef enum {
     FRIENDS_TAB_ADD
 } FriendsTab;
 
+static int g_dpi = 96;
+static inline int S(int px) { return MulDiv(px, g_dpi, 96); }
+static inline int GetHeaderH(void)   { return S(58); }
+static inline int GetDockH(void)     { return S(96); }
+static inline int GetItemH(void)     { return S(54); }
+static inline int GetSidebarW(void)  { return S(256); }
+
+static HWND g_hWnd = NULL;
+static HWND g_hSearchEdit = NULL;
+static WNDPROC g_oldSearchEditProc = NULL;
+static HBRUSH g_hBrSearchEdit = NULL;
+
+static HFONT g_hFontTitle = NULL;
+static HFONT g_hFontMain = NULL;
+static HFONT g_hFontBold = NULL;
+static HFONT g_hFontSmall = NULL;
+static HFONT g_hFontSmallBold = NULL;
+static HFONT g_hFontIcons = NULL;
+static HFONT g_hFontIconsSmall = NULL;
+static HFONT g_hFontIconsLarge = NULL;
+
+// Kalıcı GDI Çift Tampon (Her WM_PAINT'te Bitmap oluşturup silme maliyetini sıfırlar!)
+static HDC     g_backDC = NULL;
+static HBITMAP g_backBmp = NULL;
+static HBITMAP g_backOldBmp = NULL;
+static int     g_backW = 0;
+static int     g_backH = 0;
+
+// Kalıcı 1x1 Karartma Katmanı (Sidebar Scrim AlphaBlend için sıfır tahsisat)
+static HDC     g_scrimDC = NULL;
+static HBITMAP g_scrimBmp = NULL;
+static HBITMAP g_scrimOldBmp = NULL;
+
+static IPicture *g_pMainThumb = NULL;
+static HICON g_hAppIcon = NULL;
+static AppConfig g_cfg;
+static int g_currentTrack = -1;
+static int g_selectedTrack = -1;
+static int g_hoverTrack = -1;
+static int g_preMuteVol = 80;
+
+// Apple Yay Fiziği (60 FPS Kesintiye Uğratılabilir Kaydırma & Çekmece Animasyonu; Durduğunda %0.0 CPU!)
+static float g_scrollPosPx = 0.0f;
+static float g_scrollTargetPx = 0.0f;
+static float g_scrollVelPx = 0.0f;
+
+static BOOL  g_sidebarOpen = FALSE;
+static float g_sidebarAnim = 0.0f;   // 0.0 = kapalı, 1.0 = açık
+static float g_sidebarVel = 0.0f;
+static int   g_sidebarHoverItem = -1;
+static BOOL  g_animTimerActive = FALSE;
+static DWORD g_lastAnimTick = 0;
+
+static UiZone g_hotZone = ZONE_NONE;
+static UiZone g_pressedZone = ZONE_NONE;
+
+static BOOL g_isDraggingSeek = FALSE;
+static int  g_seekDragSec = 0;
+static BOOL g_isDraggingVol = FALSE;
+
+// Kaydırma çubuğu durumu
+static BOOL g_isDraggingScrollbar = FALSE;
+static int  g_scrollbarDragGrabOffsetY = 0;
+static BOOL g_scrollbarHover = FALSE;
+static RECT rcScrollbarTrack;
+static RECT rcScrollbarThumb;
+
+// Canlı Şarkı Arama / Filtreleme
+static int  *g_filterIndices = NULL;
+static int   g_filterCap = 0;
+static int   g_filterCount = 0;
+static BOOL  g_isFiltered = FALSE;
+static wchar_t g_searchQuery[128] = {0};
+
+// Liste içi sürükle-bırak (sıralama değiştirme)
+static int   g_dragFromIndex = -1;
+static int   g_dragTargetIndex = -1;
+static BOOL  g_isDraggingList = FALSE;
+static POINT g_mouseDownPt = {0};
+
+// Arkadaşlar & Jam durumu
 static SidebarView g_sidebarView = SIDEBAR_VIEW_MENU;
 static FriendsTab  g_friendsTab  = FRIENDS_TAB_LIST;
 static HWND        g_hFriendAddEdit = NULL;
@@ -163,6 +177,10 @@ static wchar_t     g_friendAddMsg[128] = {0};
 static DWORD       g_copiedTagTick = 0;
 static BOOL        g_isSyncingFromRemote = FALSE;
 
+// Hit-test dikdörtgenleri
+static RECT rcHamburger, rcQuickDownload, rcSearchBox, rcSearchClear;
+static RECT rcShuffle, rcPrev, rcPlay, rcNext, rcRepeat;
+static RECT rcSeekBar, rcSeekHit, rcVolBar, rcVolHit, rcSpeaker;
 static RECT rcToastBox, rcToastAccept, rcToastReject;
 static RECT rcJamPill, rcJamLeave;
 static RECT rcFriendsBack, rcCopyTag;
@@ -172,42 +190,282 @@ static RECT rcFriendActionBtns[MAX_FRIENDS];
 static RECT rcReqAcceptBtns[MAX_REQUESTS];
 static RECT rcReqRejectBtns[MAX_REQUESTS];
 
+static int CALLBACK EnumFontCheckProc(const LOGFONTW *lpelfe, const TEXTMETRICW *lpntme, DWORD FontType, LPARAM lParam) {
+    (void)lpelfe; (void)lpntme; (void)FontType;
+    *(BOOL*)lParam = TRUE;
+    return 0;
+}
+
+static BOOL FontExists(const wchar_t *faceName) {
+    BOOL found = FALSE;
+    LOGFONTW lf = {0};
+    lf.lfCharSet = DEFAULT_CHARSET;
+    wcsncpy(lf.lfFaceName, faceName, LF_FACESIZE - 1);
+    HDC hdc = GetDC(NULL);
+    if (hdc) {
+        EnumFontFamiliesExW(hdc, &lf, (FONTENUMPROCW)EnumFontCheckProc, (LPARAM)&found, 0);
+        ReleaseDC(NULL, hdc);
+    }
+    return found;
+}
+
+static void InitDpiFonts(int dpi) {
+    if (dpi <= 0) dpi = 96;
+    g_dpi = dpi;
+
+    if (g_hFontTitle)      DeleteObject(g_hFontTitle);
+    if (g_hFontBold)       DeleteObject(g_hFontBold);
+    if (g_hFontMain)       DeleteObject(g_hFontMain);
+    if (g_hFontSmall)      DeleteObject(g_hFontSmall);
+    if (g_hFontSmallBold)  DeleteObject(g_hFontSmallBold);
+    if (g_hFontIcons)      DeleteObject(g_hFontIcons);
+    if (g_hFontIconsSmall) DeleteObject(g_hFontIconsSmall);
+    if (g_hFontIconsLarge) DeleteObject(g_hFontIconsLarge);
+
+    int sTitle     = -MulDiv(13, dpi, 72);
+    int sMain      = -MulDiv(10, dpi, 72);
+    int sSmall     = -MulDiv(9,  dpi, 72);
+    int sIconSmall = -MulDiv(10, dpi, 72);
+    int sIcon      = -MulDiv(13, dpi, 72);
+    int sIconLarge = -MulDiv(16, dpi, 72);
+
+    const wchar_t *uiFont   = FontExists(L"Segoe UI Variable Text") ? L"Segoe UI Variable Text" : L"Segoe UI";
+    const wchar_t *dispFont = FontExists(L"Segoe UI Variable Display") ? L"Segoe UI Variable Display" : uiFont;
+    const wchar_t *iconFont = FontExists(L"Segoe Fluent Icons") ? L"Segoe Fluent Icons" : L"Segoe MDL2 Assets";
+
+    g_hFontTitle      = CreateFontW(sTitle,     0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, dispFont);
+    g_hFontBold       = CreateFontW(sMain,      0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontMain       = CreateFontW(sMain,      0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontSmall      = CreateFontW(sSmall,     0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontSmallBold  = CreateFontW(sSmall,     0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontIconsSmall = CreateFontW(sIconSmall, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, iconFont);
+    g_hFontIcons      = CreateFontW(sIcon,      0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, iconFont);
+    g_hFontIconsLarge = CreateFontW(sIconLarge, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, iconFont);
+}
+
+static void EnsureBackbuffer(HDC refDC, int w, int h) {
+    if (w <= 0 || h <= 0) return;
+    if (g_backDC && g_backBmp && g_backW == w && g_backH == h) return;
+
+    if (g_backDC) {
+        if (g_backOldBmp) SelectObject(g_backDC, g_backOldBmp);
+        if (g_backBmp) DeleteObject(g_backBmp);
+        DeleteDC(g_backDC);
+    }
+    g_backDC = CreateCompatibleDC(refDC);
+    g_backBmp = CreateCompatibleBitmap(refDC, w, h);
+    g_backOldBmp = (HBITMAP)SelectObject(g_backDC, g_backBmp);
+    g_backW = w;
+    g_backH = h;
+
+    if (!g_scrimDC) {
+        BITMAPINFO bi = {0};
+        bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bi.bmiHeader.biWidth = 1;
+        bi.bmiHeader.biHeight = -1;
+        bi.bmiHeader.biPlanes = 1;
+        bi.bmiHeader.biBitCount = 32;
+        bi.bmiHeader.biCompression = BI_RGB;
+        RGBQUAD *px = NULL;
+        g_scrimDC = CreateCompatibleDC(refDC);
+        g_scrimBmp = CreateDIBSection(g_scrimDC, &bi, DIB_RGB_COLORS, (void**)&px, NULL, 0);
+        if (g_scrimBmp && px) {
+            px[0].rgbBlue = 0;
+            px[0].rgbGreen = 0;
+            px[0].rgbRed = 0;
+            px[0].rgbReserved = 255;
+            g_scrimOldBmp = (HBITMAP)SelectObject(g_scrimDC, g_scrimBmp);
+        }
+    }
+}
+
+static void FreeBackbuffer(void) {
+    if (g_backDC) {
+        if (g_backOldBmp) SelectObject(g_backDC, g_backOldBmp);
+        if (g_backBmp) DeleteObject(g_backBmp);
+        DeleteDC(g_backDC);
+        g_backDC = NULL; g_backBmp = NULL; g_backOldBmp = NULL;
+        g_backW = 0; g_backH = 0;
+    }
+    if (g_scrimDC) {
+        if (g_scrimOldBmp) SelectObject(g_scrimDC, g_scrimOldBmp);
+        if (g_scrimBmp) DeleteObject(g_scrimBmp);
+        DeleteDC(g_scrimDC);
+        g_scrimDC = NULL; g_scrimBmp = NULL; g_scrimOldBmp = NULL;
+    }
+}
+
+static inline void FillFastRect(HDC hdc, const RECT *rc, COLORREF color) {
+    COLORREF old = SetBkColor(hdc, color);
+    ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, rc, NULL, 0, NULL);
+    SetBkColor(hdc, old);
+}
+
+static inline void DrawFastRoundRect(HDC hdc, const RECT *rc, COLORREF bg, COLORREF border, int radius) {
+    HGDIOBJ oldBr = SelectObject(hdc, GetStockObject(DC_BRUSH));
+    HGDIOBJ oldPen = SelectObject(hdc, GetStockObject(DC_PEN));
+    SetDCBrushColor(hdc, bg);
+    SetDCPenColor(hdc, border);
+    RoundRect(hdc, rc->left, rc->top, rc->right, rc->bottom, radius, radius);
+    SelectObject(hdc, oldBr);
+    SelectObject(hdc, oldPen);
+}
+
+static inline void DrawFastLine(HDC hdc, int x1, int y1, int x2, int y2, COLORREF color) {
+    HGDIOBJ oldPen = SelectObject(hdc, GetStockObject(DC_PEN));
+    SetDCPenColor(hdc, color);
+    MoveToEx(hdc, x1, y1, NULL);
+    LineTo(hdc, x2, y2);
+    SelectObject(hdc, oldPen);
+}
+
+static void DrawAACircle(HDC hdc, int cx, int cy, int radius, COLORREF color) {
+    if (radius <= 0) return;
+    int diam = radius * 2 + 2;
+    BITMAPINFO bi = {0};
+    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth = diam;
+    bi.bmiHeader.biHeight = -diam;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+
+    RGBQUAD *pixels = NULL;
+    HDC memDC = CreateCompatibleDC(hdc);
+    HBITMAP hBitmap = CreateDIBSection(memDC, &bi, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
+    if (!hBitmap || !pixels) {
+        if (memDC) DeleteDC(memDC);
+        return;
+    }
+
+    HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, hBitmap);
+    BYTE r = GetRValue(color);
+    BYTE g = GetGValue(color);
+    BYTE b = GetBValue(color);
+
+    float center = (float)diam * 0.5f - 0.5f;
+    float fRad   = (float)radius;
+    float inR2   = (fRad - 0.7f) * (fRad - 0.7f);
+    float outR2  = (fRad + 0.7f) * (fRad + 0.7f);
+
+    for (int y = 0; y < diam; y++) {
+        float dy = (float)y - center;
+        float dy2 = dy * dy;
+        RGBQUAD *row = &pixels[y * diam];
+        for (int x = 0; x < diam; x++) {
+            float dx = (float)x - center;
+            float d2 = dx * dx + dy2;
+            if (d2 >= outR2) {
+                *(DWORD*)&row[x] = 0;
+            } else if (d2 <= inR2) {
+                row[x].rgbBlue     = b;
+                row[x].rgbGreen    = g;
+                row[x].rgbRed      = r;
+                row[x].rgbReserved = 255;
+            } else {
+                float dist = sqrtf(d2);
+                float alpha = (fRad + 0.7f - dist) * (1.0f / 1.4f);
+                if (alpha < 0.0f) alpha = 0.0f;
+                if (alpha > 1.0f) alpha = 1.0f;
+                row[x].rgbReserved = (BYTE)(alpha * 255.0f);
+                row[x].rgbRed      = (BYTE)(r * alpha);
+                row[x].rgbGreen    = (BYTE)(g * alpha);
+                row[x].rgbBlue     = (BYTE)(b * alpha);
+            }
+        }
+    }
+
+    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+    AlphaBlend(hdc, cx - diam / 2, cy - diam / 2, diam, diam, memDC, 0, 0, diam, diam, bf);
+
+    SelectObject(memDC, oldBmp);
+    DeleteObject(hBitmap);
+    DeleteDC(memDC);
+}
+
+static int GetMaxScrollPx(HWND hWnd) {
+    RECT rc;
+    GetClientRect(hWnd, &rc);
+    int listTop = GetHeaderH();
+    int listBottom = rc.bottom - GetDockH();
+    int viewH = listBottom - listTop;
+    if (viewH < 0) viewH = 0;
+    int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
+    int contentH = totalCount * GetItemH() + S(12);
+    int maxPx = contentH - viewH;
+    return (maxPx > 0) ? maxPx : 0;
+}
+
+static void ClampScrollTargets(HWND hWnd) {
+    float maxPx = (float)GetMaxScrollPx(hWnd);
+    if (g_scrollTargetPx < 0.0f) g_scrollTargetPx = 0.0f;
+    if (g_scrollTargetPx > maxPx) g_scrollTargetPx = maxPx;
+    if (g_scrollPosPx < 0.0f) g_scrollPosPx = 0.0f;
+    if (g_scrollPosPx > maxPx) g_scrollPosPx = maxPx;
+}
+
+static void UpdateSidebarEditPosition(void) {
+    if (!g_hFriendAddEdit) return;
+    BOOL shouldShow = (g_sidebarAnim > 0.02f && g_sidebarView == SIDEBAR_VIEW_FRIENDS && g_friendsTab == FRIENDS_TAB_ADD);
+    if (!shouldShow) {
+        if (IsWindowVisible(g_hFriendAddEdit)) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+        return;
+    }
+    int sbW = GetSidebarW();
+    int offX = (int)((g_sidebarAnim - 1.0f) * (float)sbW);
+    MoveWindow(g_hFriendAddEdit, offX + S(16), GetHeaderH() + S(182), sbW - S(32), S(24), TRUE);
+    if (!IsWindowVisible(g_hFriendAddEdit)) ShowWindow(g_hFriendAddEdit, SW_SHOW);
+}
+
+static void StartAnimLoop(HWND hWnd) {
+    if (!g_animTimerActive) {
+        g_lastAnimTick = GetTickCount();
+        SetTimer(hWnd, IDT_ANIM_TIMER, 15, NULL);
+        g_animTimerActive = TRUE;
+    }
+}
+
+// Apple Critically-Damped Spring Integrator (Kesintiye Uğratılabilir Fiziksel Hareket)
+static BOOL StepSpring(float *pos, float *vel, float target, float omega, float damping, float dt, float eps) {
+    float disp = *pos - target;
+    if (fabsf(disp) <= eps && fabsf(*vel) <= eps * 8.0f) {
+        *pos = target;
+        *vel = 0.0f;
+        return FALSE;
+    }
+    float accel = -omega * omega * disp - 2.0f * damping * omega * (*vel);
+    *vel += accel * dt;
+    *pos += (*vel) * dt;
+    if (fabsf(*pos - target) <= eps && fabsf(*vel) <= eps * 8.0f) {
+        *pos = target;
+        *vel = 0.0f;
+        return FALSE;
+    }
+    return TRUE;
+}
+
 static void CopyToClipboard(HWND hWnd, const wchar_t *text) {
     if (!text || !OpenClipboard(hWnd)) return;
     EmptyClipboard();
     size_t len = (wcslen(text) + 1) * sizeof(wchar_t);
     HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
     if (hMem) {
-        memcpy(GlobalLock(hMem), text, len);
-        GlobalUnlock(hMem);
-        SetClipboardData(CF_UNICODETEXT, hMem);
+        void *ptr = GlobalLock(hMem);
+        if (ptr) {
+            memcpy(ptr, text, len);
+            GlobalUnlock(hMem);
+            SetClipboardData(CF_UNICODETEXT, hMem);
+        }
     }
     CloseClipboard();
 }
 
-static RECT rcHamburger;
-static RECT rcSearchBox;
-static RECT rcShuffle, rcPrev, rcPlay, rcNext, rcRepeat;
-static RECT rcSeekBar, rcVolBar;
-
-static void TrimProcessMemory(void) {
-    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
-}
-
-static void InvalidateVolumeArea(HWND hWnd) {
-    RECT rcClient;
-    GetClientRect(hWnd, &rcClient);
-    int bottomBarH = MulDiv(60, g_dpi, 96);
-    int marginL = MulDiv(30, g_dpi, 96);
-    RECT rcVolArea = { rcVolBar.left - marginL, rcClient.bottom - bottomBarH, rcClient.right, rcClient.bottom };
-    InvalidateRect(hWnd, &rcVolArea, FALSE);
-}
-
-static void FormatTime(int totalSec, wchar_t *buf, int bufLen) {
+static void FormatTime(int totalSec, wchar_t *buf) {
     if (totalSec < 0) totalSec = 0;
     int m = totalSec / 60;
     int s = totalSec % 60;
-    wsprintfW(buf, L"%02d:%02d", m, s);
+    _snwprintf(buf, 15, L"%d:%02d", m, s);
+    buf[15] = L'\0';
 }
 
 static void ApplyFilter(const wchar_t *query) {
@@ -222,15 +480,54 @@ static void ApplyFilter(const wchar_t *query) {
         g_searchQuery[127] = L'\0';
 
         int total = Playlist_Count();
-        for (int i = 0; i < total && g_filterCount < 8192; i++) {
+        if (total > g_filterCap) {
+            int newCap = total + 256;
+            int *nb = (int*)realloc(g_filterIndices, newCap * sizeof(int));
+            if (nb) {
+                g_filterIndices = nb;
+                g_filterCap = newCap;
+            }
+        }
+        for (int i = 0; i < total && g_filterCount < g_filterCap; i++) {
             const PlaylistItem *item = Playlist_Get(i);
             if (item && StrStrIW(item->title, query)) {
                 g_filterIndices[g_filterCount++] = i;
             }
         }
     }
-    g_scrollOffset = 0;
-    InvalidateRect(g_hWnd, NULL, FALSE);
+    g_scrollPosPx = 0.0f;
+    g_scrollTargetPx = 0.0f;
+    g_scrollVelPx = 0.0f;
+    if (g_hWnd) InvalidateRect(g_hWnd, NULL, FALSE);
+}
+
+static void ScrollTrackIntoView(int trackIdx) {
+    if (!g_hWnd || trackIdx < 0) return;
+    int displayIdx = trackIdx;
+    if (g_isFiltered) {
+        displayIdx = -1;
+        for (int i = 0; i < g_filterCount; i++) {
+            if (g_filterIndices[i] == trackIdx) { displayIdx = i; break; }
+        }
+        if (displayIdx < 0) return;
+    }
+
+    RECT rc;
+    GetClientRect(g_hWnd, &rc);
+    int viewH = (rc.bottom - GetDockH()) - GetHeaderH();
+    int itemH = GetItemH();
+    float itemTop = (float)(displayIdx * itemH);
+    float itemBot = itemTop + (float)itemH;
+
+    if (itemTop < g_scrollTargetPx) {
+        g_scrollTargetPx = itemTop;
+        ClampScrollTargets(g_hWnd);
+        StartAnimLoop(g_hWnd);
+    } else if (itemBot > g_scrollTargetPx + (float)viewH - (float)S(8)) {
+        g_scrollTargetPx = itemBot - (float)viewH + (float)S(12);
+        ClampScrollTargets(g_hWnd);
+        StartAnimLoop(g_hWnd);
+    }
 }
 
 static void LoadTrackThumbnail(const wchar_t *filePath) {
@@ -245,10 +542,11 @@ static void LoadTrackThumbnail(const wchar_t *filePath) {
     base[MAX_PATH - 1] = L'\0';
     PathRemoveExtensionW(base);
 
-    static const wchar_t *exts[] = { L".jpg", L".jpeg", L".png", L".webp" };
-    for (int i = 0; i < 4; i++) {
+    static const wchar_t *exts[] = { L".jpg", L".jpeg", L".png" };
+    for (int i = 0; i < 3; i++) {
         wchar_t candidate[MAX_PATH];
-        wsprintfW(candidate, L"%s%s", base, exts[i]);
+        _snwprintf(candidate, MAX_PATH - 1, L"%s%s", base, exts[i]);
+        candidate[MAX_PATH - 1] = L'\0';
         if (GetFileAttributesW(candidate) != INVALID_FILE_ATTRIBUTES) {
             OleLoadPicturePath(candidate, NULL, 0, 0, &IID_IPicture, (void**)&g_pMainThumb);
             if (g_pMainThumb) break;
@@ -325,8 +623,8 @@ static void HandleJamSyncMessage(const char *topic, const char *payload) {
                 int found = -1;
                 for (int i = 0; i < Playlist_Count(); i++) {
                     if (_wcsicmp(Playlist_Get(i)->title, wTrack) == 0 ||
-                        wcsstr(Playlist_Get(i)->title, wTrack) != NULL ||
-                        wcsstr(wTrack, Playlist_Get(i)->title) != NULL) {
+                        StrStrIW(Playlist_Get(i)->title, wTrack) != NULL ||
+                        StrStrIW(wTrack, Playlist_Get(i)->title) != NULL) {
                         found = i;
                         break;
                     }
@@ -378,6 +676,14 @@ static void HandleJamSyncMessage(const char *topic, const char *payload) {
     }
 }
 
+static void ToggleSidebar(BOOL open) {
+    g_sidebarOpen = open;
+    if (!open && g_hFriendAddEdit) {
+        ShowWindow(g_hFriendAddEdit, SW_HIDE);
+    }
+    if (g_hWnd) StartAnimLoop(g_hWnd);
+}
+
 static void SelectFolderDialog(void) {
     BROWSEINFOW bi = {0};
     bi.hwndOwner = g_hWnd;
@@ -395,10 +701,10 @@ static void SelectFolderDialog(void) {
             Player_Stop();
             Playlist_Clear();
             Playlist_ScanFolder(folderPath);
-            TrimProcessMemory();
             g_currentTrack = -1;
             g_selectedTrack = Playlist_Count() > 0 ? 0 : -1;
-            g_scrollOffset = 0;
+            g_scrollPosPx = 0.0f;
+            g_scrollTargetPx = 0.0f;
             ApplyFilter(g_searchQuery);
             InvalidateRect(g_hWnd, NULL, FALSE);
         }
@@ -446,718 +752,680 @@ static void ExportM3UDialog(void) {
     }
 }
 
-static void DrawAACircle(HDC hdc, int cx, int cy, int radius, COLORREF color) {
-    int diam = radius * 2;
-    BITMAPINFO bi = {0};
-    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bi.bmiHeader.biWidth = diam;
-    bi.bmiHeader.biHeight = -diam; // Top-down
-    bi.bmiHeader.biPlanes = 1;
-    bi.bmiHeader.biBitCount = 32;
-    bi.bmiHeader.biCompression = BI_RGB;
+static void SubmitFriendRequest(HWND hWnd) {
+    wchar_t inTag[64] = {0};
+    GetWindowTextW(g_hFriendAddEdit, inTag, 63);
+    StrTrimW(inTag, L" \t\r\n");
+    int tlen = (int)wcslen(inTag);
 
-    RGBQUAD *pixels = NULL;
-    HDC memDC = CreateCompatibleDC(hdc);
-    HBITMAP hBitmap = CreateDIBSection(memDC, &bi, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
-    if (!hBitmap || !pixels) {
-        if (memDC) DeleteDC(memDC);
-        HBRUSH hBr = CreateSolidBrush(color);
-        HPEN hPen = CreatePen(PS_SOLID, 1, color);
-        HBRUSH oldB = (HBRUSH)SelectObject(hdc, hBr);
-        HPEN oldP = (HPEN)SelectObject(hdc, hPen);
-        Ellipse(hdc, cx - radius, cy - radius, cx + radius, cy + radius);
-        SelectObject(hdc, oldB);
-        SelectObject(hdc, oldP);
-        DeleteObject(hBr);
-        DeleteObject(hPen);
-        return;
+    if (tlen == 0) {
+        wcscpy(g_friendAddMsg, L"Lütfen bir kullanıcı etiketi yazın.");
+    } else if (wcschr(inTag, L'#') == NULL) {
+        wcscpy(g_friendAddMsg, L"Etiket '#' içermelidir (Örn: Selim#8421)");
+    } else if (Friends_SendRequest(inTag)) {
+        wcscpy(g_friendAddMsg, L"Arkadaşlık isteği gönderildi!");
+        SetWindowTextW(g_hFriendAddEdit, L"");
+    } else {
+        wcscpy(g_friendAddMsg, L"İstek gönderilemedi. Bağlantıyı ve etiketi kontrol edin.");
     }
-
-    HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, hBitmap);
-
-    BYTE r = GetRValue(color);
-    BYTE g = GetGValue(color);
-    BYTE b = GetBValue(color);
-
-    float fRadius = (float)radius - 0.5f;
-    float center = (float)radius - 0.5f;
-
-    for (int y = 0; y < diam; y++) {
-        float dy = (float)y - center;
-        float dy2 = dy * dy;
-        RGBQUAD *row = &pixels[y * diam];
-        for (int x = 0; x < diam; x++) {
-            float dx = (float)x - center;
-            float dist = sqrtf(dx * dx + dy2);
-            float alpha = 0.0f;
-            if (dist <= fRadius - 0.75f) {
-                alpha = 1.0f;
-            } else if (dist >= fRadius + 0.75f) {
-                alpha = 0.0f;
-            } else {
-                alpha = (fRadius + 0.75f - dist) / 1.5f;
-            }
-
-            if (alpha > 0.0f) {
-                row[x].rgbReserved = (BYTE)(alpha * 255.0f);
-                row[x].rgbRed      = (BYTE)(r * alpha);
-                row[x].rgbGreen    = (BYTE)(g * alpha);
-                row[x].rgbBlue     = (BYTE)(b * alpha);
-            } else {
-                row[x].rgbReserved = 0;
-                row[x].rgbRed      = 0;
-                row[x].rgbGreen    = 0;
-                row[x].rgbBlue     = 0;
-            }
-        }
-    }
-
-    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-    AlphaBlend(hdc, cx - radius, cy - radius, diam, diam, memDC, 0, 0, diam, diam, bf);
-
-    SelectObject(memDC, oldBmp);
-    DeleteObject(hBitmap);
-    DeleteDC(memDC);
+    InvalidateRect(hWnd, NULL, FALSE);
 }
 
-static void DrawRoundedCard(HDC hdc, const RECT *rc, COLORREF bg, COLORREF border, int radius) {
-    HBRUSH hBr = CreateSolidBrush(bg);
-    HPEN hPen = CreatePen(PS_SOLID, 1, border);
-    HBRUSH oldBr = (HBRUSH)SelectObject(hdc, hBr);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPen);
+static void DrawIconButtonPill(HDC hdc, const RECT *rc, UiZone zone, const wchar_t *glyph, COLORREF activeColor, BOOL showActiveDot) {
+    BOOL isHot = (g_hotZone == zone);
+    BOOL isPress = (g_pressedZone == zone);
+    if (isHot || isPress) {
+        int cx = (rc->left + rc->right) / 2;
+        int cy = (rc->top + rc->bottom) / 2;
+        int rad = (rc->right - rc->left) / 2;
+        DrawAACircle(hdc, cx, cy, rad, isPress ? COLOR_CTRL_PRESS : COLOR_CTRL_HOVER);
+    }
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, activeColor != 0 ? activeColor : (isHot ? COLOR_TEXT_WHITE : RGB(195, 195, 204)));
+    RECT rcGlyph = *rc;
+    if (isPress) OffsetRect(&rcGlyph, 0, 1);
+    DrawTextW(hdc, glyph, -1, &rcGlyph, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-    RoundRect(hdc, rc->left, rc->top, rc->right, rc->bottom, radius, radius);
-
-    SelectObject(hdc, oldBr);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hBr);
-    DeleteObject(hPen);
+    if (showActiveDot) {
+        DrawAACircle(hdc, (rc->left + rc->right) / 2, rc->bottom - S(3), S(2), COLOR_ACCENT);
+    }
 }
 
 static void RenderUI(HDC hdc, const RECT *clientRc) {
     int w = clientRc->right - clientRc->left;
     int h = clientRc->bottom - clientRc->top;
+    int headerH = GetHeaderH();
+    int dockH   = GetDockH();
+    int itemH   = GetItemH();
 
-    // Arka planı doldur
-    HBRUSH hBrBg = CreateSolidBrush(COLOR_BG);
-    FillRect(hdc, clientRc, hBrBg);
-    DeleteObject(hBrBg);
+    // 0. Tuval Arka Planı
+    FillFastRect(hdc, clientRc, COLOR_BG);
 
-    // 1. UST HEADER BAR (Yükseklik: 60px)
-    RECT rcHeader = { 0, 0, w, 60 };
-    HBRUSH hBrHdr = CreateSolidBrush(COLOR_HEADER);
-    FillRect(hdc, &rcHeader, hBrHdr);
-    DeleteObject(hBrHdr);
-
-    HPEN hPenBorder = CreatePen(PS_SOLID, 1, COLOR_BORDER);
-    HPEN oldPen = (HPEN)SelectObject(hdc, hPenBorder);
-    MoveToEx(hdc, 0, 60, NULL);
-    LineTo(hdc, w, 60);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hPenBorder);
-
-    // Hamburger Menü Butonu (Sol: 15, Üst: 13, 34x34)
-    rcHamburger = (RECT){ 15, 13, 49, 47 };
-    DrawRoundedCard(hdc, &rcHamburger, g_sidebarOpen ? COLOR_ACCENT : COLOR_CARD, COLOR_BORDER, 6);
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, g_sidebarOpen ? COLOR_BG : COLOR_TEXT_WHITE);
-    DrawTextW(hdc, L"\uE700", -1, &rcHamburger, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-    // Sağ Üst: Şarkı Arama Çubuğu (0 FPS drop yerine gelen modern arama kutusu)
-    int searchW = 195;
-    int searchX = w - searchW - 15;
-    rcSearchBox = (RECT){ searchX, 14, searchX + searchW, 46 };
-    DrawRoundedCard(hdc, &rcSearchBox, RGB(36, 36, 40), COLOR_BORDER, 8);
-    RECT rcMag = { searchX + 6, 14, searchX + 28, 46 };
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, COLOR_TEXT_MUTED);
-    DrawTextW(hdc, L"\uE721", -1, &rcMag, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-    // Başlık ve Çalan Şarkı Bilgisi (Sol taraf)
-    SetBkMode(hdc, TRANSPARENT);
-    SetBkColor(hdc, COLOR_HEADER);
-
-    RECT rcTitle = { 65, 8, searchX - 15, 32 };
-    SelectObject(hdc, g_hFontTitle);
-    SetTextColor(hdc, COLOR_TEXT_WHITE);
-    if (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) {
-        const PlaylistItem *cur = Playlist_Get(g_currentTrack);
-        DrawTextW(hdc, cur->title, -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-    } else {
-        DrawTextW(hdc, L"Selo Player", -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    }
-
-    RECT rcSub = { 65, 33, searchX - 15, 52 };
-    SelectObject(hdc, g_hFontSmall);
-    SetTextColor(hdc, COLOR_TEXT_MUTED);
-    wchar_t statusBuf[256];
-    if (g_isFiltered) {
-        wsprintfW(statusBuf, L"Arama Sonucu: %d şarkı bulundu", g_filterCount);
-    } else if (g_currentTrack >= 0) {
-        wsprintfW(statusBuf, L"%d / %d Şarkı • %s", g_currentTrack + 1, Playlist_Count(), Player_IsPlaying() ? L"Çalıyor" : L"Duraklatıldı");
-    } else {
-        wsprintfW(statusBuf, L"Toplam %d şarkı hazır", Playlist_Count());
-    }
-    DrawTextW(hdc, statusBuf, -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-
-    // 2. ORTA: ŞARKI LİSTESİ (65px ile h - 105px arası)
-    int itemHeight = GetItemHeight();
-    int listTop = 65;
-    int listBottom = h - 105;
-    int visibleCount = (listBottom - listTop) / itemHeight;
+    // =========================================================================
+    // 1. ORTA BÖLGE: ŞARKI LİSTESİ (Kırpılmış & Pürüzsüz Piksel Yay Kaydırmalı)
+    // =========================================================================
+    int listTop    = headerH;
+    int listBottom = h - dockH;
     int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
 
+    int savedDC = SaveDC(hdc);
+    IntersectClipRect(hdc, 0, listTop, w, listBottom);
+
     if (totalCount == 0) {
-        RECT rcEmpty = { 0, listTop, w, listBottom };
-        SetBkColor(hdc, COLOR_BG);
+        RECT rcEmpty = { S(24), listTop, w - S(24), listBottom };
+        SetBkMode(hdc, TRANSPARENT);
         SelectObject(hdc, g_hFontMain);
         SetTextColor(hdc, COLOR_TEXT_MUTED);
         if (g_isFiltered) {
-            DrawTextW(hdc, L"Aradığınız kriterlere uygun şarkı bulunamadı.\n(Aramayı temizlemek için kutuyu boşaltın)", -1, &rcEmpty, DT_CENTER | DT_VCENTER);
+            DrawTextW(hdc, L"Aramanızla eşleşen şarkı bulunamadı.", -1, &rcEmpty, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         } else {
-            DrawTextW(hdc, L"Çalma listeniz boş.\n\nMenüden (≡) klasör seçebilir, M3U ekleyebilir\nveya buraya şarkıları sürükleyip bırakabilirsiniz.", -1, &rcEmpty, DT_CENTER | DT_VCENTER);
+            RECT rcEmptyTitle = { S(24), (listTop + listBottom) / 2 - S(36), w - S(24), (listTop + listBottom) / 2 - S(10) };
+            RECT rcEmptySub   = { S(24), (listTop + listBottom) / 2 - S(6),  w - S(24), (listTop + listBottom) / 2 + S(48) };
+            SelectObject(hdc, g_hFontTitle);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, L"Kitaplığınız Boş", -1, &rcEmptyTitle, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_TEXT_MUTED);
+            DrawTextW(hdc, L"Üstteki '+ İndir' butonuyla YouTube'dan şarkı indirebilir,\nmenüden klasör seçebilir veya dosyaları buraya sürükleyebilirsiniz.", -1, &rcEmptySub, DT_CENTER | DT_TOP | DT_WORDBREAK);
         }
     } else {
-        int itemPad = MulDiv(6, g_dpi, 96);
-        for (int i = 0; i < visibleCount + 1; i++) {
-            int displayIdx = g_scrollOffset + i;
-            if (displayIdx >= totalCount) break;
+        int scrollPx = (int)(g_scrollPosPx + 0.5f);
+        int firstIdx = scrollPx / itemH;
+        if (firstIdx < 0) firstIdx = 0;
+        int endY = listBottom;
+        int padX = S(12);
+        int rowGap = S(3);
 
-            int actualTrackIdx = g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
-            int itemY = listTop + i * itemHeight;
-            RECT rcItem = { 15, itemY, w - 24, itemY + itemHeight - itemPad };
+        for (int displayIdx = firstIdx; displayIdx < totalCount; displayIdx++) {
+            int itemY = listTop + S(6) + displayIdx * itemH - scrollPx;
+            if (itemY >= endY) break;
+            if (itemY + itemH < listTop) continue;
 
-            COLORREF itemBg = COLOR_CARD;
-            COLORREF itemBorder = COLOR_BORDER;
-            if (actualTrackIdx == g_selectedTrack) {
-                itemBg = COLOR_CARD_SEL;
-                itemBorder = COLOR_ACCENT;
-            } else if (actualTrackIdx == g_hoverTrack) {
-                itemBg = COLOR_CARD_HOVER;
-            }
+            int actualIdx = g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
+            RECT rcItem = { padX, itemY, w - S(18), itemY + itemH - rowGap };
 
-            DrawRoundedCard(hdc, &rcItem, itemBg, itemBorder, 8);
+            BOOL isPlayingTrack = (actualIdx == g_currentTrack);
+            BOOL isSelected     = (actualIdx == g_selectedTrack);
+            BOOL isHovered      = (actualIdx == g_hoverTrack && g_sidebarAnim < 0.1f);
 
-            // Sürükle-bırak hedef çizgisi
-            if (g_isDraggingList && actualTrackIdx == g_dragTargetIndex) {
-                int lineY = (g_dragFromIndex < g_dragTargetIndex) ? rcItem.bottom + 2 : rcItem.top - 2;
-                RECT rcLine = { rcItem.left, lineY - 1, rcItem.right, lineY + 2 };
-                HBRUSH hBrLine = CreateSolidBrush(COLOR_ACCENT);
-                FillRect(hdc, &rcLine, hBrLine);
-                DeleteObject(hBrLine);
-            }
-
-            // Çalan şarkı sol Apple hap şeridi
-            if (actualTrackIdx == g_currentTrack) {
-                int stripW = MulDiv(3, g_dpi, 96);
+            // Apple & Spotify Kuralı: Yalnızca etkileşimdeki veya aktif satırda yumuşak yüzey, sıfır çerçeve kalabalığı!
+            if (isPlayingTrack) {
+                DrawFastRoundRect(hdc, &rcItem, COLOR_ROW_ACTIVE, RGB(28, 66, 40), S(8));
+                int stripW = S(3);
                 if (stripW < 3) stripW = 3;
-                RECT rcAccent = { rcItem.left + MulDiv(3, g_dpi, 96), rcItem.top + MulDiv(8, g_dpi, 96), rcItem.left + MulDiv(3, g_dpi, 96) + stripW, rcItem.bottom - MulDiv(8, g_dpi, 96) };
-                DrawRoundedCard(hdc, &rcAccent, COLOR_ACCENT, COLOR_ACCENT, 2);
+                RECT rcStrip = { rcItem.left + S(4), rcItem.top + S(11), rcItem.left + S(4) + stripW, rcItem.bottom - S(11) };
+                DrawFastRoundRect(hdc, &rcStrip, COLOR_ACCENT, COLOR_ACCENT, S(2));
+            } else if (isHovered) {
+                DrawFastRoundRect(hdc, &rcItem, COLOR_ROW_HOVER, COLOR_ROW_HOVER, S(8));
+            } else if (isSelected) {
+                DrawFastRoundRect(hdc, &rcItem, COLOR_ROW_SEL, COLOR_ROW_SEL, S(8));
             }
 
-            // Numara veya Çalma ikonu
-            int numW = MulDiv(42, g_dpi, 96);
-            RECT rcNum = { rcItem.left + MulDiv(6, g_dpi, 96), rcItem.top, rcItem.left + numW, rcItem.bottom };
-            SetBkColor(hdc, itemBg);
-            if (actualTrackIdx == g_currentTrack) {
-                SelectObject(hdc, g_hFontIcons);
-                SetTextColor(hdc, COLOR_ACCENT);
-                SetBkMode(hdc, TRANSPARENT);
+            // Sürükle-bırak hedef göstergesi
+            if (g_isDraggingList && actualIdx == g_dragTargetIndex && g_dragFromIndex != g_dragTargetIndex) {
+                int lineY = (g_dragFromIndex < g_dragTargetIndex) ? rcItem.bottom + 1 : rcItem.top - 1;
+                RECT rcLine = { rcItem.left + S(8), lineY - 1, rcItem.right - S(8), lineY + 1 };
+                FillFastRect(hdc, &rcLine, COLOR_ACCENT);
+            }
+
+            // Sol: Sıra numarası veya Oynatma ikonu
+            int numColW = S(40);
+            RECT rcNum = { rcItem.left + S(6), rcItem.top, rcItem.left + numColW, rcItem.bottom };
+            SetBkMode(hdc, TRANSPARENT);
+            if (isPlayingTrack) {
+                SelectObject(hdc, g_hFontIconsSmall);
+                SetTextColor(hdc, COLOR_ACCENT_HOV);
                 DrawTextW(hdc, Player_IsPlaying() ? L"\uE768" : L"\uE769", -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            } else if (isHovered) {
+                SelectObject(hdc, g_hFontIconsSmall);
+                SetTextColor(hdc, COLOR_TEXT_WHITE);
+                DrawTextW(hdc, L"\uE768", -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             } else {
                 SelectObject(hdc, g_hFontSmall);
                 SetTextColor(hdc, COLOR_TEXT_DIM);
                 wchar_t numBuf[16];
-                wsprintfW(numBuf, L"%02d", displayIdx + 1);
+                _snwprintf(numBuf, 15, L"%d", displayIdx + 1);
+                numBuf[15] = L'\0';
                 DrawTextW(hdc, numBuf, -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
 
-            // Şarkı Başlığı ve Sanatçı (Apple İki Satırlı Akıllı Düzen)
-            const PlaylistItem *item = Playlist_Get(actualTrackIdx);
+            // Sağ: Şarkı Başlığı & Sanatçı (TAM SANATÇI İSMİ — KESİNLİKLE BOZULMAZ!)
+            const PlaylistItem *item = Playlist_Get(actualIdx);
             if (item) {
-                int textLeft = rcItem.left + numW + MulDiv(4, g_dpi, 96);
-                int textRight = rcItem.right - MulDiv(14, g_dpi, 96);
-                int cardH = rcItem.bottom - rcItem.top;
-                int midY = rcItem.top + (cardH / 2);
+                int textLeft  = rcItem.left + numColW + S(4);
+                int textRight = rcItem.right - S(12);
+                int rowMidY   = (rcItem.top + rcItem.bottom) / 2;
 
                 const wchar_t *dash = wcsstr(item->title, L" - ");
                 if (dash) {
-                    int artistLen = (int)(dash - item->title[0] != 0);
+                    int artistLen = (int)(dash - item->title);
                     wchar_t artistPart[256];
                     if (artistLen > 255) artistLen = 255;
+                    if (artistLen < 0) artistLen = 0;
                     wcsncpy(artistPart, item->title, artistLen);
                     artistPart[artistLen] = L'\0';
                     const wchar_t *titlePart = dash + 3;
 
-                    RECT rcSongTitle = { textLeft, rcItem.top + MulDiv(4, g_dpi, 96), textRight, midY + MulDiv(1, g_dpi, 96) };
-                    RECT rcArtist = { textLeft, midY, textRight, rcItem.bottom - MulDiv(4, g_dpi, 96) };
+                    RECT rcSongTitle = { textLeft, rcItem.top + S(5), textRight, rowMidY + S(1) };
+                    RECT rcArtist    = { textLeft, rowMidY + S(1), textRight, rcItem.bottom - S(5) };
 
-                    SetBkColor(hdc, itemBg);
-                    SelectObject(hdc, actualTrackIdx == g_currentTrack ? g_hFontBold : g_hFontMain);
-                    SetTextColor(hdc, actualTrackIdx == g_currentTrack ? COLOR_ACCENT : COLOR_TEXT_WHITE);
+                    SelectObject(hdc, g_hFontBold);
+                    SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
                     DrawTextW(hdc, titlePart, -1, &rcSongTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                     SelectObject(hdc, g_hFontSmall);
-                    SetTextColor(hdc, actualTrackIdx == g_currentTrack ? RGB(160, 230, 185) : COLOR_TEXT_MUTED);
+                    SetTextColor(hdc, isPlayingTrack ? RGB(175, 225, 190) : COLOR_TEXT_MUTED);
                     DrawTextW(hdc, artistPart, -1, &rcArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                 } else {
                     RECT rcName = { textLeft, rcItem.top, textRight, rcItem.bottom };
-                    SetBkColor(hdc, itemBg);
-                    SelectObject(hdc, actualTrackIdx == g_currentTrack ? g_hFontBold : g_hFontMain);
-                    SetTextColor(hdc, actualTrackIdx == g_currentTrack ? COLOR_ACCENT : COLOR_TEXT_WHITE);
+                    SelectObject(hdc, g_hFontBold);
+                    SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
                     DrawTextW(hdc, item->title, -1, &rcName, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                 }
             }
         }
     }
 
-    // SAĞDAKİ KAYDIRMA ÇUBUĞU (Apple macOS Floating Scrollbar)
-    int sbLeft = w - 12;
-    int sbRight = w - 6;
-    int sbTop = listTop + 6;
-    int sbBottom = listBottom - 6;
-    rcScrollbarTrack = (RECT){ sbLeft, sbTop, sbRight, sbBottom };
+    // Sağ Yüzen İnce Kaydırma Çubuğu (Apple macOS Overlay Scrollbar)
+    int maxScrollPx = GetMaxScrollPx(g_hWnd);
+    int sbW = (g_scrollbarHover || g_isDraggingScrollbar) ? S(7) : S(4);
+    if (sbW < 4) sbW = 4;
+    int sbRight  = w - S(4);
+    int sbLeft   = sbRight - sbW;
+    int sbTop    = listTop + S(6);
+    int sbBottom = listBottom - S(6);
+    rcScrollbarTrack = (RECT){ w - S(14), sbTop, w - S(2), sbBottom };
 
-    if (totalCount > visibleCount) {
+    if (maxScrollPx > 0 && sbBottom > sbTop) {
         int trackH = sbBottom - sbTop;
-        int thumbH = (int)((float)visibleCount / totalCount * trackH);
-        if (thumbH < 28) thumbH = 28;
+        int viewH  = listBottom - listTop;
+        int contentH = viewH + maxScrollPx;
+        int thumbH = (int)((float)viewH / (float)contentH * (float)trackH);
+        if (thumbH < S(28)) thumbH = S(28);
+        if (thumbH > trackH) thumbH = trackH;
 
-        int maxScroll = totalCount - visibleCount;
-        float scrollRatio = (maxScroll > 0) ? ((float)g_scrollOffset / (float)maxScroll) : 0.0f;
-        int thumbY = sbTop + (int)(scrollRatio * (trackH - thumbH));
+        float ratio = g_scrollPosPx / (float)maxScrollPx;
+        if (ratio < 0.0f) ratio = 0.0f;
+        if (ratio > 1.0f) ratio = 1.0f;
+        int thumbY = sbTop + (int)(ratio * (float)(trackH - thumbH));
         rcScrollbarThumb = (RECT){ sbLeft, thumbY, sbRight, thumbY + thumbH };
 
-        COLORREF thumbCol = g_isDraggingScrollbar ? COLOR_ACCENT : (g_scrollbarHover ? RGB(120, 120, 128) : RGB(65, 65, 72));
-        DrawRoundedCard(hdc, &rcScrollbarThumb, thumbCol, thumbCol, 3);
+        COLORREF thumbCol = g_isDraggingScrollbar ? COLOR_ACCENT : (g_scrollbarHover ? RGB(130, 130, 140) : RGB(68, 68, 76));
+        DrawFastRoundRect(hdc, &rcScrollbarThumb, thumbCol, thumbCol, sbW);
     } else {
-        rcScrollbarThumb = (RECT){ 0, 0, 0, 0 };
+        rcScrollbarThumb = (RECT){0};
     }
 
-    // 3. ALT: KONTROL BAR (Yükseklik: 102px)
-    RECT rcCtrlBar = { 0, h - 102, w, h };
-    HBRUSH hBrCtrl = CreateSolidBrush(COLOR_HEADER);
-    FillRect(hdc, &rcCtrlBar, hBrCtrl);
-    DeleteObject(hBrCtrl);
+    RestoreDC(hdc, savedDC);
 
-    HPEN hPenCtrl = CreatePen(PS_SOLID, 1, COLOR_BORDER);
-    oldPen = (HPEN)SelectObject(hdc, hPenCtrl);
-    MoveToEx(hdc, 0, h - 102, NULL);
-    LineTo(hdc, w, h - 102);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hPenCtrl);
+    // =========================================================================
+    // 2. ÜST HEADER BAR (Temiz Apple Kimliği + Hızlı İndir + Yuvarlak Arama Hapı)
+    // =========================================================================
+    RECT rcHeader = { 0, 0, w, headerH };
+    FillFastRect(hdc, &rcHeader, COLOR_HEADER);
+    DrawFastLine(hdc, 0, headerH - 1, w, headerH - 1, COLOR_BORDER);
 
-    // İlerleme Çubuğu (Seek Bar)
-    int seekY = h - 90;
-    rcSeekBar = (RECT){ 65, seekY, w - 65, seekY + 6 };
-    DrawRoundedCard(hdc, &rcSeekBar, COLOR_BAR_BG, COLOR_BAR_BG, 3);
+    // Sol: Hamburger Menüsü (+ Bekleyen arkadaş isteği yeşil nokta göstergesi)
+    int hbSize = S(34);
+    int hbY = (headerH - hbSize) / 2;
+    rcHamburger = (RECT){ S(12), hbY, S(12) + hbSize, hbY + hbSize };
+    {
+        COLORREF hbBg = g_sidebarOpen ? COLOR_ACCENT : (g_pressedZone == ZONE_HAMBURGER ? COLOR_CTRL_PRESS : (g_hotZone == ZONE_HAMBURGER ? COLOR_CTRL_HOVER : COLOR_CARD));
+        DrawFastRoundRect(hdc, &rcHamburger, hbBg, g_sidebarOpen ? COLOR_ACCENT : COLOR_BORDER, S(8));
+        SetBkMode(hdc, TRANSPARENT);
+        SelectObject(hdc, g_hFontIcons);
+        SetTextColor(hdc, g_sidebarOpen ? RGB(10, 10, 12) : COLOR_TEXT_WHITE);
+        DrawTextW(hdc, L"\uE700", -1, &rcHamburger, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        if (!g_sidebarOpen && Friends_GetPendingCount() > 0) {
+            DrawAACircle(hdc, rcHamburger.right - S(3), rcHamburger.top + S(3), S(4), COLOR_ACCENT_HOV);
+        }
+    }
+
+    // Sağ: Arama Hapı + Hızlı '+ İndir' Butonu
+    int searchW = S(188);
+    int searchH = S(32);
+    int searchX = w - searchW - S(12);
+    int searchY = (headerH - searchH) / 2;
+    rcSearchBox = (RECT){ searchX, searchY, searchX + searchW, searchY + searchH };
+    DrawFastRoundRect(hdc, &rcSearchBox, COLOR_SEARCH_PILL, g_isFiltered ? COLOR_ACCENT : COLOR_BORDER, S(16));
+
+    RECT rcMag = { searchX + S(8), searchY, searchX + S(28), searchY + searchH };
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIconsSmall);
+    SetTextColor(hdc, g_isFiltered ? COLOR_ACCENT : COLOR_TEXT_MUTED);
+    DrawTextW(hdc, L"\uE721", -1, &rcMag, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+    if (g_searchQuery[0]) {
+        rcSearchClear = (RECT){ rcSearchBox.right - S(26), searchY + S(4), rcSearchBox.right - S(4), searchY + searchH - S(4) };
+        SelectObject(hdc, g_hFontIconsSmall);
+        SetTextColor(hdc, (g_hotZone == ZONE_SEARCH_CLEAR) ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED);
+        DrawTextW(hdc, L"\uE711", -1, &rcSearchClear, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    } else {
+        rcSearchClear = (RECT){0};
+    }
+
+    // Hızlı '+ İndir' Butonu (Arama kutusunun hemen solunda)
+    int dlBtnW = S(76);
+    int dlBtnX = searchX - dlBtnW - S(8);
+    rcQuickDownload = (RECT){ dlBtnX, searchY, dlBtnX + dlBtnW, searchY + searchH };
+    {
+        BOOL isHot = (g_hotZone == ZONE_QUICK_DOWNLOAD);
+        BOOL isPress = (g_pressedZone == ZONE_QUICK_DOWNLOAD);
+        COLORREF dlBg = isPress ? COLOR_ACCENT_DARK : (isHot ? RGB(28, 52, 36) : COLOR_CARD);
+        COLORREF dlBorder = (isHot || isPress) ? COLOR_ACCENT : COLOR_BORDER;
+        DrawFastRoundRect(hdc, &rcQuickDownload, dlBg, dlBorder, S(16));
+        SelectObject(hdc, g_hFontSmallBold);
+        SetTextColor(hdc, isPress ? RGB(10, 10, 12) : COLOR_ACCENT_HOV);
+        DrawTextW(hdc, L"+ İndir", -1, &rcQuickDownload, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
+
+    // Sol-Orta: Uygulama Başlığı ve Kitaplık Özeti (Alt bar ile kendini tekrar etmez!)
+    int titleRight = dlBtnX - S(10);
+    if (titleRight > rcHamburger.right + S(12)) {
+        RECT rcAppTitle = { rcHamburger.right + S(12), S(8), titleRight, S(31) };
+        RECT rcAppSub   = { rcHamburger.right + S(12), S(31), titleRight, headerH - S(7) };
+        SetBkMode(hdc, TRANSPARENT);
+        SelectObject(hdc, g_hFontTitle);
+        SetTextColor(hdc, COLOR_TEXT_WHITE);
+        DrawTextW(hdc, L"Selo Player", -1, &rcAppTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+        wchar_t subBuf[128];
+        if (g_isFiltered) {
+            _snwprintf(subBuf, 127, L"%d sonuç gösteriliyor", g_filterCount);
+        } else {
+            _snwprintf(subBuf, 127, L"%d şarkı kitaplıkta", Playlist_Count());
+        }
+        subBuf[127] = L'\0';
+        SelectObject(hdc, g_hFontSmall);
+        SetTextColor(hdc, COLOR_TEXT_MUTED);
+        DrawTextW(hdc, subBuf, -1, &rcAppSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
+
+    // =========================================================================
+    // 3. ALT OYNATICI DOCK (Apple Music & Spotify Kusursuz 3 Bölgeli Kontroller)
+    // =========================================================================
+    int dockTop = h - dockH;
+    RECT rcDock = { 0, dockTop, w, h };
+    FillFastRect(hdc, &rcDock, COLOR_DOCK);
+    DrawFastLine(hdc, 0, dockTop, w, dockTop, COLOR_BORDER);
+
+    // Üst Kısım: Etkileşimli İnce Scrubber Seek Bar (Hover'da büyüyen Apple/Spotify çubuğu)
+    int seekY = dockTop + S(16);
+    int timeW = S(44);
+    int seekLeft  = S(14) + timeW;
+    int seekRight = w - S(14) - timeW;
+    BOOL seekActive = (g_hotZone == ZONE_SEEK || g_isDraggingSeek);
+    int seekBarH = seekActive ? S(6) : S(4);
+    if (seekBarH < 4) seekBarH = 4;
+
+    rcSeekBar = (RECT){ seekLeft, seekY - seekBarH / 2, seekRight, seekY + (seekBarH - seekBarH / 2) };
+    rcSeekHit = (RECT){ seekLeft - S(8), seekY - S(10), seekRight + S(8), seekY + S(10) };
+
+    DrawFastRoundRect(hdc, &rcSeekBar, seekActive ? COLOR_BAR_HOVER : COLOR_BAR_BG, seekActive ? COLOR_BAR_HOVER : COLOR_BAR_BG, seekBarH);
 
     int duration = Player_GetDuration();
     int position = g_isDraggingSeek ? g_seekDragSec : Player_GetPosition();
     if (position < 0) position = 0;
     if (duration > 0 && position > duration) position = duration;
 
-    float progressRatio = (duration > 0) ? ((float)position / (float)duration) : 0.0f;
-    if (progressRatio > 1.0f) progressRatio = 1.0f;
+    float progRatio = (duration > 0) ? ((float)position / (float)duration) : 0.0f;
+    if (progRatio < 0.0f) progRatio = 0.0f;
+    if (progRatio > 1.0f) progRatio = 1.0f;
 
-    int totalTrackW = rcSeekBar.right - rcSeekBar.left;
-    int seekFillW = (int)(totalTrackW * progressRatio);
+    int seekTrackW = rcSeekBar.right - rcSeekBar.left;
+    int seekFillW  = (int)(seekTrackW * progRatio);
     if (seekFillW > 0) {
-        RECT rcSeekFill = { rcSeekBar.left, rcSeekBar.top, rcSeekBar.left + seekFillW, rcSeekBar.bottom };
-        DrawRoundedCard(hdc, &rcSeekFill, COLOR_ACCENT, COLOR_ACCENT, 3);
+        RECT rcFill = { rcSeekBar.left, rcSeekBar.top, rcSeekBar.left + seekFillW, rcSeekBar.bottom };
+        COLORREF fillCol = seekActive ? COLOR_ACCENT_HOV : COLOR_ACCENT;
+        DrawFastRoundRect(hdc, &rcFill, fillCol, fillCol, seekBarH);
     }
 
-    // Beyaz Thumb yuvarlağı (Her zaman net ve modern görünüm)
-    if (duration > 0 || g_isDraggingSeek) {
-        int thumbX = rcSeekBar.left + seekFillW;
-        if (thumbX < rcSeekBar.left) thumbX = rcSeekBar.left;
-        if (thumbX > rcSeekBar.right) thumbX = rcSeekBar.right;
-        int thumbY = rcSeekBar.top + 3;
-        int thumbRadius = 6;
-
-        HBRUSH hBrThumb = CreateSolidBrush(COLOR_TEXT_WHITE);
-        HPEN hPenThumb = CreatePen(PS_SOLID, 1, COLOR_ACCENT);
-        HBRUSH oldB = (HBRUSH)SelectObject(hdc, hBrThumb);
-        HPEN oldP = (HPEN)SelectObject(hdc, hPenThumb);
-
-        Ellipse(hdc, thumbX - thumbRadius, thumbY - thumbRadius, thumbX + thumbRadius, thumbY + thumbRadius);
-
-        SelectObject(hdc, oldB);
-        SelectObject(hdc, oldP);
-        DeleteObject(hBrThumb);
-        DeleteObject(hPenThumb);
+    if ((duration > 0 && seekActive) || g_isDraggingSeek) {
+        int tx = rcSeekBar.left + seekFillW;
+        if (tx < rcSeekBar.left) tx = rcSeekBar.left;
+        if (tx > rcSeekBar.right) tx = rcSeekBar.right;
+        DrawAACircle(hdc, tx, seekY, g_isDraggingSeek ? S(7) : S(6), COLOR_TEXT_WHITE);
     }
 
-    // Süre Metinleri (Sol: Geçen Süre, Sağ: Toplam Süre)
-    wchar_t timePosStr[32], timeDurStr[32];
-    FormatTime(position, timePosStr, 32);
-    FormatTime(duration, timeDurStr, 32);
-
-    SetBkColor(hdc, COLOR_HEADER);
+    wchar_t tPos[16], tDur[16];
+    FormatTime(position, tPos);
+    FormatTime(duration, tDur);
+    SetBkMode(hdc, TRANSPARENT);
     SelectObject(hdc, g_hFontSmall);
-    SetTextColor(hdc, COLOR_TEXT_MUTED);
+    SetTextColor(hdc, COLOR_TEXT_DIM);
 
-    RECT rcTimePos = { 10, seekY - 6, 60, seekY + 12 };
-    DrawTextW(hdc, timePosStr, -1, &rcTimePos, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    RECT rcTPos = { S(10), seekY - S(9), seekLeft - S(6), seekY + S(9) };
+    RECT rcTDur = { seekRight + S(6), seekY - S(9), w - S(10), seekY + S(9) };
+    DrawTextW(hdc, tPos, -1, &rcTPos, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(hdc, tDur, -1, &rcTDur, DT_LEFT  | DT_VCENTER | DT_SINGLELINE);
 
-    RECT rcTimeDur = { w - 60, seekY - 6, w - 10, seekY + 12 };
-    DrawTextW(hdc, timeDurStr, -1, &rcTimeDur, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    // Alt Kısım: 3 Bölgeli Kontroller
+    int rowCenterY = dockTop + S(58);
+    int centerX    = w / 2;
 
-    // OYNATMA BUTONLARI (Kusursuz 3 Bölgeli Modern Tasarım - Sıfır Çakışma)
-    int btnY = h - 68;
-    int centerX = w / 2;
+    // --- BÖLGE 2 (MERKEZ): Çerçevesiz Zarif Medya İkonları + Pürüzsüz Yeşil Play Dairesi ---
+    int playRad = (g_pressedZone == ZONE_PLAY) ? S(19) : (g_hotZone == ZONE_PLAY ? S(21) : S(20));
+    int iconBox = S(32);
 
-    // Bölge 1 (Sol): Şu An Çalan Şarkı Bilgisi & Kapak Resmi (Sade ve Şık Görünüm)
-    // Bölge 1 (Sol): Şu An Çalan Şarkı Bilgisi & Kapak Resmi (Apple Music Now Playing)
-    if (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) {
-        const PlaylistItem *cur = Playlist_Get(g_currentTrack);
+    rcPlay    = (RECT){ centerX - S(22), rowCenterY - S(22), centerX + S(22), rowCenterY + S(22) };
+    rcPrev    = (RECT){ centerX - S(60), rowCenterY - iconBox / 2, centerX - S(60) + iconBox, rowCenterY + iconBox / 2 };
+    rcShuffle = (RECT){ centerX - S(96), rowCenterY - iconBox / 2, centerX - S(96) + iconBox, rowCenterY + iconBox / 2 };
+    rcNext    = (RECT){ centerX + S(60) - iconBox, rowCenterY - iconBox / 2, centerX + S(60), rowCenterY + iconBox / 2 };
+    rcRepeat  = (RECT){ centerX + S(96) - iconBox, rowCenterY - iconBox / 2, centerX + S(96), rowCenterY + iconBox / 2 };
 
-        RECT rcThumbBox = { 20, btnY - 2, 60, btnY + 38 };
-        DrawRoundedCard(hdc, &rcThumbBox, COLOR_CARD, COLOR_BORDER, 8);
+    DrawIconButtonPill(hdc, &rcShuffle, ZONE_SHUFFLE, L"\uE8B1", g_cfg.shuffle ? COLOR_ACCENT_HOV : 0, g_cfg.shuffle != 0);
+    DrawIconButtonPill(hdc, &rcPrev,    ZONE_PREV,    L"\uE892", 0, FALSE);
 
-        if (g_pMainThumb) {
-            OLE_XSIZE_HIMETRIC cx;
-            OLE_YSIZE_HIMETRIC cy;
-            g_pMainThumb->lpVtbl->get_Width(g_pMainThumb, &cx);
-            g_pMainThumb->lpVtbl->get_Height(g_pMainThumb, &cy);
-            g_pMainThumb->lpVtbl->Render(g_pMainThumb, hdc, rcThumbBox.left + 1, rcThumbBox.top + 1, 38, 38, 0, cy, cx, -cy, NULL);
-        } else if (g_hAppIcon) {
-            DrawIconEx(hdc, rcThumbBox.left + 2, rcThumbBox.top + 2, g_hAppIcon, 36, 36, 0, NULL, DI_NORMAL);
-        } else {
-            SelectObject(hdc, g_hFontSmall);
-            SetTextColor(hdc, COLOR_TEXT_MUTED);
-            SetBkMode(hdc, TRANSPARENT);
-            DrawTextW(hdc, L"🎵", -1, &rcThumbBox, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        }
-
-        // Jam Durum Hapı
-        if (Jam_IsActive()) {
-            wchar_t pName[64] = {0};
-            Jam_GetPartnerName(pName, 64);
-            wchar_t jamTxt[128];
-            wsprintfW(jamTxt, L"🟢 Jam: %s", pName[0] ? pName : L"Arkadaş");
-
-            rcJamPill = (RECT){ 68, btnY - 15, 215, btnY + 1 };
-            DrawRoundedCard(hdc, &rcJamPill, RGB(20, 32, 24), COLOR_ACCENT, 4);
-
-            RECT rcJamTxt = { rcJamPill.left + 8, rcJamPill.top, rcJamPill.right - 44, rcJamPill.bottom };
-            SelectObject(hdc, g_hFontSmall);
-            SetTextColor(hdc, COLOR_ACCENT);
-            SetBkMode(hdc, TRANSPARENT);
-            DrawTextW(hdc, jamTxt, -1, &rcJamTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-
-            rcJamLeave = (RECT){ rcJamPill.right - 42, rcJamPill.top + 1, rcJamPill.right - 4, rcJamPill.bottom - 1 };
-            SetTextColor(hdc, RGB(255, 120, 120));
-            DrawTextW(hdc, L"Ayrıl", -1, &rcJamLeave, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        } else {
-            rcJamPill = (RECT){0};
-        }
-
-        const wchar_t *dash = wcsstr(cur->title, L" - ");
-        RECT rcTrackInfo = { 68, btnY, centerX - 112, btnY + 18 };
-        RECT rcTrackSub  = { 68, btnY + 18, centerX - 112, btnY + 36 };
-
-        SetBkColor(hdc, COLOR_HEADER);
-        if (dash) {
-            int aLen = (int)(dash - cur->title);
-            wchar_t aPart[256];
-            if (aLen > 255) aLen = 255;
-            wcsncpy(aPart, cur->title, aLen);
-            aPart[aLen] = L'\0';
-            const wchar_t *tPart = dash + 3;
-
-            SelectObject(hdc, g_hFontBold);
-            SetTextColor(hdc, COLOR_TEXT_WHITE);
-            DrawTextW(hdc, tPart, -1, &rcTrackInfo, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-
-            SelectObject(hdc, g_hFontSmall);
-            SetTextColor(hdc, COLOR_TEXT_MUTED);
-            DrawTextW(hdc, aPart, -1, &rcTrackSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-        } else {
-            SelectObject(hdc, g_hFontBold);
-            SetTextColor(hdc, COLOR_TEXT_WHITE);
-            DrawTextW(hdc, cur->title, -1, &rcTrackInfo, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-
-            SelectObject(hdc, g_hFontSmall);
-            SetTextColor(hdc, Player_IsPlaying() ? COLOR_ACCENT : COLOR_TEXT_MUTED);
-            DrawTextW(hdc, Player_IsPlaying() ? L"Çalıyor" : L"Duraklatıldı", -1, &rcTrackSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        }
-    } else {
-        RECT rcThumbBox = { 20, btnY - 2, 60, btnY + 38 };
-        DrawRoundedCard(hdc, &rcThumbBox, COLOR_CARD, COLOR_BORDER, 8);
-        if (g_hAppIcon) {
-            DrawIconEx(hdc, rcThumbBox.left + 2, rcThumbBox.top + 2, g_hAppIcon, 36, 36, 0, NULL, DI_NORMAL);
-        }
-        RECT rcTrackInfo = { 68, btnY, centerX - 112, btnY + 18 };
-        RECT rcTrackSub  = { 68, btnY + 18, centerX - 112, btnY + 36 };
-        SetBkColor(hdc, COLOR_HEADER);
-        SelectObject(hdc, g_hFontBold);
-        SetTextColor(hdc, COLOR_TEXT_WHITE);
-        DrawTextW(hdc, L"Selo Player", -1, &rcTrackInfo, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-        SelectObject(hdc, g_hFontSmall);
-        SetTextColor(hdc, COLOR_TEXT_MUTED);
-        DrawTextW(hdc, L"Müzik seçin", -1, &rcTrackSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    }
-
-    // Bölge 2 (Merkez): Karıştır - Önceki - Oynat/Duraklat - Sonraki - Tekrar (Spotify & Apple Standardı)
-    rcShuffle = (RECT){ centerX - 104, btnY + 2, centerX - 72, btnY + 34 };
-    rcPrev    = (RECT){ centerX - 66,  btnY + 1, centerX - 30, btnY + 37 };
-    rcPlay    = (RECT){ centerX - 22,  btnY - 3, centerX + 22, btnY + 41 };
-    rcNext    = (RECT){ centerX + 30,  btnY + 1, centerX + 66, btnY + 37 };
-    rcRepeat  = (RECT){ centerX + 72,  btnY + 2, centerX + 104, btnY + 34 };
-
-    // Karıştırma Butonu (Shuffle - ClearType Vector Subpixel Anti-Aliased)
-    COLORREF shuffleCol = g_cfg.shuffle ? COLOR_ACCENT : COLOR_TEXT_MUTED;
-    DrawRoundedCard(hdc, &rcShuffle, COLOR_CARD, g_cfg.shuffle ? COLOR_ACCENT : COLOR_BORDER, 8);
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, shuffleCol);
-    DrawTextW(hdc, L"\uE8B1", -1, &rcShuffle, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    if (g_cfg.shuffle) {
-        DrawAACircle(hdc, (rcShuffle.left + rcShuffle.right) / 2, rcShuffle.bottom - 4, 2, COLOR_ACCENT);
-    }
-
-    // Önceki Butonu (Previous - ClearType Vector)
-    DrawRoundedCard(hdc, &rcPrev, COLOR_CARD, COLOR_BORDER, 8);
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, COLOR_TEXT_WHITE);
-    DrawTextW(hdc, L"\uE892", -1, &rcPrev, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-
-    // Oynat/Duraklat Butonu (44x44 Tam Anti-Aliased Subpixel Pürüzsüz Daire & Vektör İkon)
-    int playCx = (rcPlay.left + rcPlay.right) / 2;
-    int playCy = (rcPlay.top + rcPlay.bottom) / 2;
-    DrawAACircle(hdc, playCx, playCy, 22, COLOR_ACCENT);
-
+    // Ana Hero Oynat/Duraklat Dairesi
+    COLORREF playCol = (g_pressedZone == ZONE_PLAY) ? COLOR_ACCENT_DARK : ((g_hotZone == ZONE_PLAY) ? COLOR_ACCENT_HOV : COLOR_ACCENT);
+    DrawAACircle(hdc, centerX, rowCenterY, playRad, playCol);
     SetBkMode(hdc, TRANSPARENT);
     SelectObject(hdc, g_hFontIconsLarge);
-    SetTextColor(hdc, COLOR_TEXT_WHITE);
+    SetTextColor(hdc, RGB(10, 10, 12));
     if (Player_IsPlaying()) {
         DrawTextW(hdc, L"\uE769", -1, &rcPlay, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     } else {
-        RECT rcPlayIcon = rcPlay;
-        OffsetRect(&rcPlayIcon, 1, 0); // Üçgenin optik merkezini tam ortala
-        DrawTextW(hdc, L"\uE768", -1, &rcPlayIcon, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        RECT rcPlayGlyph = rcPlay;
+        OffsetRect(&rcPlayGlyph, S(1), 0);
+        DrawTextW(hdc, L"\uE768", -1, &rcPlayGlyph, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
-    // Sonraki Butonu (Next - ClearType Vector)
-    DrawRoundedCard(hdc, &rcNext, COLOR_CARD, COLOR_BORDER, 8);
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, COLOR_TEXT_WHITE);
-    DrawTextW(hdc, L"\uE893", -1, &rcNext, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    DrawIconButtonPill(hdc, &rcNext,   ZONE_NEXT,   L"\uE893", 0, FALSE);
+    DrawIconButtonPill(hdc, &rcRepeat, ZONE_REPEAT, (g_cfg.repeat == 2) ? L"\uE8ED" : L"\uE8EE", (g_cfg.repeat > 0) ? COLOR_ACCENT_HOV : 0, g_cfg.repeat > 0);
 
-    // Tekrar Butonu (Repeat: E8EE=Tümü, E8ED=Tek Şarkı ClearType Vektör)
-    COLORREF repeatCol = (g_cfg.repeat > 0) ? COLOR_ACCENT : COLOR_TEXT_MUTED;
-    DrawRoundedCard(hdc, &rcRepeat, COLOR_CARD, (g_cfg.repeat > 0) ? COLOR_ACCENT : COLOR_BORDER, 8);
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, repeatCol);
-    const wchar_t *repGlyph = (g_cfg.repeat == 2) ? L"\uE8ED" : L"\uE8EE";
-    DrawTextW(hdc, repGlyph, -1, &rcRepeat, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    if (g_cfg.repeat > 0) {
-        DrawAACircle(hdc, (rcRepeat.left + rcRepeat.right) / 2, rcRepeat.bottom - 4, 2, COLOR_ACCENT);
+    // --- BÖLGE 1 (SOL): Kapak Resmi (HALFTONE Netlik) + Şarkı & Sanatçı + Jam Rozeti ---
+    int coverSz = S(44);
+    RECT rcThumbBox = { S(14), rowCenterY - coverSz / 2, S(14) + coverSz, rowCenterY + coverSz / 2 };
+    DrawFastRoundRect(hdc, &rcThumbBox, COLOR_CARD, COLOR_BORDER, S(8));
+
+    if (g_currentTrack >= 0 && g_currentTrack < Playlist_Count() && g_pMainThumb) {
+        OLE_XSIZE_HIMETRIC cx, cy;
+        g_pMainThumb->lpVtbl->get_Width(g_pMainThumb, &cx);
+        g_pMainThumb->lpVtbl->get_Height(g_pMainThumb, &cy);
+        int oldMode = SetStretchBltMode(hdc, HALFTONE);
+        SetBrushOrgEx(hdc, 0, 0, NULL);
+        g_pMainThumb->lpVtbl->Render(g_pMainThumb, hdc, rcThumbBox.left + 1, rcThumbBox.top + 1, coverSz - 2, coverSz - 2, 0, cy, cx, -cy, NULL);
+        SetStretchBltMode(hdc, oldMode);
+    } else if (g_hAppIcon) {
+        int icSz = S(32);
+        int icPad = (coverSz - icSz) / 2;
+        DrawIconEx(hdc, rcThumbBox.left + icPad, rcThumbBox.top + icPad, g_hAppIcon, icSz, icSz, 0, NULL, DI_NORMAL);
     }
 
-    // Bölge 3 (Sağ): Ses Kontrolü (Sağa yaslı, asla butonlarla çakışmaz)
-    int volRight = w - 15;
-    int volW = MulDiv(70, g_dpi, 96);
-    int txtW = MulDiv(36, g_dpi, 96);
-    int volBarRight = volRight - txtW;
-    int volBarLeft = volBarRight - volW;
-    int barH = MulDiv(6, g_dpi, 96);
-    if (barH < 6) barH = 6;
-    int barY = btnY + MulDiv(16, g_dpi, 96);
-    rcVolBar = (RECT){ volBarLeft, barY, volBarRight, barY + barH };
+    int metaLeft  = rcThumbBox.right + S(10);
+    int metaRight = rcShuffle.left - S(10);
+    if (metaRight > metaLeft + S(20)) {
+        if (Jam_IsActive()) {
+            wchar_t pName[64] = {0};
+            Jam_GetPartnerName(pName, 64);
+            int pillW = metaRight - metaLeft;
+            if (pillW > S(148)) pillW = S(148);
+            rcJamPill = (RECT){ metaLeft, rowCenterY - S(23), metaLeft + pillW, rowCenterY - S(7) };
+            DrawFastRoundRect(hdc, &rcJamPill, RGB(18, 36, 24), COLOR_ACCENT, S(8));
 
-    int curVol = Player_GetVolume();
-    RECT rcSpeaker = { volBarLeft - MulDiv(26, g_dpi, 96), btnY, volBarLeft - MulDiv(4, g_dpi, 96), btnY + MulDiv(38, g_dpi, 96) };
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, COLOR_TEXT_MUTED);
-    DrawTextW(hdc, (curVol == 0) ? L"\uE74F" : L"\uE767", -1, &rcSpeaker, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            DrawAACircle(hdc, rcJamPill.left + S(9), (rcJamPill.top + rcJamPill.bottom) / 2, S(3), COLOR_ACCENT_HOV);
+            RECT rcJT = { rcJamPill.left + S(16), rcJamPill.top, rcJamPill.right - S(36), rcJamPill.bottom };
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_ACCENT_HOV);
+            DrawTextW(hdc, pName[0] ? pName : L"Jam", -1, &rcJT, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-    DrawRoundedCard(hdc, &rcVolBar, COLOR_BAR_BG, COLOR_BAR_BG, barH / 2);
-    if (curVol < 0) curVol = 0;
-    if (curVol > 100) curVol = 100;
-    int volFillW = (int)((rcVolBar.right - rcVolBar.left) * (curVol / 100.0f));
-    if (volFillW > 0) {
-        RECT rcVolFill = { rcVolBar.left, rcVolBar.top, rcVolBar.left + volFillW, rcVolBar.bottom };
-        DrawRoundedCard(hdc, &rcVolFill, COLOR_ACCENT, COLOR_ACCENT, barH / 2);
+            rcJamLeave = (RECT){ rcJamPill.right - S(35), rcJamPill.top, rcJamPill.right - S(3), rcJamPill.bottom };
+            SetTextColor(hdc, (g_hotZone == ZONE_JAM_LEAVE) ? RGB(255, 160, 160) : RGB(255, 110, 110));
+            DrawTextW(hdc, L"Ayrıl", -1, &rcJamLeave, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        } else {
+            rcJamPill = (RECT){0};
+            rcJamLeave = (RECT){0};
+        }
+
+        int infoTop = Jam_IsActive() ? (rowCenterY - S(6)) : (rowCenterY - S(19));
+        RECT rcTrackTitle  = { metaLeft, infoTop, metaRight, infoTop + S(19) };
+        RECT rcTrackArtist = { metaLeft, infoTop + S(18), metaRight, infoTop + S(36) };
+
+        if (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) {
+            const PlaylistItem *cur = Playlist_Get(g_currentTrack);
+            const wchar_t *dash = wcsstr(cur->title, L" - ");
+            if (dash) {
+                int aLen = (int)(dash - cur->title);
+                wchar_t aPart[256];
+                if (aLen > 255) aLen = 255;
+                if (aLen < 0) aLen = 0;
+                wcsncpy(aPart, cur->title, aLen);
+                aPart[aLen] = L'\0';
+
+                SelectObject(hdc, g_hFontBold);
+                SetTextColor(hdc, COLOR_TEXT_WHITE);
+                DrawTextW(hdc, dash + 3, -1, &rcTrackTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                SelectObject(hdc, g_hFontSmall);
+                SetTextColor(hdc, COLOR_TEXT_MUTED);
+                DrawTextW(hdc, aPart, -1, &rcTrackArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            } else {
+                SelectObject(hdc, g_hFontBold);
+                SetTextColor(hdc, COLOR_TEXT_WHITE);
+                DrawTextW(hdc, cur->title, -1, &rcTrackTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+                SelectObject(hdc, g_hFontSmall);
+                SetTextColor(hdc, COLOR_TEXT_MUTED);
+                DrawTextW(hdc, Player_IsPlaying() ? L"Şu an çalıyor" : L"Duraklatıldı", -1, &rcTrackArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            }
+        } else {
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, L"Hazır", -1, &rcTrackTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_TEXT_DIM);
+            DrawTextW(hdc, L"Bir şarkıya tıklayın", -1, &rcTrackArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        }
     }
 
-    // Ses Thumb Yuvarlağı (Apple standardı daire buton)
-    int thumbX = rcVolBar.left + volFillW;
-    if (thumbX < rcVolBar.left) thumbX = rcVolBar.left;
-    if (thumbX > rcVolBar.right) thumbX = rcVolBar.right;
-    int thumbY = (rcVolBar.top + rcVolBar.bottom) / 2;
-    int thumbRadius = MulDiv(5, g_dpi, 96);
-    if (thumbRadius < 5) thumbRadius = 5;
+    // --- BÖLGE 3 (SAĞ): Sessize Alma (Mute) İkonu + Etkileşimli Ses Çubuğu ---
+    int volW = S(76);
+    int volRight = w - S(16);
+    int volLeft  = volRight - volW;
+    if (volLeft > rcRepeat.right + S(34)) {
+        BOOL volActive = (g_hotZone == ZONE_VOL || g_isDraggingVol);
+        int vBarH = volActive ? S(6) : S(4);
+        if (vBarH < 4) vBarH = 4;
 
-DrawAACircle(hdc, thumbX, thumbY, thumbRadius, COLOR_TEXT_WHITE);
+        rcVolBar = (RECT){ volLeft, rowCenterY - vBarH / 2, volRight, rowCenterY + (vBarH - vBarH / 2) };
+        rcVolHit = (RECT){ volLeft - S(6), rowCenterY - S(12), volRight + S(6), rowCenterY + S(12) };
+        rcSpeaker = (RECT){ volLeft - S(32), rowCenterY - S(15), volLeft - S(4), rowCenterY + S(15) };
 
-    wchar_t volTxt[16];
-    wsprintfW(volTxt, L"%%%d", curVol);
-    RECT rcVolTxt = { volBarRight + MulDiv(4, g_dpi, 96), btnY, volRight, btnY + MulDiv(38, g_dpi, 96) };
-    SetBkColor(hdc, COLOR_HEADER);
-    SetBkMode(hdc, TRANSPARENT);
-    SelectObject(hdc, g_hFontSmall);
-    SetTextColor(hdc, COLOR_TEXT_MUTED);
-    DrawTextW(hdc, volTxt, -1, &rcVolTxt, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+        int curVol = Player_GetVolume();
+        const wchar_t *spkGlyph = (curVol == 0) ? L"\uE74F" : (curVol < 50 ? L"\uE993" : L"\uE767");
+        DrawIconButtonPill(hdc, &rcSpeaker, ZONE_SPEAKER, spkGlyph, (curVol == 0) ? RGB(255, 110, 110) : 0, FALSE);
 
-    // 4. HAMBURGER YAN PANEL (Sol Bölüm - Menü & Arkadaşlar)
-    if (g_sidebarOpen) {
-        RECT rcSide = { 0, 60, SIDEBAR_WIDTH, h };
-        HBRUSH hBrSide = CreateSolidBrush(COLOR_SIDEBAR);
-        FillRect(hdc, &rcSide, hBrSide);
-        DeleteObject(hBrSide);
+        DrawFastRoundRect(hdc, &rcVolBar, volActive ? COLOR_BAR_HOVER : COLOR_BAR_BG, volActive ? COLOR_BAR_HOVER : COLOR_BAR_BG, vBarH);
+        int vFillW = (int)((rcVolBar.right - rcVolBar.left) * (curVol / 100.0f));
+        if (vFillW > 0) {
+            RECT rcVFill = { rcVolBar.left, rcVolBar.top, rcVolBar.left + vFillW, rcVolBar.bottom };
+            COLORREF vCol = volActive ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE;
+            DrawFastRoundRect(hdc, &rcVFill, vCol, vCol, vBarH);
+        }
+        if (volActive) {
+            DrawAACircle(hdc, rcVolBar.left + vFillW, rowCenterY, S(5), COLOR_TEXT_WHITE);
+        }
+    }
 
-        HPEN hPenSide = CreatePen(PS_SOLID, 1, COLOR_BORDER);
-        oldPen = (HPEN)SelectObject(hdc, hPenSide);
-        MoveToEx(hdc, SIDEBAR_WIDTH, 60, NULL);
-        LineTo(hdc, SIDEBAR_WIDTH, h);
-        SelectObject(hdc, oldPen);
-        DeleteObject(hPenSide);
+    // =========================================================================
+    // 4. APPLE AKIŞKAN YAN ÇEKMECE + YARI SAYDAM KARARTMA PERDESİ (SCRIM)
+    // =========================================================================
+    if (g_sidebarAnim > 0.005f) {
+        int sbW = GetSidebarW();
+        int offX = (int)((g_sidebarAnim - 1.0f) * (float)sbW);
+
+        // Arka planı orantılı karart (Apple Design: "Dim to focus, separate to keep flow")
+        if (g_scrimDC && g_scrimBmp) {
+            BYTE scrimAlpha = (BYTE)(g_sidebarAnim * 120.0f);
+            BLENDFUNCTION bf = { AC_SRC_OVER, 0, scrimAlpha, 0 };
+            AlphaBlend(hdc, 0, headerH, w, h - headerH, g_scrimDC, 0, 0, 1, 1, bf);
+        }
+
+        int savedSide = SaveDC(hdc);
+        IntersectClipRect(hdc, 0, headerH, offX + sbW + 1, h);
+
+        RECT rcSide = { offX, headerH, offX + sbW, h };
+        FillFastRect(hdc, &rcSide, COLOR_SIDEBAR);
+        DrawFastLine(hdc, offX + sbW, headerH, offX + sbW, h, COLOR_BORDER);
 
         if (g_sidebarView == SIDEBAR_VIEW_MENU) {
-            const wchar_t *menuItems[] = {
-                L"📁  Klasör Seç",
-                L"📥  M3U İçe Aktar",
-                L"📤  M3U Dışa Aktar",
-                L"🔍  Müzik Ara & İndir (MYT)",
-                L"👥  Arkadaşlar & Jam",
-                L"🧹  Listeyi Temizle",
-                L"🔄  Güncellemeleri Denetle"
+            static const struct { const wchar_t *icon; const wchar_t *label; BOOL accent; } items[] = {
+                { L"\uE8B7", L"Klasör Seç",             FALSE },
+                { L"\uE896", L"Müzik Ara ve İndir",     TRUE  },
+                { L"\uE716", L"Arkadaşlar ve Jam",      TRUE  },
+                { L"\uE8E5", L"M3U İçe Aktar",          FALSE },
+                { L"\uE74E", L"M3U Dışa Aktar",         FALSE },
+                { L"\uE74D", L"Listeyi Temizle",        FALSE },
+                { L"\uE72C", L"Güncellemeleri Denetle", FALSE }
             };
             int menuCount = 7;
 
             for (int m = 0; m < menuCount; m++) {
-                RECT rcMenu = { 10, 75 + m * 48, SIDEBAR_WIDTH - 10, 75 + m * 48 + 40 };
-                COLORREF mBg = (m == g_sidebarHoverItem) ? COLOR_CARD_HOVER : COLOR_SIDEBAR;
-                DrawRoundedCard(hdc, &rcMenu, mBg, (m == g_sidebarHoverItem) ? COLOR_BORDER : COLOR_SIDEBAR, 6);
+                int itemTop = headerH + S(12) + m * S(44);
+                RECT rcMenu = { offX + S(10), itemTop, offX + sbW - S(10), itemTop + S(38) };
+                BOOL isHov = (m == g_sidebarHoverItem);
+                if (isHov) {
+                    DrawFastRoundRect(hdc, &rcMenu, COLOR_CTRL_HOVER, COLOR_BORDER, S(8));
+                }
 
-                SetBkColor(hdc, mBg);
-                SelectObject(hdc, g_hFontMain);
-                SetTextColor(hdc, (m == 3 || m == 4) ? COLOR_ACCENT : COLOR_TEXT_WHITE);
-                RECT rcText = { rcMenu.left + 14, rcMenu.top, rcMenu.right - 35, rcMenu.bottom };
-                DrawTextW(hdc, menuItems[m], -1, &rcText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                RECT rcIc = { rcMenu.left + S(10), rcMenu.top, rcMenu.left + S(36), rcMenu.bottom };
+                SetBkMode(hdc, TRANSPARENT);
+                SelectObject(hdc, g_hFontIcons);
+                SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_HOV : (isHov ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED));
+                DrawTextW(hdc, items[m].icon, -1, &rcIc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                // Gelen istek rozeti
-                if (m == 4 && Friends_GetPendingCount() > 0) {
+                RECT rcTxt = { rcMenu.left + S(40), rcMenu.top, rcMenu.right - S(34), rcMenu.bottom };
+                SelectObject(hdc, items[m].accent ? g_hFontBold : g_hFontMain);
+                SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+                DrawTextW(hdc, items[m].label, -1, &rcTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+                if (m == 2 && Friends_GetPendingCount() > 0) {
                     wchar_t bTxt[16];
-                    wsprintfW(bTxt, L"%d", Friends_GetPendingCount());
-                    RECT rcBadge = { rcMenu.right - 30, rcMenu.top + 11, rcMenu.right - 10, rcMenu.bottom - 11 };
-                    DrawRoundedCard(hdc, &rcBadge, COLOR_ACCENT, COLOR_ACCENT, 8);
-                    SetBkMode(hdc, TRANSPARENT);
-                    SelectObject(hdc, g_hFontSmall);
-                    SetTextColor(hdc, COLOR_BG);
+                    _snwprintf(bTxt, 15, L"%d", Friends_GetPendingCount());
+                    bTxt[15] = L'\0';
+                    RECT rcBadge = { rcMenu.right - S(30), rcMenu.top + S(9), rcMenu.right - S(10), rcMenu.bottom - S(9) };
+                    DrawFastRoundRect(hdc, &rcBadge, COLOR_ACCENT, COLOR_ACCENT, S(10));
+                    SelectObject(hdc, g_hFontSmallBold);
+                    SetTextColor(hdc, RGB(10, 10, 12));
                     DrawTextW(hdc, bTxt, -1, &rcBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                 }
             }
+
+            // En altta sürüm bilgisi
+            RECT rcVer = { offX + S(16), h - S(32), offX + sbW - S(16), h - S(10) };
+            wchar_t verStr[64];
+            _snwprintf(verStr, 63, L"Selo Player v%s • Saf C Motoru", APP_VERSION_STR);
+            verStr[63] = L'\0';
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_TEXT_DIM);
+            DrawTextW(hdc, verStr, -1, &rcVer, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         }
         else if (g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
-            // Header: Geri Butonu ve Başlık
-            rcFriendsBack = (RECT){ 10, 68, 70, 96 };
-            DrawRoundedCard(hdc, &rcFriendsBack, COLOR_CARD, COLOR_BORDER, 6);
+            int yBase = headerH + S(10);
+            rcFriendsBack = (RECT){ offX + S(10), yBase, offX + S(68), yBase + S(28) };
+            DrawFastRoundRect(hdc, &rcFriendsBack, (g_hotZone == ZONE_FRIENDS_BACK) ? COLOR_CTRL_HOVER : COLOR_CARD, COLOR_BORDER, S(6));
             SetBkMode(hdc, TRANSPARENT);
-            SelectObject(hdc, g_hFontSmall);
+            SelectObject(hdc, g_hFontSmallBold);
             SetTextColor(hdc, COLOR_TEXT_WHITE);
-            DrawTextW(hdc, L"◀ Geri", -1, &rcFriendsBack, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(hdc, L"‹ Menü", -1, &rcFriendsBack, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            RECT rcFTitle = { 76, 68, SIDEBAR_WIDTH - 10, 96 };
+            RECT rcFTitle = { offX + S(76), yBase, offX + sbW - S(10), yBase + S(28) };
             SelectObject(hdc, g_hFontBold);
             SetTextColor(hdc, COLOR_TEXT_WHITE);
             DrawTextW(hdc, L"Arkadaşlar & Jam", -1, &rcFTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Profil Kartı
+            // Kullanıcı Profil & Etiket Kartı
             wchar_t myTag[32] = {0};
             Friends_GetMyTag(myTag, 32);
 
-            RECT rcProfile = { 10, 104, SIDEBAR_WIDTH - 10, 144 };
-            DrawRoundedCard(hdc, &rcProfile, RGB(28, 28, 32), COLOR_BORDER, 6);
+            RECT rcProfile = { offX + S(10), yBase + S(36), offX + sbW - S(10), yBase + S(78) };
+            DrawFastRoundRect(hdc, &rcProfile, COLOR_CARD, COLOR_BORDER, S(8));
+            DrawAACircle(hdc, rcProfile.left + S(14), (rcProfile.top + rcProfile.bottom) / 2, S(4), Network_IsConnected() ? COLOR_ACCENT_HOV : COLOR_TEXT_DIM);
 
-            DrawAACircle(hdc, rcProfile.left + 14, 124, 4, Network_IsConnected() ? COLOR_ACCENT : COLOR_TEXT_MUTED);
-
-            RECT rcTagText = { rcProfile.left + 24, 106, rcProfile.right - 64, 142 };
+            RECT rcTagText = { rcProfile.left + S(24), rcProfile.top, rcProfile.right - S(68), rcProfile.bottom };
             SelectObject(hdc, g_hFontBold);
             SetTextColor(hdc, COLOR_TEXT_WHITE);
-            DrawTextW(hdc, myTag, -1, &rcTagText, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(hdc, myTag, -1, &rcTagText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-            rcCopyTag = (RECT){ rcProfile.right - 62, 112, rcProfile.right - 6, 136 };
-            DrawRoundedCard(hdc, &rcCopyTag, COLOR_CARD, COLOR_BORDER, 4);
-            SelectObject(hdc, g_hFontSmall);
-            SetTextColor(hdc, COLOR_ACCENT);
+            rcCopyTag = (RECT){ rcProfile.right - S(64), rcProfile.top + S(8), rcProfile.right - S(8), rcProfile.bottom - S(8) };
+            DrawFastRoundRect(hdc, &rcCopyTag, (g_hotZone == ZONE_COPY_TAG) ? COLOR_CTRL_HOVER : COLOR_SIDEBAR, COLOR_BORDER, S(6));
+            SelectObject(hdc, g_hFontSmallBold);
+            SetTextColor(hdc, COLOR_ACCENT_HOV);
             BOOL copiedRecently = (g_copiedTagTick > 0 && GetTickCount() - g_copiedTagTick < 2000);
             DrawTextW(hdc, copiedRecently ? L"Kopya!" : L"Kopyala", -1, &rcCopyTag, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // 3 Sekme
-            int tabW = (SIDEBAR_WIDTH - 20) / 3;
-            rcFriendsTab0 = (RECT){ 10, 150, 10 + tabW, 178 };
-            rcFriendsTab1 = (RECT){ 10 + tabW, 150, 10 + tabW * 2, 178 };
-            rcFriendsTab2 = (RECT){ 10 + tabW * 2, 150, SIDEBAR_WIDTH - 10, 178 };
+            // Apple Segmented Control Tarzı 3 Sekme
+            RECT rcSegBg = { offX + S(10), yBase + S(86), offX + sbW - S(10), yBase + S(116) };
+            DrawFastRoundRect(hdc, &rcSegBg, RGB(14, 14, 17), COLOR_BORDER, S(8));
 
-            DrawRoundedCard(hdc, &rcFriendsTab0, (g_friendsTab == FRIENDS_TAB_LIST) ? COLOR_CARD_HOVER : COLOR_SIDEBAR, (g_friendsTab == FRIENDS_TAB_LIST) ? COLOR_ACCENT : COLOR_BORDER, 4);
-            DrawRoundedCard(hdc, &rcFriendsTab1, (g_friendsTab == FRIENDS_TAB_REQUESTS) ? COLOR_CARD_HOVER : COLOR_SIDEBAR, (g_friendsTab == FRIENDS_TAB_REQUESTS) ? COLOR_ACCENT : COLOR_BORDER, 4);
-            DrawRoundedCard(hdc, &rcFriendsTab2, (g_friendsTab == FRIENDS_TAB_ADD) ? COLOR_CARD_HOVER : COLOR_SIDEBAR, (g_friendsTab == FRIENDS_TAB_ADD) ? COLOR_ACCENT : COLOR_BORDER, 4);
+            int segW = (rcSegBg.right - rcSegBg.left - S(6)) / 3;
+            rcFriendsTab0 = (RECT){ rcSegBg.left + S(3),            rcSegBg.top + S(3), rcSegBg.left + S(3) + segW,     rcSegBg.bottom - S(3) };
+            rcFriendsTab1 = (RECT){ rcSegBg.left + S(3) + segW,     rcSegBg.top + S(3), rcSegBg.left + S(3) + segW * 2, rcSegBg.bottom - S(3) };
+            rcFriendsTab2 = (RECT){ rcSegBg.left + S(3) + segW * 2, rcSegBg.top + S(3), rcSegBg.right - S(3),           rcSegBg.bottom - S(3) };
 
-            SelectObject(hdc, g_hFontSmall);
-            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_LIST) ? COLOR_ACCENT : COLOR_TEXT_MUTED);
-            wchar_t t0Buf[32];
-            wsprintfW(t0Buf, L"Liste (%d)", Friends_GetFriendCount());
+            if (g_friendsTab == FRIENDS_TAB_LIST)     DrawFastRoundRect(hdc, &rcFriendsTab0, COLOR_CTRL_HOVER, COLOR_BORDER, S(6));
+            if (g_friendsTab == FRIENDS_TAB_REQUESTS) DrawFastRoundRect(hdc, &rcFriendsTab1, COLOR_CTRL_HOVER, COLOR_BORDER, S(6));
+            if (g_friendsTab == FRIENDS_TAB_ADD)      DrawFastRoundRect(hdc, &rcFriendsTab2, COLOR_CTRL_HOVER, COLOR_BORDER, S(6));
+
+            SelectObject(hdc, g_hFontSmallBold);
+            wchar_t t0Buf[32], t1Buf[32];
+            _snwprintf(t0Buf, 31, L"Liste (%d)", Friends_GetFriendCount()); t0Buf[31] = L'\0';
+            _snwprintf(t1Buf, 31, L"İstek (%d)", Friends_GetPendingCount()); t1Buf[31] = L'\0';
+
+            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_LIST) ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED);
             DrawTextW(hdc, t0Buf, -1, &rcFriendsTab0, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_REQUESTS) ? COLOR_ACCENT : (Friends_GetPendingCount() > 0 ? COLOR_ACCENT : COLOR_TEXT_MUTED));
-            wchar_t t1Buf[32];
-            wsprintfW(t1Buf, L"İstek (%d)", Friends_GetPendingCount());
+            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_REQUESTS) ? COLOR_ACCENT_HOV : (Friends_GetPendingCount() > 0 ? COLOR_ACCENT_HOV : COLOR_TEXT_MUTED));
             DrawTextW(hdc, t1Buf, -1, &rcFriendsTab1, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_ADD) ? COLOR_ACCENT : COLOR_TEXT_MUTED);
+            SetTextColor(hdc, (g_friendsTab == FRIENDS_TAB_ADD) ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED);
             DrawTextW(hdc, L"+ Ekle", -1, &rcFriendsTab2, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // Sekme İçerikleri
+            int contentTop = yBase + S(126);
+
             if (g_friendsTab == FRIENDS_TAB_LIST) {
                 int fCount = Friends_GetFriendCount();
                 if (fCount == 0) {
-                    RECT rcEmpty = { 15, 220, SIDEBAR_WIDTH - 15, 340 };
+                    RECT rcEmpty = { offX + S(16), contentTop + S(24), offX + sbW - S(16), contentTop + S(140) };
                     SelectObject(hdc, g_hFontSmall);
                     SetTextColor(hdc, COLOR_TEXT_MUTED);
-                    DrawTextW(hdc, L"Henüz arkadaşınız yok.\n\n'+ Ekle' sekmesinden\narkadaşınızın etiketini yazarak\nistek gönderebilirsiniz.", -1, &rcEmpty, DT_CENTER | DT_WORDBREAK);
+                    DrawTextW(hdc, L"Henüz arkadaşınız yok.\n\n'+ Ekle' sekmesinden arkadaşınızın\netiketini yazıp davet gönderebilirsiniz.", -1, &rcEmpty, DT_CENTER | DT_WORDBREAK);
                 } else {
                     for (int i = 0; i < fCount; i++) {
                         const FriendItem *fi = Friends_GetFriend(i);
                         if (!fi) continue;
 
-                        int itemY = 186 + i * 50;
-                        RECT rcCard = { 10, itemY, SIDEBAR_WIDTH - 10, itemY + 44 };
-                        DrawRoundedCard(hdc, &rcCard, COLOR_CARD, COLOR_BORDER, 6);
+                        int cardY = contentTop + i * S(52);
+                        RECT rcCard = { offX + S(10), cardY, offX + sbW - S(10), cardY + S(46) };
+                        DrawFastRoundRect(hdc, &rcCard, COLOR_CARD, COLOR_BORDER, S(8));
+                        DrawAACircle(hdc, rcCard.left + S(12), cardY + S(23), S(4), fi->isOnline ? COLOR_ACCENT_HOV : COLOR_TEXT_DIM);
 
-                        DrawAACircle(hdc, rcCard.left + 12, itemY + 22, 4, fi->isOnline ? COLOR_ACCENT : COLOR_TEXT_MUTED);
-
-                        RECT rcName = { rcCard.left + 22, itemY + 4, rcCard.right - 64, itemY + 24 };
+                        RECT rcName = { rcCard.left + S(22), cardY + S(5), rcCard.right - S(62), cardY + S(24) };
                         SelectObject(hdc, g_hFontBold);
                         SetTextColor(hdc, COLOR_TEXT_WHITE);
                         DrawTextW(hdc, fi->name, -1, &rcName, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-                        RECT rcStatus = { rcCard.left + 22, itemY + 22, rcCard.right - 64, itemY + 40 };
+                        RECT rcSt = { rcCard.left + S(22), cardY + S(23), rcCard.right - S(62), cardY + S(41) };
                         SelectObject(hdc, g_hFontSmall);
                         SetTextColor(hdc, fi->isOnline ? COLOR_TEXT_MUTED : COLOR_TEXT_DIM);
-                        DrawTextW(hdc, fi->currentTrack[0] ? fi->currentTrack : (fi->isOnline ? L"Boşta" : L"Çevrimdışı"), -1, &rcStatus, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+                        DrawTextW(hdc, fi->currentTrack[0] ? fi->currentTrack : (fi->isOnline ? L"Çevrimiçi" : L"Çevrimdışı"), -1, &rcSt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-                        rcFriendActionBtns[i] = (RECT){ rcCard.right - 60, itemY + 8, rcCard.right - 6, itemY + 36 };
+                        rcFriendActionBtns[i] = (RECT){ rcCard.right - S(56), cardY + S(9), rcCard.right - S(8), cardY + S(37) };
                         wchar_t partnerTag[32] = {0};
                         Jam_GetPartnerTag(partnerTag, 32);
-                        BOOL isJammingWithThis = (Jam_IsActive() && _wcsicmp(partnerTag, fi->tag) == 0);
+                        BOOL isJamming = (Jam_IsActive() && _wcsicmp(partnerTag, fi->tag) == 0);
 
-                        if (isJammingWithThis) {
-                            DrawRoundedCard(hdc, &rcFriendActionBtns[i], RGB(45, 25, 25), RGB(180, 50, 50), 4);
-                            SetTextColor(hdc, RGB(255, 100, 100));
+                        if (isJamming) {
+                            DrawFastRoundRect(hdc, &rcFriendActionBtns[i], RGB(48, 22, 22), RGB(170, 50, 50), S(6));
+                            SelectObject(hdc, g_hFontSmallBold);
+                            SetTextColor(hdc, RGB(255, 120, 120));
                             DrawTextW(hdc, L"Ayrıl", -1, &rcFriendActionBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                         } else if (fi->isOnline) {
-                            DrawRoundedCard(hdc, &rcFriendActionBtns[i], COLOR_CARD_HOVER, COLOR_ACCENT, 4);
-                            SetTextColor(hdc, COLOR_ACCENT);
-                            DrawTextW(hdc, L"🎧 Jam", -1, &rcFriendActionBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                            DrawFastRoundRect(hdc, &rcFriendActionBtns[i], RGB(20, 44, 28), COLOR_ACCENT, S(6));
+                            SelectObject(hdc, g_hFontSmallBold);
+                            SetTextColor(hdc, COLOR_ACCENT_HOV);
+                            DrawTextW(hdc, L"Jam", -1, &rcFriendActionBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                         }
                     }
                 }
@@ -1165,7 +1433,7 @@ DrawAACircle(hdc, thumbX, thumbY, thumbRadius, COLOR_TEXT_WHITE);
             else if (g_friendsTab == FRIENDS_TAB_REQUESTS) {
                 int pCount = Friends_GetPendingCount();
                 if (pCount == 0) {
-                    RECT rcEmpty = { 15, 230, SIDEBAR_WIDTH - 15, 300 };
+                    RECT rcEmpty = { offX + S(16), contentTop + S(28), offX + sbW - S(16), contentTop + S(90) };
                     SelectObject(hdc, g_hFontSmall);
                     SetTextColor(hdc, COLOR_TEXT_MUTED);
                     DrawTextW(hdc, L"Bekleyen arkadaşlık isteği yok.", -1, &rcEmpty, DT_CENTER | DT_SINGLELINE);
@@ -1174,100 +1442,146 @@ DrawAACircle(hdc, thumbX, thumbY, thumbRadius, COLOR_TEXT_WHITE);
                         const FriendRequest *rq = Friends_GetPending(i);
                         if (!rq) continue;
 
-                        int itemY = 186 + i * 52;
-                        RECT rcCard = { 10, itemY, SIDEBAR_WIDTH - 10, itemY + 46 };
-                        DrawRoundedCard(hdc, &rcCard, COLOR_CARD, COLOR_BORDER, 6);
+                        int cardY = contentTop + i * S(52);
+                        RECT rcCard = { offX + S(10), cardY, offX + sbW - S(10), cardY + S(46) };
+                        DrawFastRoundRect(hdc, &rcCard, COLOR_CARD, COLOR_BORDER, S(8));
 
-                        RECT rcName = { rcCard.left + 10, itemY + 4, rcCard.right - 70, itemY + 24 };
+                        RECT rcName = { rcCard.left + S(12), cardY + S(5), rcCard.right - S(72), cardY + S(24) };
                         SelectObject(hdc, g_hFontBold);
                         SetTextColor(hdc, COLOR_TEXT_WHITE);
                         DrawTextW(hdc, rq->name, -1, &rcName, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-                        RECT rcTag = { rcCard.left + 10, itemY + 22, rcCard.right - 70, itemY + 42 };
+                        RECT rcTag = { rcCard.left + S(12), cardY + S(23), rcCard.right - S(72), cardY + S(41) };
                         SelectObject(hdc, g_hFontSmall);
                         SetTextColor(hdc, COLOR_TEXT_MUTED);
                         DrawTextW(hdc, rq->tag, -1, &rcTag, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-                        rcReqAcceptBtns[i] = (RECT){ rcCard.right - 64, itemY + 9, rcCard.right - 36, itemY + 37 };
-                        DrawRoundedCard(hdc, &rcReqAcceptBtns[i], COLOR_ACCENT, COLOR_ACCENT, 4);
-                        SelectObject(hdc, g_hFontBold);
-                        SetTextColor(hdc, RGB(0, 0, 0));
-                        DrawTextW(hdc, L"✓", -1, &rcReqAcceptBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        rcReqAcceptBtns[i] = (RECT){ rcCard.right - S(66), cardY + S(9), rcCard.right - S(38), cardY + S(37) };
+                        DrawFastRoundRect(hdc, &rcReqAcceptBtns[i], COLOR_ACCENT, COLOR_ACCENT, S(6));
+                        SelectObject(hdc, g_hFontIconsSmall);
+                        SetTextColor(hdc, RGB(10, 10, 12));
+                        DrawTextW(hdc, L"\uE73E", -1, &rcReqAcceptBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        rcReqRejectBtns[i] = (RECT){ rcCard.right - 32, itemY + 9, rcCard.right - 6, itemY + 37 };
-                        DrawRoundedCard(hdc, &rcReqRejectBtns[i], COLOR_CARD_HOVER, COLOR_BORDER, 4);
+                        rcReqRejectBtns[i] = (RECT){ rcCard.right - S(34), cardY + S(9), rcCard.right - S(6), cardY + S(37) };
+                        DrawFastRoundRect(hdc, &rcReqRejectBtns[i], COLOR_CTRL_HOVER, COLOR_BORDER, S(6));
+                        SelectObject(hdc, g_hFontIconsSmall);
                         SetTextColor(hdc, COLOR_TEXT_MUTED);
-                        DrawTextW(hdc, L"✕", -1, &rcReqRejectBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        DrawTextW(hdc, L"\uE711", -1, &rcReqRejectBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                     }
                 }
             }
             else if (g_friendsTab == FRIENDS_TAB_ADD) {
-                RECT rcLbl = { 14, 192, SIDEBAR_WIDTH - 14, 212 };
+                RECT rcLbl = { offX + S(14), contentTop + S(2), offX + sbW - S(14), contentTop + S(22) };
                 SelectObject(hdc, g_hFontBold);
                 SetTextColor(hdc, COLOR_TEXT_WHITE);
-                DrawTextW(hdc, L"Arkadaşının Etiketi:", -1, &rcLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                DrawTextW(hdc, L"Arkadaş Ekle", -1, &rcLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-                RECT rcSub = { 14, 212, SIDEBAR_WIDTH - 14, 230 };
+                RECT rcSub = { offX + S(14), contentTop + S(22), offX + sbW - S(14), contentTop + S(40) };
                 SelectObject(hdc, g_hFontSmall);
                 SetTextColor(hdc, COLOR_TEXT_MUTED);
-                DrawTextW(hdc, L"Örn: Selim#8421", -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                DrawTextW(hdc, L"Etiketi girin (Örn: Selim#8421)", -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-                rcFriendSendBtn = (RECT){ 12, 275, SIDEBAR_WIDTH - 12, 308 };
-                DrawRoundedCard(hdc, &rcFriendSendBtn, COLOR_ACCENT, COLOR_ACCENT, 6);
+                RECT rcInputBox = { offX + S(10), contentTop + S(46), offX + sbW - S(10), contentTop + S(82) };
+                DrawFastRoundRect(hdc, &rcInputBox, COLOR_SEARCH_PILL, COLOR_BORDER, S(8));
+
+                rcFriendSendBtn = (RECT){ offX + S(10), contentTop + S(92), offX + sbW - S(10), contentTop + S(128) };
+                COLORREF btnCol = (g_pressedZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_DARK : ((g_hotZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_HOV : COLOR_ACCENT);
+                DrawFastRoundRect(hdc, &rcFriendSendBtn, btnCol, btnCol, S(8));
                 SelectObject(hdc, g_hFontBold);
-                SetTextColor(hdc, RGB(0, 0, 0));
+                SetTextColor(hdc, RGB(10, 10, 12));
                 DrawTextW(hdc, L"İstek Gönder", -1, &rcFriendSendBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                 if (g_friendAddMsg[0]) {
-                    RECT rcMsg = { 14, 320, SIDEBAR_WIDTH - 14, 370 };
+                    RECT rcMsg = { offX + S(12), contentTop + S(138), offX + sbW - S(12), contentTop + S(190) };
                     SelectObject(hdc, g_hFontSmall);
-                    SetTextColor(hdc, wcsstr(g_friendAddMsg, L"gönderildi") ? COLOR_ACCENT : RGB(255, 120, 120));
+                    SetTextColor(hdc, wcsstr(g_friendAddMsg, L"gönderildi") ? COLOR_ACCENT_HOV : RGB(255, 120, 120));
                     DrawTextW(hdc, g_friendAddMsg, -1, &rcMsg, DT_LEFT | DT_WORDBREAK);
                 }
             }
         }
+
+        RestoreDC(hdc, savedSide);
     }
 
-    // 5. CANLI JAM DAVETİ BİLDİRİMİ (TOAST)
+    // =========================================================================
+    // 5. CANLI JAM DAVETİ YÜZEN BİLDİRİMİ (APPLE FLOATING BANNER)
+    // =========================================================================
     if (Jam_HasPendingInvite()) {
         wchar_t invName[64] = {0};
         wchar_t invTag[32] = {0};
         Jam_GetPendingInviteInfo(invName, invTag);
 
-        rcToastBox = (RECT){ centerX - 180, 12, centerX + 180, 56 };
-        DrawRoundedCard(hdc, &rcToastBox, RGB(28, 28, 34), COLOR_ACCENT, 8);
+        int bannerW = S(360);
+        if (bannerW > w - S(24)) bannerW = w - S(24);
+        rcToastBox = (RECT){ (w - bannerW) / 2, headerH + S(10), (w + bannerW) / 2, headerH + S(56) };
+        DrawFastRoundRect(hdc, &rcToastBox, RGB(24, 30, 26), COLOR_ACCENT, S(12));
 
         wchar_t toastMsg[128];
-        wsprintfW(toastMsg, L"🎧 %s seni Jam'e davet etti!", invName[0] ? invName : invTag);
+        _snwprintf(toastMsg, 127, L"%s seni Jam'e davet etti", invName[0] ? invName : invTag);
+        toastMsg[127] = L'\0';
 
-        RECT rcToastTxt = { rcToastBox.left + 14, rcToastBox.top, rcToastBox.right - 100, rcToastBox.bottom };
+        RECT rcToastTxt = { rcToastBox.left + S(14), rcToastBox.top, rcToastBox.right - S(102), rcToastBox.bottom };
+        SetBkMode(hdc, TRANSPARENT);
         SelectObject(hdc, g_hFontBold);
         SetTextColor(hdc, COLOR_TEXT_WHITE);
         DrawTextW(hdc, toastMsg, -1, &rcToastTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-        rcToastAccept = (RECT){ rcToastBox.right - 92, rcToastBox.top + 8, rcToastBox.right - 42, rcToastBox.bottom - 8 };
-        DrawRoundedCard(hdc, &rcToastAccept, COLOR_ACCENT, COLOR_ACCENT, 4);
-        SelectObject(hdc, g_hFontBold);
-        SetTextColor(hdc, RGB(0, 0, 0));
+        rcToastAccept = (RECT){ rcToastBox.right - S(94), rcToastBox.top + S(9), rcToastBox.right - S(40), rcToastBox.bottom - S(9) };
+        DrawFastRoundRect(hdc, &rcToastAccept, (g_hotZone == ZONE_TOAST_ACCEPT) ? COLOR_ACCENT_HOV : COLOR_ACCENT, COLOR_ACCENT, S(8));
+        SelectObject(hdc, g_hFontSmallBold);
+        SetTextColor(hdc, RGB(10, 10, 12));
         DrawTextW(hdc, L"Katıl", -1, &rcToastAccept, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-        rcToastReject = (RECT){ rcToastBox.right - 36, rcToastBox.top + 8, rcToastBox.right - 10, rcToastBox.bottom - 8 };
-        DrawRoundedCard(hdc, &rcToastReject, COLOR_CARD, COLOR_BORDER, 4);
-        SelectObject(hdc, g_hFontSmall);
+        rcToastReject = (RECT){ rcToastBox.right - S(34), rcToastBox.top + S(9), rcToastBox.right - S(8), rcToastBox.bottom - S(9) };
+        DrawFastRoundRect(hdc, &rcToastReject, COLOR_CTRL_HOVER, COLOR_BORDER, S(8));
+        SelectObject(hdc, g_hFontIconsSmall);
         SetTextColor(hdc, COLOR_TEXT_MUTED);
-        DrawTextW(hdc, L"✕", -1, &rcToastReject, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        DrawTextW(hdc, L"\uE711", -1, &rcToastReject, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     } else {
         rcToastBox = (RECT){0};
     }
 }
 
-static LRESULT CALLBACK SearchEditSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+static UiZone HitTestZones(POINT pt) {
+    if (Jam_HasPendingInvite()) {
+        if (PtInRect(&rcToastAccept, pt)) return ZONE_TOAST_ACCEPT;
+        if (PtInRect(&rcToastReject, pt)) return ZONE_TOAST_REJECT;
+    }
+    if (PtInRect(&rcHamburger, pt)) return ZONE_HAMBURGER;
+    if (g_searchQuery[0] && PtInRect(&rcSearchClear, pt)) return ZONE_SEARCH_CLEAR;
+    if (PtInRect(&rcQuickDownload, pt)) return ZONE_QUICK_DOWNLOAD;
+
+    if (g_sidebarOpen && pt.x < GetSidebarW() && pt.y >= GetHeaderH()) {
+        if (g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
+            if (PtInRect(&rcFriendsBack, pt)) return ZONE_FRIENDS_BACK;
+            if (PtInRect(&rcCopyTag, pt))     return ZONE_COPY_TAG;
+            if (PtInRect(&rcFriendsTab0, pt)) return ZONE_FTAB0;
+            if (PtInRect(&rcFriendsTab1, pt)) return ZONE_FTAB1;
+            if (PtInRect(&rcFriendsTab2, pt)) return ZONE_FTAB2;
+            if (g_friendsTab == FRIENDS_TAB_ADD && PtInRect(&rcFriendSendBtn, pt)) return ZONE_FRIEND_SEND;
+        }
+        return ZONE_NONE;
+    }
+    if (g_sidebarOpen && pt.y >= GetHeaderH()) return ZONE_NONE;
+
+    if (Jam_IsActive() && PtInRect(&rcJamLeave, pt)) return ZONE_JAM_LEAVE;
+    if (PtInRect(&rcPlay, pt))    return ZONE_PLAY;
+    if (PtInRect(&rcPrev, pt))    return ZONE_PREV;
+    if (PtInRect(&rcNext, pt))    return ZONE_NEXT;
+    if (PtInRect(&rcShuffle, pt)) return ZONE_SHUFFLE;
+    if (PtInRect(&rcRepeat, pt))  return ZONE_REPEAT;
+    if (PtInRect(&rcSpeaker, pt)) return ZONE_SPEAKER;
+    if (PtInRect(&rcSeekHit, pt)) return ZONE_SEEK;
+    if (PtInRect(&rcVolHit, pt))  return ZONE_VOL;
+    return ZONE_NONE;
+}
+
+static LRESULT CALLBACK SearchBoxSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_KEYDOWN) {
         if (wParam == VK_RETURN) {
             int total = g_isFiltered ? g_filterCount : Playlist_Count();
             if (total > 0) {
-                int firstIdx = g_isFiltered ? g_filterIndices[0] : 0;
-                PlayTrack(firstIdx);
+                PlayTrack(g_isFiltered ? g_filterIndices[0] : 0);
             }
             return 0;
         } else if (wParam == VK_ESCAPE) {
@@ -1279,8 +1593,39 @@ static LRESULT CALLBACK SearchEditSubclassProc(HWND hWnd, UINT msg, WPARAM wPara
             SetFocus(g_hWnd);
             return 0;
         }
+    } else if (msg == WM_CHAR && (wParam == 1 || wParam == 22 || wParam == 3 || wParam == 24 || wParam == VK_RETURN || wParam == VK_ESCAPE)) {
+        if (wParam == VK_RETURN || wParam == VK_ESCAPE) return 0;
     }
     return CallWindowProcW(g_oldSearchEditProc, hWnd, msg, wParam, lParam);
+}
+
+static LRESULT CALLBACK FriendEditSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_KEYDOWN) {
+        if (wParam == VK_RETURN) {
+            SubmitFriendRequest(g_hWnd);
+            return 0;
+        } else if (wParam == VK_ESCAPE) {
+            ToggleSidebar(FALSE);
+            SetFocus(g_hWnd);
+            return 0;
+        }
+    } else if (msg == WM_CHAR && (wParam == VK_RETURN || wParam == VK_ESCAPE)) {
+        return 0;
+    }
+    return CallWindowProcW(g_oldFriendAddEditProc, hWnd, msg, wParam, lParam);
+}
+
+static void LayoutHeaderInputs(int clientW) {
+    int headerH = GetHeaderH();
+    int searchW = S(188);
+    int searchH = S(32);
+    int searchX = clientW - searchW - S(12);
+    int searchY = (headerH - searchH) / 2;
+    int rightPad = g_searchQuery[0] ? S(28) : S(10);
+    if (g_hSearchEdit) {
+        MoveWindow(g_hSearchEdit, searchX + S(28), searchY + S(6), searchW - S(28) - rightPad, searchH - S(12), TRUE);
+    }
+    UpdateSidebarEditPosition();
 }
 
 static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -1289,20 +1634,18 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             g_hWnd = hWnd;
 
             BOOL useDark = TRUE;
-            DwmSetWindowAttribute(hWnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &useDark, sizeof(useDark));
+            DwmSetWindowAttribute(hWnd, 20, &useDark, sizeof(useDark));
             DwmSetWindowAttribute(hWnd, 19, &useDark, sizeof(useDark));
 
             typedef UINT(WINAPI *GetDpiForWindowProc)(HWND);
             GetDpiForWindowProc pGetDpi = (GetDpiForWindowProc)GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow");
-            int dpi = pGetDpi ? pGetDpi(hWnd) : 96;
+            int dpi = pGetDpi ? (int)pGetDpi(hWnd) : 96;
             if (dpi <= 0) dpi = 96;
             InitDpiFonts(dpi);
 
-            g_hAppIcon = (HICON)LoadImageW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(1), IMAGE_ICON, 36, 36, LR_DEFAULTCOLOR);
+            g_hAppIcon = (HICON)LoadImageW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(1), IMAGE_ICON, S(36), S(36), LR_DEFAULTCOLOR);
+            g_hBrSearchEdit = CreateSolidBrush(COLOR_SEARCH_PILL);
 
-            g_hBrSearchEdit = CreateSolidBrush(RGB(36, 36, 40));
-
-            // Sağ üst arama kutusu
             g_hSearchEdit = CreateWindowExW(
                 0, L"EDIT", L"",
                 WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
@@ -1311,12 +1654,20 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             );
             SendMessageW(g_hSearchEdit, WM_SETFONT, (WPARAM)g_hFontMain, TRUE);
             SendMessageW(g_hSearchEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Şarkılarda ara...");
+            g_oldSearchEditProc = (WNDPROC)SetWindowLongPtrW(g_hSearchEdit, GWLP_WNDPROC, (LONG_PTR)SearchBoxSubclassProc);
 
-            g_oldSearchEditProc = (WNDPROC)SetWindowLongPtrW(g_hSearchEdit, GWLP_WNDPROC, (LONG_PTR)SearchEditSubclassProc);
+            g_hFriendAddEdit = CreateWindowExW(
+                0, L"EDIT", L"",
+                WS_CHILD | ES_AUTOHSCROLL,
+                0, 0, 0, 0,
+                hWnd, (HMENU)IDC_FRIEND_ADD_EDIT, GetModuleHandle(NULL), NULL
+            );
+            SendMessageW(g_hFriendAddEdit, WM_SETFONT, (WPARAM)g_hFontMain, TRUE);
+            SendMessageW(g_hFriendAddEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Selim#8421");
+            g_oldFriendAddEditProc = (WNDPROC)SetWindowLongPtrW(g_hFriendAddEdit, GWLP_WNDPROC, (LONG_PTR)FriendEditSubclassProc);
 
             Player_Init(hWnd);
             Playlist_Init();
-
             Friends_Init();
             Jam_Init();
 
@@ -1342,24 +1693,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 }
             }
 
-            g_hFriendAddEdit = CreateWindowExW(
-                0, L"EDIT", L"",
-                WS_CHILD | ES_AUTOHSCROLL,
-                0, 0, 0, 0,
-                hWnd, (HMENU)IDC_FRIEND_ADD_EDIT, GetModuleHandle(NULL), NULL
-            );
-            SendMessageW(g_hFriendAddEdit, WM_SETFONT, (WPARAM)g_hFontMain, TRUE);
-            SendMessageW(g_hFriendAddEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Etiket yazın (Örn: Selim#8421)");
-
             Config_Load(&g_cfg, L"config.json");
             Player_SetVolume(g_cfg.volume);
+            if (g_cfg.volume > 0) g_preMuteVol = g_cfg.volume;
 
             if (g_cfg.lastFolder[0] && GetFileAttributesW(g_cfg.lastFolder) != INVALID_FILE_ATTRIBUTES) {
                 Playlist_ScanFolder(g_cfg.lastFolder);
-                TrimProcessMemory();
-                if (Playlist_Count() > 0) {
-                    g_selectedTrack = 0;
-                }
+                if (Playlist_Count() > 0) g_selectedTrack = 0;
             } else {
                 wchar_t defaultMusicDir[MAX_PATH];
                 GetModuleFileNameW(NULL, defaultMusicDir, MAX_PATH);
@@ -1375,17 +1715,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     g_cfg.lastFolder[MAX_PATH - 1] = L'\0';
                     Config_Save(&g_cfg, L"config.json");
                     Playlist_ScanFolder(g_cfg.lastFolder);
-                    TrimProcessMemory();
-                    if (Playlist_Count() > 0) {
-                        g_selectedTrack = 0;
-                    }
+                    if (Playlist_Count() > 0) g_selectedTrack = 0;
                 }
             }
 
             DragAcceptFiles(hWnd, TRUE);
             SetTimer(hWnd, IDT_UPDATE_TIMER, 250, NULL);
 
-            // Başlangıçta eski geçici güncelleme dosyalarını temizle ve güncelleme kontrolü yap
             Updater_Init();
             Updater_CheckAsync(hWnd, FALSE);
             return 0;
@@ -1395,7 +1731,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             HWND hCtrl = (HWND)lParam;
             if (hCtrl == g_hSearchEdit || hCtrl == g_hFriendAddEdit) {
                 HDC hdcEdit = (HDC)wParam;
-                SetBkColor(hdcEdit, RGB(36, 36, 40));
+                SetBkColor(hdcEdit, COLOR_SEARCH_PILL);
                 SetTextColor(hdcEdit, COLOR_TEXT_WHITE);
                 return (LRESULT)g_hBrSearchEdit;
             }
@@ -1405,8 +1741,14 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         case WM_COMMAND: {
             if (LOWORD(wParam) == IDC_HEADER_SEARCH && HIWORD(wParam) == EN_CHANGE) {
                 wchar_t q[128] = {0};
-                GetWindowTextW(g_hSearchEdit, q, 128);
+                GetWindowTextW(g_hSearchEdit, q, 127);
+                BOOL hadQuery = (g_searchQuery[0] != 0);
                 ApplyFilter(q);
+                if (hadQuery != (g_searchQuery[0] != 0)) {
+                    RECT rc;
+                    GetClientRect(hWnd, &rc);
+                    LayoutHeaderInputs(rc.right);
+                }
                 return 0;
             }
             break;
@@ -1415,6 +1757,9 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         case 0x02E0 /* WM_DPICHANGED */: {
             int newDpi = HIWORD(wParam);
             InitDpiFonts(newDpi);
+            if (g_hSearchEdit) SendMessageW(g_hSearchEdit, WM_SETFONT, (WPARAM)g_hFontMain, TRUE);
+            if (g_hFriendAddEdit) SendMessageW(g_hFriendAddEdit, WM_SETFONT, (WPARAM)g_hFontMain, TRUE);
+            FreeBackbuffer();
             RECT *prc = (RECT*)lParam;
             SetWindowPos(hWnd, NULL, prc->left, prc->top, prc->right - prc->left, prc->bottom - prc->top, SWP_NOZORDER | SWP_NOACTIVATE);
             InvalidateRect(hWnd, NULL, FALSE);
@@ -1422,54 +1767,67 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         }
 
         case WM_ACTIVATE: {
-            if (LOWORD(wParam) == WA_INACTIVE) {
-                SetTimer(hWnd, IDT_UPDATE_TIMER, 1000, NULL);
-                TrimProcessMemory();
-            } else {
-                SetTimer(hWnd, IDT_UPDATE_TIMER, 250, NULL);
-            }
+            SetTimer(hWnd, IDT_UPDATE_TIMER, (LOWORD(wParam) == WA_INACTIVE) ? 1000 : 250, NULL);
             break;
         }
 
         case WM_SIZE: {
             if (wParam == SIZE_MINIMIZED) {
                 SetTimer(hWnd, IDT_UPDATE_TIMER, 1500, NULL);
-                TrimProcessMemory();
+                FreeBackbuffer();
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
             } else {
                 int w = LOWORD(lParam);
-                int searchW = 195;
-                int searchX = w - searchW - 15;
-                if (g_hSearchEdit) {
-                    MoveWindow(g_hSearchEdit, searchX + 28, 20, searchW - 36, 20, TRUE);
-                }
+                ClampScrollTargets(hWnd);
+                LayoutHeaderInputs(w);
                 InvalidateRect(hWnd, NULL, FALSE);
             }
             break;
         }
 
         case WM_TIMER: {
-            if (wParam == IDT_UPDATE_TIMER) {
-                static int s_trimCounter = 0;
-                if (++s_trimCounter >= 40) {
-                    s_trimCounter = 0;
-                    TrimProcessMemory();
-                }
+            if (wParam == IDT_ANIM_TIMER) {
+                DWORD now = GetTickCount();
+                float dt = (float)(now - g_lastAnimTick) * 0.001f;
+                g_lastAnimTick = now;
+                if (dt <= 0.0f || dt > 0.05f) dt = 0.016f;
 
-                static int s_friendsStatusCounter = 0;
-                if (++s_friendsStatusCounter >= 16) {
-                    s_friendsStatusCounter = 0;
-                    Friends_CheckTimeouts();
-                    const wchar_t *curTitle = (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) ? Playlist_Get(g_currentTrack)->title : L"";
-                    Friends_PublishMyStatus(Player_IsPlaying(), curTitle, Player_GetPosition());
+                BOOL movingScroll  = StepSpring(&g_scrollPosPx, &g_scrollVelPx, g_scrollTargetPx, 24.0f, 1.0f, dt, 0.35f);
+                BOOL movingSidebar = StepSpring(&g_sidebarAnim, &g_sidebarVel, g_sidebarOpen ? 1.0f : 0.0f, 26.0f, 0.92f, dt, 0.003f);
+
+                UpdateSidebarEditPosition();
+                InvalidateRect(hWnd, NULL, FALSE);
+
+                if (!movingScroll && !movingSidebar) {
+                    KillTimer(hWnd, IDT_ANIM_TIMER);
+                    g_animTimerActive = FALSE;
+                }
+                return 0;
+            }
+
+            if (wParam == IDT_UPDATE_TIMER) {
+                // Yalnızca gerçek arkadaş varken durum yayınla — gereksiz ağ trafiği sıfır!
+                if (Friends_GetFriendCount() > 0) {
+                    static int s_statusTicks = 0;
+                    static int s_lastPubTrack = -2;
+                    static int s_lastPubPlay  = -1;
+                    int curPlay = Player_IsPlaying();
+                    s_statusTicks++;
+                    if (curPlay != s_lastPubPlay || g_currentTrack != s_lastPubTrack || s_statusTicks >= 60) {
+                        s_statusTicks = 0;
+                        s_lastPubPlay = curPlay;
+                        s_lastPubTrack = g_currentTrack;
+                        Friends_CheckTimeouts();
+                        const wchar_t *curTitle = (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) ? Playlist_Get(g_currentTrack)->title : L"";
+                        Friends_PublishMyStatus(curPlay, curTitle, Player_GetPosition());
+                    }
                 }
 
                 if (Player_IsPlaying() || g_isDraggingSeek) {
                     RECT rcClient;
                     GetClientRect(hWnd, &rcClient);
-                    RECT rcSeekArea = { 0, rcClient.bottom - 102, rcClient.right, rcClient.bottom - 60 };
-                    InvalidateRect(hWnd, &rcSeekArea, FALSE);
-                    RECT rcHdr = { 65, 0, rcClient.right - 220, 60 };
-                    InvalidateRect(hWnd, &rcHdr, FALSE);
+                    RECT rcDockSeek = { 0, rcClient.bottom - GetDockH(), rcClient.right, rcClient.bottom - GetDockH() + S(32) };
+                    InvalidateRect(hWnd, &rcDockSeek, FALSE);
                 }
             }
             return 0;
@@ -1479,6 +1837,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             int nextIdx = Playlist_FindNext(g_currentTrack, g_cfg.shuffle, g_cfg.repeat);
             if (nextIdx >= 0) {
                 PlayTrack(nextIdx);
+                ScrollTrackIntoView(nextIdx);
             } else {
                 Player_Stop();
                 InvalidateRect(hWnd, NULL, FALSE);
@@ -1511,10 +1870,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             if (g_cfg.lastFolder[0]) {
                 int oldCount = Playlist_Count();
                 Playlist_ScanFolder(g_cfg.lastFolder);
-                TrimProcessMemory();
                 int newCount = Playlist_Count();
 
-                // Eğer aktif bir arama filtresi varsa temizle ki indirilen şarkı görünsün
                 if (g_isFiltered || g_searchQuery[0]) {
                     g_searchQuery[0] = L'\0';
                     SetWindowTextW(g_hSearchEdit, L"");
@@ -1523,7 +1880,6 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
                 if (newCount > oldCount) {
                     int addedCount = newCount - oldCount;
-                    // YENİ İNDİRİLEN ŞARKILARI EN ÜSTE (0. SIRAYA) TAŞI
                     for (int i = 0; i < addedCount; i++) {
                         Playlist_Move(oldCount + i, 0);
                     }
@@ -1531,7 +1887,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         g_currentTrack += addedCount;
                     }
                     g_selectedTrack = 0;
-                    g_scrollOffset = 0;
+                    g_scrollTargetPx = 0.0f;
+                    StartAnimLoop(hWnd);
                 }
                 InvalidateRect(hWnd, NULL, FALSE);
             }
@@ -1544,28 +1901,29 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 if (info->hasUpdate) {
                     wchar_t prompt[2048];
                     if (info->changelog[0]) {
-                        wsprintfW(prompt, L"SeloPlayer için yeni bir güncelleme mevcut!\n\n"
-                                          L"Mevcut Sürüm: v%s\n"
-                                          L"Yeni Sürüm: v%s\n\n"
-                                          L"Yenilikler:\n%s\n\n"
-                                          L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
-                                  APP_VERSION_STR, info->newVersion, info->changelog);
+                        _snwprintf(prompt, 2047,
+                                   L"SeloPlayer için yeni bir güncelleme mevcut!\n\n"
+                                   L"Mevcut Sürüm: v%s\nYeni Sürüm: v%s\n\nYenilikler:\n%s\n\n"
+                                   L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
+                                   APP_VERSION_STR, info->newVersion, info->changelog);
                     } else {
-                        wsprintfW(prompt, L"SeloPlayer için yeni bir güncelleme mevcut!\n\n"
-                                          L"Mevcut Sürüm: v%s\n"
-                                          L"Yeni Sürüm: v%s\n\n"
-                                          L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
-                                  APP_VERSION_STR, info->newVersion);
+                        _snwprintf(prompt, 2047,
+                                   L"SeloPlayer için yeni bir güncelleme mevcut!\n\n"
+                                   L"Mevcut Sürüm: v%s\nYeni Sürüm: v%s\n\n"
+                                   L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
+                                   APP_VERSION_STR, info->newVersion);
                     }
+                    prompt[2047] = L'\0';
 
                     if (MessageBoxW(hWnd, prompt, L"Güncelleme Mevcut", MB_YESNO | MB_ICONINFORMATION) == IDYES) {
                         Updater_PerformUpdate(hWnd, info->downloadUrl);
                     }
                 } else if (info->isManual) {
                     if (info->checkSuccess) {
-                        wchar_t msg[256];
-                        wsprintfW(msg, L"Zaten en güncel sürümü kullanıyorsunuz.\n(Mevcut Sürüm: v%s)", APP_VERSION_STR);
-                        MessageBoxW(hWnd, msg, L"Güncelleme Kontrolü", MB_OK | MB_ICONINFORMATION);
+                        wchar_t msgBuf[256];
+                        _snwprintf(msgBuf, 255, L"Zaten en güncel sürümü kullanıyorsunuz.\n(Mevcut Sürüm: v%s)", APP_VERSION_STR);
+                        msgBuf[255] = L'\0';
+                        MessageBoxW(hWnd, msgBuf, L"Güncelleme Kontrolü", MB_OK | MB_ICONINFORMATION);
                     } else {
                         MessageBoxW(hWnd, L"Güncelleme sunucusuna erişilemedi.\nLütfen internet bağlantınızı kontrol edin.", L"Güncelleme Kontrolü", MB_OK | MB_ICONWARNING);
                     }
@@ -1596,10 +1954,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 }
             }
             DragFinish(hDrop);
-            TrimProcessMemory();
-            if (g_selectedTrack < 0 && Playlist_Count() > 0) {
-                g_selectedTrack = 0;
-            }
+            if (g_selectedTrack < 0 && Playlist_Count() > 0) g_selectedTrack = 0;
             ApplyFilter(g_searchQuery);
             InvalidateRect(hWnd, NULL, FALSE);
             return 0;
@@ -1607,102 +1962,106 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_MOUSEWHEEL: {
             int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-            POINT pt = { LOWORD(lParam), HIWORD(lParam) };
+            POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
             ScreenToClient(hWnd, &pt);
 
-            if (PtInRect(&rcVolBar, pt) || pt.y >= rcSeekBar.top - 10) {
+            RECT rcClient;
+            GetClientRect(hWnd, &rcClient);
+            if (pt.y >= rcClient.bottom - GetDockH()) {
                 int vol = Player_GetVolume() + (delta > 0 ? 5 : -5);
                 Player_SetVolume(vol);
+                if (Player_GetVolume() > 0) g_preMuteVol = Player_GetVolume();
                 g_cfg.volume = Player_GetVolume();
                 Config_Save(&g_cfg, L"config.json");
-                InvalidateVolumeArea(hWnd);
-            } else {
-                int total = g_isFiltered ? g_filterCount : Playlist_Count();
-                RECT rcClient;
-                GetClientRect(hWnd, &rcClient);
-                int visible = (rcClient.bottom - 105 - 65) / GetItemHeight();
-                int maxScroll = total - visible;
-                if (maxScroll < 0) maxScroll = 0;
+                RECT rcDock = { 0, rcClient.bottom - GetDockH(), rcClient.right, rcClient.bottom };
+                InvalidateRect(hWnd, &rcDock, FALSE);
+            } else if (!g_sidebarOpen || pt.x >= GetSidebarW()) {
+                float step = ((float)delta / 120.0f) * (float)(GetItemH() * 2.2f);
+                g_scrollTargetPx -= step;
+                ClampScrollTargets(hWnd);
+                StartAnimLoop(hWnd);
+            }
+            return 0;
+        }
 
-                g_scrollOffset -= (delta > 0 ? 2 : -2);
-                if (g_scrollOffset < 0) g_scrollOffset = 0;
-                if (g_scrollOffset > maxScroll) g_scrollOffset = maxScroll;
+        case WM_MOUSELEAVE: {
+            if (g_hotZone != ZONE_NONE || g_hoverTrack != -1 || g_scrollbarHover || g_sidebarHoverItem != -1) {
+                g_hotZone = ZONE_NONE;
+                g_hoverTrack = -1;
+                g_scrollbarHover = FALSE;
+                g_sidebarHoverItem = -1;
                 InvalidateRect(hWnd, NULL, FALSE);
             }
             return 0;
         }
 
         case WM_MOUSEMOVE: {
-            POINT pt = { LOWORD(lParam), HIWORD(lParam) };
+            POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
 
-            // Sağ kaydırma çubuğu sürükleme
+            TRACKMOUSEEVENT tme = { sizeof(tme), TME_LEAVE, hWnd, 0 };
+            TrackMouseEvent(&tme);
+
+            // 1:1 Doğrudan Kaydırma Çubuğu Sürükleme (Apple Direct Manipulation)
             if (g_isDraggingScrollbar) {
-                int trackH = rcScrollbarTrack.bottom - rcScrollbarTrack.top;
-                int thumbH = rcScrollbarThumb.bottom - rcScrollbarThumb.top;
-                int totalItems = g_isFiltered ? g_filterCount : Playlist_Count();
+                int sbTop = GetHeaderH() + S(6);
+                int sbBottom = 0;
                 RECT rcClient;
                 GetClientRect(hWnd, &rcClient);
-                int visibleItems = (rcClient.bottom - 105 - 65) / GetItemHeight();
-                int maxScroll = totalItems - visibleItems;
-                if (maxScroll > 0 && trackH > thumbH) {
-                    int dy = pt.y - g_scrollbarDragStartY;
-                    float dRatio = (float)dy / (float)(trackH - thumbH);
-                    int newOffset = g_scrollbarDragStartOffset + (int)(dRatio * maxScroll);
-                    if (newOffset < 0) newOffset = 0;
-                    if (newOffset > maxScroll) newOffset = maxScroll;
-                    if (newOffset != g_scrollOffset) {
-                        g_scrollOffset = newOffset;
-                        InvalidateRect(hWnd, NULL, FALSE);
-                    }
+                sbBottom = rcClient.bottom - GetDockH() - S(6);
+                int trackH = sbBottom - sbTop;
+                int thumbH = rcScrollbarThumb.bottom - rcScrollbarThumb.top;
+                int maxScrollPx = GetMaxScrollPx(hWnd);
+                if (maxScrollPx > 0 && trackH > thumbH) {
+                    float ratio = (float)(pt.y - g_scrollbarDragGrabOffsetY - sbTop) / (float)(trackH - thumbH);
+                    if (ratio < 0.0f) ratio = 0.0f;
+                    if (ratio > 1.0f) ratio = 1.0f;
+                    g_scrollPosPx = g_scrollTargetPx = ratio * (float)maxScrollPx;
+                    g_scrollVelPx = 0.0f;
+                    InvalidateRect(hWnd, NULL, FALSE);
                 }
                 return 0;
             }
 
-            // Kaydırma çubuğu hover tespiti
-            BOOL sbHover = PtInRect(&rcScrollbarTrack, pt);
-            if (sbHover != g_scrollbarHover) {
-                g_scrollbarHover = sbHover;
-                InvalidateRect(hWnd, &rcScrollbarTrack, FALSE);
-            }
-
-            // İlerleme çubuğu sürükleme
             if (g_isDraggingSeek) {
                 int duration = Player_GetDuration();
-                if (duration > 0) {
+                if (duration > 0 && rcSeekBar.right > rcSeekBar.left) {
                     float ratio = (float)(pt.x - rcSeekBar.left) / (float)(rcSeekBar.right - rcSeekBar.left);
                     if (ratio < 0.0f) ratio = 0.0f;
                     if (ratio > 1.0f) ratio = 1.0f;
                     g_seekDragSec = (int)(ratio * duration);
                     RECT rcClient;
                     GetClientRect(hWnd, &rcClient);
-                    RECT rcSeekArea = { 0, rcClient.bottom - 102, rcClient.right, rcClient.bottom - 60 };
-                    InvalidateRect(hWnd, &rcSeekArea, FALSE);
+                    RECT rcDock = { 0, rcClient.bottom - GetDockH(), rcClient.right, rcClient.bottom };
+                    InvalidateRect(hWnd, &rcDock, FALSE);
                 }
                 return 0;
             }
 
-            // Ses çubuğu sürükleme
             if (g_isDraggingVol) {
-                float ratio = (float)(pt.x - rcVolBar.left) / (float)(rcVolBar.right - rcVolBar.left);
-                if (ratio < 0.0f) ratio = 0.0f;
-                if (ratio > 1.0f) ratio = 1.0f;
-                int vol = (int)(ratio * 100);
-                Player_SetVolume(vol);
-                g_cfg.volume = vol;
-                InvalidateVolumeArea(hWnd);
+                if (rcVolBar.right > rcVolBar.left) {
+                    float ratio = (float)(pt.x - rcVolBar.left) / (float)(rcVolBar.right - rcVolBar.left);
+                    if (ratio < 0.0f) ratio = 0.0f;
+                    if (ratio > 1.0f) ratio = 1.0f;
+                    int vol = (int)(ratio * 100.0f + 0.5f);
+                    Player_SetVolume(vol);
+                    if (vol > 0) g_preMuteVol = vol;
+                    g_cfg.volume = vol;
+                    RECT rcClient;
+                    GetClientRect(hWnd, &rcClient);
+                    RECT rcDock = { rcClient.right / 2, rcClient.bottom - GetDockH(), rcClient.right, rcClient.bottom };
+                    InvalidateRect(hWnd, &rcDock, FALSE);
+                }
                 return 0;
             }
 
-            // Liste içi şarkı sıralamasını değiştirme sürüklemesi
+            // Liste içi sıralama değiştirme sürüklemesi
             if ((wParam & MK_LBUTTON) && g_dragFromIndex >= 0 && !g_isFiltered) {
-                if (!g_isDraggingList) {
-                    if (abs(pt.y - g_mouseDownPt.y) > 7) {
-                        g_isDraggingList = TRUE;
-                    }
+                if (!g_isDraggingList && abs(pt.y - g_mouseDownPt.y) > S(7)) {
+                    g_isDraggingList = TRUE;
                 }
                 if (g_isDraggingList) {
-                    int listTop = 65;
-                    int target = g_scrollOffset + ((pt.y - listTop) / GetItemHeight());
+                    int listTop = GetHeaderH() + S(6);
+                    int target = (int)((pt.y - listTop + g_scrollPosPx) / (float)GetItemH());
                     if (target < 0) target = 0;
                     if (target >= Playlist_Count()) target = Playlist_Count() - 1;
                     if (target != g_dragTargetIndex) {
@@ -1713,131 +2072,140 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 }
             }
 
-            // Hamburger hover
-            if (g_sidebarOpen && pt.x < SIDEBAR_WIDTH && pt.y >= 75) {
-                int item = (pt.y - 75) / 48;
-                if (item >= 0 && item < 6) {
-                    if (g_sidebarHoverItem != item) {
-                        g_sidebarHoverItem = item;
-                        InvalidateRect(hWnd, NULL, FALSE);
-                    }
-                }
-                return 0;
-            } else if (g_sidebarHoverItem != -1) {
-                g_sidebarHoverItem = -1;
-                InvalidateRect(hWnd, NULL, FALSE);
+            BOOL needRepaint = FALSE;
+            UiZone newHot = HitTestZones(pt);
+            if (newHot != g_hotZone) {
+                g_hotZone = newHot;
+                needRepaint = TRUE;
             }
 
-            // Liste item hover
+            BOOL sbHov = (!g_sidebarOpen && PtInRect(&rcScrollbarTrack, pt));
+            if (sbHov != g_scrollbarHover) {
+                g_scrollbarHover = sbHov;
+                needRepaint = TRUE;
+            }
+
+            int newSideHover = -1;
+            if (g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_MENU && pt.x < GetSidebarW() && pt.y >= GetHeaderH() + S(12)) {
+                int m = (pt.y - (GetHeaderH() + S(12))) / S(44);
+                if (m >= 0 && m < 7) newSideHover = m;
+            }
+            if (newSideHover != g_sidebarHoverItem) {
+                g_sidebarHoverItem = newSideHover;
+                needRepaint = TRUE;
+            }
+
+            int newHoverTrack = -1;
             RECT rcClient;
             GetClientRect(hWnd, &rcClient);
-            int listTop = 65;
-            int listBottom = rcClient.bottom - 105;
-
-            if (pt.y >= listTop && pt.y <= listBottom && pt.x >= 15 && pt.x <= rcClient.right - 24) {
-                int displayIdx = g_scrollOffset + ((pt.y - listTop) / GetItemHeight());
+            int listTop = GetHeaderH();
+            int listBottom = rcClient.bottom - GetDockH();
+            if (!g_sidebarOpen && !sbHov && pt.y >= listTop && pt.y < listBottom && pt.x >= S(12) && pt.x <= rcClient.right - S(18)) {
+                int displayIdx = (int)((pt.y - (listTop + S(6)) + g_scrollPosPx) / (float)GetItemH());
                 int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
-                if (displayIdx < totalCount) {
-                    int actualIdx = g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
-                    if (actualIdx != g_hoverTrack) {
-                        g_hoverTrack = actualIdx;
-                        InvalidateRect(hWnd, NULL, FALSE);
-                    }
+                if (displayIdx >= 0 && displayIdx < totalCount) {
+                    newHoverTrack = g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
                 }
-            } else if (g_hoverTrack != -1) {
-                g_hoverTrack = -1;
+            }
+            if (newHoverTrack != g_hoverTrack) {
+                g_hoverTrack = newHoverTrack;
+                needRepaint = TRUE;
+            }
+
+            if (needRepaint) {
                 InvalidateRect(hWnd, NULL, FALSE);
             }
             return 0;
         }
 
         case WM_LBUTTONDOWN: {
-            POINT pt = { LOWORD(lParam), HIWORD(lParam) };
+            POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
+            SetFocus(hWnd);
             SetCapture(hWnd);
 
-            // 0. Canlı Jam Toast tıklamaları
-            if (Jam_HasPendingInvite()) {
-                if (PtInRect(&rcToastAccept, pt)) {
-                    Jam_AcceptInvite();
-                    InvalidateRect(hWnd, NULL, FALSE);
-                    return 0;
-                }
-                if (PtInRect(&rcToastReject, pt)) {
-                    Jam_RejectInvite();
-                    InvalidateRect(hWnd, NULL, FALSE);
-                    return 0;
-                }
-            }
+            UiZone hit = HitTestZones(pt);
+            g_pressedZone = hit;
 
-            // 0.1 Jam Durum Ayrıl tıklaması
-            if (Jam_IsActive() && PtInRect(&rcJamLeave, pt)) {
-                Jam_Leave();
+            // 0. Jam Davet Toast Tıklamaları
+            if (hit == ZONE_TOAST_ACCEPT) {
+                Jam_AcceptInvite();
+                g_pressedZone = ZONE_NONE;
+                ReleaseCapture();
+                InvalidateRect(hWnd, NULL, FALSE);
+                return 0;
+            }
+            if (hit == ZONE_TOAST_REJECT) {
+                Jam_RejectInvite();
+                g_pressedZone = ZONE_NONE;
+                ReleaseCapture();
                 InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
 
-            // 1. Hamburger Aç / Kapa Butonu
-            if (PtInRect(&rcHamburger, pt)) {
-                g_sidebarOpen = !g_sidebarOpen;
-                if (!g_sidebarOpen && g_hFriendAddEdit) {
-                    ShowWindow(g_hFriendAddEdit, SW_HIDE);
-                }
+            // 1. Üst Bar Butonları
+            if (hit == ZONE_HAMBURGER) {
+                ToggleSidebar(!g_sidebarOpen);
                 InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
+            if (hit == ZONE_SEARCH_CLEAR) {
+                SetWindowTextW(g_hSearchEdit, L"");
+                ApplyFilter(L"");
+                RECT rc;
+                GetClientRect(hWnd, &rc);
+                LayoutHeaderInputs(rc.right);
+                g_pressedZone = ZONE_NONE;
+                ReleaseCapture();
+                return 0;
+            }
+            if (hit == ZONE_QUICK_DOWNLOAD) {
+                InvalidateRect(hWnd, &rcQuickDownload, FALSE);
+                g_pressedZone = ZONE_NONE;
+                ReleaseCapture();
+                Search_ShowDialog(hWnd, g_cfg.lastFolder);
+                return 0;
+            }
 
-            // 2. Sidebar açıkken tıklama kontrolü
-            if (g_sidebarOpen) {
+            // 2. Yan Çekmece Açıkken Etkileşim
+            if (g_sidebarOpen && pt.y >= GetHeaderH()) {
+                int sbW = GetSidebarW();
+                if (pt.x >= sbW) {
+                    ToggleSidebar(FALSE);
+                    g_pressedZone = ZONE_NONE;
+                    ReleaseCapture();
+                    return 0;
+                }
+
                 if (g_sidebarView == SIDEBAR_VIEW_MENU) {
-                    if (pt.x < SIDEBAR_WIDTH && pt.y >= 75) {
-                        int item = (pt.y - 75) / 48;
-                        if (item == 0) { g_sidebarOpen = FALSE; SelectFolderDialog(); }
-                        else if (item == 1) { g_sidebarOpen = FALSE; ImportM3UDialog(); }
-                        else if (item == 2) { g_sidebarOpen = FALSE; ExportM3UDialog(); }
-                        else if (item == 3) { g_sidebarOpen = FALSE; Search_ShowDialog(hWnd, g_cfg.lastFolder); }
-                        else if (item == 4) {
-                            g_sidebarView = SIDEBAR_VIEW_FRIENDS;
-                            InvalidateRect(hWnd, NULL, FALSE);
-                            return 0;
-                        }
+                    if (pt.y >= GetHeaderH() + S(12)) {
+                        int item = (pt.y - (GetHeaderH() + S(12))) / S(44);
+                        g_pressedZone = ZONE_NONE;
+                        ReleaseCapture();
+                        if (item == 0) { ToggleSidebar(FALSE); SelectFolderDialog(); }
+                        else if (item == 1) { ToggleSidebar(FALSE); Search_ShowDialog(hWnd, g_cfg.lastFolder); }
+                        else if (item == 2) { g_sidebarView = SIDEBAR_VIEW_FRIENDS; InvalidateRect(hWnd, NULL, FALSE); }
+                        else if (item == 3) { ToggleSidebar(FALSE); ImportM3UDialog(); }
+                        else if (item == 4) { ToggleSidebar(FALSE); ExportM3UDialog(); }
                         else if (item == 5) {
-                            g_sidebarOpen = FALSE;
+                            ToggleSidebar(FALSE);
                             Playlist_Clear();
                             Player_Stop();
                             g_currentTrack = -1;
                             g_selectedTrack = -1;
                             ApplyFilter(L"");
                         }
-                        else if (item == 6) {
-                            g_sidebarOpen = FALSE;
-                            Updater_CheckAsync(hWnd, TRUE);
-                        }
-                        InvalidateRect(hWnd, NULL, FALSE);
-                        return 0;
-                    } else if (pt.x >= SIDEBAR_WIDTH) {
-                        g_sidebarOpen = FALSE;
-                        InvalidateRect(hWnd, NULL, FALSE);
-                        return 0;
+                        else if (item == 6) { ToggleSidebar(FALSE); Updater_CheckAsync(hWnd, TRUE); }
                     }
+                    return 0;
                 }
                 else if (g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
-                    if (pt.x >= SIDEBAR_WIDTH) {
-                        g_sidebarOpen = FALSE;
-                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
-                        InvalidateRect(hWnd, NULL, FALSE);
-                        return 0;
-                    }
-
-                    // Geri butonu
-                    if (PtInRect(&rcFriendsBack, pt)) {
+                    if (hit == ZONE_FRIENDS_BACK) {
                         g_sidebarView = SIDEBAR_VIEW_MENU;
-                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                        UpdateSidebarEditPosition();
                         InvalidateRect(hWnd, NULL, FALSE);
                         return 0;
                     }
-
-                    // Kopyala butonu
-                    if (PtInRect(&rcCopyTag, pt)) {
+                    if (hit == ZONE_COPY_TAG) {
                         wchar_t myTag[32] = {0};
                         Friends_GetMyTag(myTag, 32);
                         CopyToClipboard(hWnd, myTag);
@@ -1845,32 +2213,31 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         InvalidateRect(hWnd, NULL, FALSE);
                         return 0;
                     }
-
-                    // Sekmeler
-                    if (PtInRect(&rcFriendsTab0, pt)) {
+                    if (hit == ZONE_FTAB0) {
                         g_friendsTab = FRIENDS_TAB_LIST;
-                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                        UpdateSidebarEditPosition();
                         InvalidateRect(hWnd, NULL, FALSE);
                         return 0;
                     }
-                    if (PtInRect(&rcFriendsTab1, pt)) {
+                    if (hit == ZONE_FTAB1) {
                         g_friendsTab = FRIENDS_TAB_REQUESTS;
-                        if (g_hFriendAddEdit) ShowWindow(g_hFriendAddEdit, SW_HIDE);
+                        UpdateSidebarEditPosition();
                         InvalidateRect(hWnd, NULL, FALSE);
                         return 0;
                     }
-                    if (PtInRect(&rcFriendsTab2, pt)) {
+                    if (hit == ZONE_FTAB2) {
                         g_friendsTab = FRIENDS_TAB_ADD;
-                        if (g_hFriendAddEdit) {
-                            MoveWindow(g_hFriendAddEdit, 14, 238, SIDEBAR_WIDTH - 28, 28, TRUE);
-                            ShowWindow(g_hFriendAddEdit, SW_SHOW);
-                            SetFocus(g_hFriendAddEdit);
-                        }
+                        UpdateSidebarEditPosition();
+                        if (g_hFriendAddEdit) SetFocus(g_hFriendAddEdit);
                         InvalidateRect(hWnd, NULL, FALSE);
+                        return 0;
+                    }
+                    if (hit == ZONE_FRIEND_SEND) {
+                        InvalidateRect(hWnd, NULL, FALSE);
+                        SubmitFriendRequest(hWnd);
                         return 0;
                     }
 
-                    // Liste içi butonlar
                     if (g_friendsTab == FRIENDS_TAB_LIST) {
                         for (int fi = 0; fi < Friends_GetFriendCount(); fi++) {
                             if (PtInRect(&rcFriendActionBtns[fi], pt)) {
@@ -1905,69 +2272,38 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                             }
                         }
                     }
-                    else if (g_friendsTab == FRIENDS_TAB_ADD) {
-                        if (PtInRect(&rcFriendSendBtn, pt)) {
-                            wchar_t inTag[64] = {0};
-                            GetWindowTextW(g_hFriendAddEdit, inTag, 63);
-                            while (inTag[0] == L' ') memmove(inTag, inTag + 1, (wcslen(inTag) + 1) * sizeof(wchar_t));
-                            int tlen = (int)wcslen(inTag);
-                            while (tlen > 0 && inTag[tlen - 1] == L' ') inTag[--tlen] = 0;
-
-                            if (tlen == 0) {
-                                wsprintfW(g_friendAddMsg, L"Lütfen bir etiket girin!");
-                            } else if (wcschr(inTag, L'#') == NULL) {
-                                wsprintfW(g_friendAddMsg, L"Etiket '#' içermeli (Örn: Selim#8421)");
-                            } else if (Friends_SendRequest(inTag)) {
-                                wsprintfW(g_friendAddMsg, L"İstek başarıyla gönderildi!");
-                                SetWindowTextW(g_hFriendAddEdit, L"");
-                            } else {
-                                wsprintfW(g_friendAddMsg, L"İstek gönderilemedi. Etiketi kontrol edin.");
-                            }
-                            InvalidateRect(hWnd, NULL, FALSE);
-                            return 0;
-                        }
-                    }
                     return 0;
                 }
             }
 
-            // 3. Sağdaki Kaydırma Çubuğu (Scrollbar) Tıklaması
-            if (PtInRect(&rcScrollbarTrack, pt)) {
+            // 3. Kaydırma Çubuğu (Apple 1:1 Tutma Ofseti Korunarak)
+            if (GetMaxScrollPx(hWnd) > 0 && PtInRect(&rcScrollbarTrack, pt)) {
                 if (PtInRect(&rcScrollbarThumb, pt)) {
                     g_isDraggingScrollbar = TRUE;
-                    g_scrollbarDragStartY = pt.y;
-                    g_scrollbarDragStartOffset = g_scrollOffset;
-                    InvalidateRect(hWnd, &rcScrollbarTrack, FALSE);
+                    g_scrollbarDragGrabOffsetY = pt.y - rcScrollbarThumb.top;
                 } else {
-                    int trackH = rcScrollbarTrack.bottom - rcScrollbarTrack.top;
                     int thumbH = rcScrollbarThumb.bottom - rcScrollbarThumb.top;
-                    int totalItems = g_isFiltered ? g_filterCount : Playlist_Count();
-                    RECT rcClient;
-                    GetClientRect(hWnd, &rcClient);
-                    int visibleItems = (rcClient.bottom - 105 - 65) / GetItemHeight();
-                    int maxScroll = totalItems - visibleItems;
-                    if (maxScroll > 0 && trackH > thumbH) {
-                        float r = (float)(pt.y - rcScrollbarTrack.top - thumbH / 2) / (float)(trackH - thumbH);
-                        if (r < 0.0f) r = 0.0f;
-                        if (r > 1.0f) r = 1.0f;
-                        g_scrollOffset = (int)(r * maxScroll);
-                        g_isDraggingScrollbar = TRUE;
-                        g_scrollbarDragStartY = pt.y;
-                        g_scrollbarDragStartOffset = g_scrollOffset;
-                        InvalidateRect(hWnd, NULL, FALSE);
-                    }
+                    g_isDraggingScrollbar = TRUE;
+                    g_scrollbarDragGrabOffsetY = thumbH / 2;
+                    SendMessageW(hWnd, WM_MOUSEMOVE, wParam, lParam);
                 }
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
 
-            // 4. Oynatma Kontrolleri
-            if (PtInRect(&rcShuffle, pt)) {
+            // 4. Alt Oynatıcı Kontrolleri (Anında Pointer-Down Tepkisi!)
+            if (hit == ZONE_JAM_LEAVE) {
+                Jam_Leave();
+                InvalidateRect(hWnd, NULL, FALSE);
+                return 0;
+            }
+            if (hit == ZONE_SHUFFLE) {
                 g_cfg.shuffle = !g_cfg.shuffle;
                 Config_Save(&g_cfg, L"config.json");
                 InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
-            if (PtInRect(&rcPlay, pt)) {
+            if (hit == ZONE_PLAY) {
                 if (Player_IsPlaying()) {
                     Player_Pause();
                     if (Jam_IsActive()) Jam_BroadcastPause(Player_GetPosition());
@@ -1982,27 +2318,39 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
-            if (PtInRect(&rcPrev, pt)) {
+            if (hit == ZONE_PREV) {
                 int prev = Playlist_FindPrev(g_currentTrack);
-                if (prev >= 0) PlayTrack(prev);
+                if (prev >= 0) { PlayTrack(prev); ScrollTrackIntoView(prev); }
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
-            if (PtInRect(&rcNext, pt)) {
+            if (hit == ZONE_NEXT) {
                 int next = Playlist_FindNext(g_currentTrack, g_cfg.shuffle, g_cfg.repeat == 2 ? 1 : g_cfg.repeat);
-                if (next >= 0) PlayTrack(next);
+                if (next >= 0) { PlayTrack(next); ScrollTrackIntoView(next); }
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
-            if (PtInRect(&rcRepeat, pt)) {
+            if (hit == ZONE_REPEAT) {
                 g_cfg.repeat = (g_cfg.repeat + 1) % 3;
                 Config_Save(&g_cfg, L"config.json");
                 InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
-
-            // 5. Seek Bar (Genişletilmiş kolay tıklama alanı & anında atlama)
-            if (pt.y >= rcSeekBar.top - 12 && pt.y <= rcSeekBar.bottom + 12 && pt.x >= rcSeekBar.left - 10 && pt.x <= rcSeekBar.right + 10) {
+            if (hit == ZONE_SPEAKER) {
+                if (Player_GetVolume() > 0) {
+                    g_preMuteVol = Player_GetVolume();
+                    Player_SetVolume(0);
+                } else {
+                    Player_SetVolume(g_preMuteVol > 0 ? g_preMuteVol : 80);
+                }
+                g_cfg.volume = Player_GetVolume();
+                Config_Save(&g_cfg, L"config.json");
+                InvalidateRect(hWnd, NULL, FALSE);
+                return 0;
+            }
+            if (hit == ZONE_SEEK) {
                 int duration = Player_GetDuration();
-                if (duration > 0) {
+                if (duration > 0 && rcSeekBar.right > rcSeekBar.left) {
                     float ratio = (float)(pt.x - rcSeekBar.left) / (float)(rcSeekBar.right - rcSeekBar.left);
                     if (ratio < 0.0f) ratio = 0.0f;
                     if (ratio > 1.0f) ratio = 1.0f;
@@ -2010,45 +2358,30 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     g_isDraggingSeek = TRUE;
                     Player_SetPosition(g_seekDragSec);
                     if (Jam_IsActive()) Jam_BroadcastSeek(g_seekDragSec);
-
-                    RECT rcClient;
-                    GetClientRect(hWnd, &rcClient);
-                    RECT rcSeekArea = { 0, rcClient.bottom - 102, rcClient.right, rcClient.bottom - 60 };
-                    InvalidateRect(hWnd, &rcSeekArea, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                 }
                 return 0;
             }
-
-            // 6. Ses Barı
-            if (pt.y >= rcVolBar.top - 8 && pt.y <= rcVolBar.bottom + 8 && pt.x >= rcVolBar.left - 5 && pt.x <= rcVolBar.right + 5) {
+            if (hit == ZONE_VOL) {
                 g_isDraggingVol = TRUE;
-                float ratio = (float)(pt.x - rcVolBar.left) / (float)(rcVolBar.right - rcVolBar.left);
-                if (ratio < 0.0f) ratio = 0.0f;
-                if (ratio > 1.0f) ratio = 1.0f;
-                int vol = (int)(ratio * 100);
-                Player_SetVolume(vol);
-                g_cfg.volume = vol;
-                Config_Save(&g_cfg, L"config.json");
-                InvalidateVolumeArea(hWnd);
+                SendMessageW(hWnd, WM_MOUSEMOVE, wParam, lParam);
                 return 0;
             }
 
-            // 7. Şarkı Listesi: TEK TIKLAMAYLA ANINDA ÇAL + SÜRÜKLEME BAŞLAT
+            // 5. Şarkı Listesi: Tek Tıkla Anında Çal + Sürükleme Hazırlığı
             RECT rcClient;
             GetClientRect(hWnd, &rcClient);
-            int listTop = 65;
-            int listBottom = rcClient.bottom - 105;
-            if (pt.y >= listTop && pt.y <= listBottom && pt.x >= 15 && pt.x <= rcClient.right - 24) {
-                int displayIdx = g_scrollOffset + ((pt.y - listTop) / GetItemHeight());
+            int listTop = GetHeaderH();
+            int listBottom = rcClient.bottom - GetDockH();
+            if (pt.y >= listTop && pt.y < listBottom && pt.x >= S(12) && pt.x <= rcClient.right - S(18)) {
+                int displayIdx = (int)((pt.y - (listTop + S(6)) + g_scrollPosPx) / (float)GetItemH());
                 int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
-                if (displayIdx < totalCount) {
+                if (displayIdx >= 0 && displayIdx < totalCount) {
                     int actualIdx = g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
                     g_dragFromIndex = actualIdx;
                     g_dragTargetIndex = actualIdx;
                     g_mouseDownPt = pt;
                     g_isDraggingList = FALSE;
-
-                    // TEK TIKLAMAYLA ÇAL
                     PlayTrack(actualIdx);
                 }
             }
@@ -2057,21 +2390,23 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_LBUTTONUP: {
             ReleaseCapture();
+            BOOL needRepaint = (g_pressedZone != ZONE_NONE);
+            g_pressedZone = ZONE_NONE;
+
             if (g_isDraggingScrollbar) {
                 g_isDraggingScrollbar = FALSE;
-                InvalidateRect(hWnd, &rcScrollbarTrack, FALSE);
+                needRepaint = TRUE;
             }
             if (g_isDraggingSeek) {
                 g_isDraggingSeek = FALSE;
                 Player_SetPosition(g_seekDragSec);
-                RECT rcClient;
-                GetClientRect(hWnd, &rcClient);
-                RECT rcSeekArea = { 0, rcClient.bottom - 102, rcClient.right, rcClient.bottom - 60 };
-                InvalidateRect(hWnd, &rcSeekArea, FALSE);
+                if (Jam_IsActive()) Jam_BroadcastSeek(g_seekDragSec);
+                needRepaint = TRUE;
             }
             if (g_isDraggingVol) {
                 g_isDraggingVol = FALSE;
                 Config_Save(&g_cfg, L"config.json");
+                needRepaint = TRUE;
             }
             if (g_isDraggingList && g_dragFromIndex >= 0 && g_dragTargetIndex >= 0 && !g_isFiltered) {
                 if (g_dragFromIndex != g_dragTargetIndex) {
@@ -2085,19 +2420,23 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     }
                     g_selectedTrack = g_dragTargetIndex;
                 }
-                g_isDraggingList = FALSE;
-                g_dragFromIndex = -1;
-                g_dragTargetIndex = -1;
+                needRepaint = TRUE;
+            }
+            g_isDraggingList = FALSE;
+            g_dragFromIndex = -1;
+            g_dragTargetIndex = -1;
+
+            if (needRepaint) {
                 InvalidateRect(hWnd, NULL, FALSE);
-            } else {
-                g_dragFromIndex = -1;
-                g_dragTargetIndex = -1;
-                g_isDraggingList = FALSE;
             }
             return 0;
         }
 
         case WM_KEYDOWN: {
+            if (wParam == VK_ESCAPE && g_sidebarOpen) {
+                ToggleSidebar(FALSE);
+                return 0;
+            }
             if (GetKeyState(VK_CONTROL) < 0) {
                 if (wParam == 'R' || wParam == 'r') {
                     g_cfg.repeat = (g_cfg.repeat + 1) % 3;
@@ -2111,48 +2450,58 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
+                if (wParam == 'F' || wParam == 'f') {
+                    if (g_hSearchEdit) SetFocus(g_hSearchEdit);
+                    return 0;
+                }
             }
             switch (wParam) {
                 case VK_SPACE: {
-                    if (Player_IsPlaying()) Player_Pause();
-                    else if (g_currentTrack >= 0) Player_Play();
-                    else if (Playlist_Count() > 0) PlayTrack(g_selectedTrack >= 0 ? g_selectedTrack : 0);
+                    if (Player_IsPlaying()) {
+                        Player_Pause();
+                        if (Jam_IsActive()) Jam_BroadcastPause(Player_GetPosition());
+                    } else if (g_currentTrack >= 0) {
+                        Player_Play();
+                        if (Jam_IsActive()) Jam_BroadcastPlay(Playlist_Get(g_currentTrack)->title, Player_GetPosition());
+                    } else if (Playlist_Count() > 0) {
+                        PlayTrack(g_selectedTrack >= 0 ? g_selectedTrack : 0);
+                    }
                     InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_LEFT: {
                     int pos = Player_GetPosition() - 5;
-                    Player_SetPosition(pos < 0 ? 0 : pos);
-                    RECT rcClient;
-                    GetClientRect(hWnd, &rcClient);
-                    RECT rcSeekArea = { 0, rcClient.bottom - 102, rcClient.right, rcClient.bottom - 60 };
-                    InvalidateRect(hWnd, &rcSeekArea, FALSE);
+                    if (pos < 0) pos = 0;
+                    Player_SetPosition(pos);
+                    if (Jam_IsActive()) Jam_BroadcastSeek(pos);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_RIGHT: {
                     int pos = Player_GetPosition() + 5;
                     int dur = Player_GetDuration();
-                    Player_SetPosition(pos > dur ? dur : pos);
-                    RECT rcClient;
-                    GetClientRect(hWnd, &rcClient);
-                    RECT rcSeekArea = { 0, rcClient.bottom - 102, rcClient.right, rcClient.bottom - 60 };
-                    InvalidateRect(hWnd, &rcSeekArea, FALSE);
+                    if (dur > 0 && pos > dur) pos = dur;
+                    Player_SetPosition(pos);
+                    if (Jam_IsActive()) Jam_BroadcastSeek(pos);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_UP: {
                     int vol = Player_GetVolume() + 5;
                     Player_SetVolume(vol);
+                    if (Player_GetVolume() > 0) g_preMuteVol = Player_GetVolume();
                     g_cfg.volume = Player_GetVolume();
                     Config_Save(&g_cfg, L"config.json");
-                    InvalidateVolumeArea(hWnd);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_DOWN: {
                     int vol = Player_GetVolume() - 5;
                     Player_SetVolume(vol);
+                    if (Player_GetVolume() > 0) g_preMuteVol = Player_GetVolume();
                     g_cfg.volume = Player_GetVolume();
                     Config_Save(&g_cfg, L"config.json");
-                    InvalidateVolumeArea(hWnd);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_RETURN: {
@@ -2183,13 +2532,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         int found = Playlist_FindByPrefix((wchar_t)wParam, g_selectedTrack);
                         if (found >= 0) {
                             g_selectedTrack = found;
-                            RECT rcClient;
-                            GetClientRect(hWnd, &rcClient);
-                            int visible = (rcClient.bottom - 105 - 65) / GetItemHeight();
-                            if (found < g_scrollOffset || found >= g_scrollOffset + visible) {
-                                g_scrollOffset = found - visible / 2;
-                                if (g_scrollOffset < 0) g_scrollOffset = 0;
-                            }
+                            ScrollTrackIntoView(found);
                             InvalidateRect(hWnd, NULL, FALSE);
                         }
                     }
@@ -2201,8 +2544,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_GETMINMAXINFO: {
             MINMAXINFO *mmi = (MINMAXINFO*)lParam;
-            mmi->ptMinTrackSize.x = 480;
-            mmi->ptMinTrackSize.y = 520;
+            mmi->ptMinTrackSize.x = S(480);
+            mmi->ptMinTrackSize.y = S(500);
             return 0;
         }
 
@@ -2217,18 +2560,17 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
 
-            // Çift Tamponlu Çizim
-            HDC memDC = CreateCompatibleDC(hdc);
-            HBITMAP memBitmap = CreateCompatibleBitmap(hdc, rcClient.right, rcClient.bottom);
-            HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
-
-            RenderUI(memDC, &rcClient);
-
-            BitBlt(hdc, 0, 0, rcClient.right, rcClient.bottom, memDC, 0, 0, SRCCOPY);
-
-            SelectObject(memDC, oldBitmap);
-            DeleteObject(memBitmap);
-            DeleteDC(memDC);
+            EnsureBackbuffer(hdc, rcClient.right, rcClient.bottom);
+            if (g_backDC) {
+                RenderUI(g_backDC, &rcClient);
+                int rx = ps.rcPaint.left;
+                int ry = ps.rcPaint.top;
+                int rw = ps.rcPaint.right - ps.rcPaint.left;
+                int rh = ps.rcPaint.bottom - ps.rcPaint.top;
+                BitBlt(hdc, rx, ry, rw, rh, g_backDC, rx, ry, SRCCOPY);
+            } else {
+                RenderUI(hdc, &rcClient);
+            }
 
             EndPaint(hWnd, &ps);
             return 0;
@@ -2243,16 +2585,24 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_DESTROY: {
             KillTimer(hWnd, IDT_UPDATE_TIMER);
+            if (g_animTimerActive) KillTimer(hWnd, IDT_ANIM_TIMER);
             Player_Shutdown();
             Playlist_Free();
+            FreeBackbuffer();
+            if (g_filterIndices) {
+                free(g_filterIndices);
+                g_filterIndices = NULL;
+            }
 
-            if (g_hFontTitle) DeleteObject(g_hFontTitle);
-            if (g_hFontBold) DeleteObject(g_hFontBold);
-            if (g_hFontMain) DeleteObject(g_hFontMain);
-            if (g_hFontSmall) DeleteObject(g_hFontSmall);
-            if (g_hFontIcons) DeleteObject(g_hFontIcons);
+            if (g_hFontTitle)      DeleteObject(g_hFontTitle);
+            if (g_hFontBold)       DeleteObject(g_hFontBold);
+            if (g_hFontMain)       DeleteObject(g_hFontMain);
+            if (g_hFontSmall)      DeleteObject(g_hFontSmall);
+            if (g_hFontSmallBold)  DeleteObject(g_hFontSmallBold);
+            if (g_hFontIcons)      DeleteObject(g_hFontIcons);
+            if (g_hFontIconsSmall) DeleteObject(g_hFontIconsSmall);
             if (g_hFontIconsLarge) DeleteObject(g_hFontIconsLarge);
-            if (g_hBrSearchEdit) DeleteObject(g_hBrSearchEdit);
+            if (g_hBrSearchEdit)   DeleteObject(g_hBrSearchEdit);
             if (g_pMainThumb) {
                 g_pMainThumb->lpVtbl->Release(g_pMainThumb);
                 g_pMainThumb = NULL;
@@ -2262,7 +2612,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 g_hAppIcon = NULL;
             }
 
-                        Jam_Leave();
+            Jam_Leave();
             Network_Close();
             PostQuitMessage(0);
             return 0;
@@ -2272,7 +2622,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
-    // 1. Per-Monitor High-DPI Awareness (Windows %125/%150 ölçekteki bulanıklığı yok eder)
+    (void)hInstance; (void)hPrevInstance; (void)pCmdLine;
+
     typedef BOOL(WINAPI *SetDpiCtxProc)(DPI_AWARENESS_CONTEXT);
     HMODULE hUser = GetModuleHandleW(L"user32.dll");
     if (hUser) {
@@ -2285,8 +2636,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
     OleInitialize(NULL);
-
-    SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
 
     INITCOMMONCONTROLSEX icex = { sizeof(icex), ICC_WIN95_CLASSES | ICC_STANDARD_CLASSES };
     InitCommonControlsEx(&icex);
@@ -2316,14 +2665,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
     if (screenDpi <= 0) screenDpi = 96;
 
-    int winW = MulDiv(520, screenDpi, 96);
+    int winW = MulDiv(540, screenDpi, 96);
     int winH = MulDiv(680, screenDpi, 96);
 
     HWND hWnd = CreateWindowExW(
         WS_EX_ACCEPTFILES,
         L"SeloPlayerNativeClass",
         L"Selo Player",
-        WS_OVERLAPPEDWINDOW,
+        WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
         CW_USEDEFAULT, CW_USEDEFAULT, winW, winH,
         NULL, NULL, hInst, NULL
     );
@@ -2340,8 +2689,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     ShowWindow(hWnd, show);
     UpdateWindow(hWnd);
 
-    TrimProcessMemory();
-
     MSG msg;
     while (GetMessageW(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
@@ -2353,5 +2700,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    (void)lpCmdLine;
     return wWinMain(hInstance, hPrevInstance, GetCommandLineW(), nCmdShow);
 }
