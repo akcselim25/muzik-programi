@@ -1,6 +1,7 @@
 1.0.9
 https://raw.githubusercontent.com/akcselim25/muzik-programi/main/SeloPlayer.exe
-- Tasarim 6 - Yuzen Kapsul Bar ve Spotify Yesili (#1DB954) tasarim mimarisi: Hantal tablolar ve gereksiz cizgiler kaldirildi; saf kadife siyah (#0B0B0F) zemin uzerinde ferah ve akici sarkici/parca gorunumu getirildi.
-- Sifir-FPS-Drop Oyun Modu: Uygulama arka plandayken veya oyundayken tum animasyon ve zamanlayici uyandirmalari tamamen durdurulur (%0.000 CPU). Oyunlarda en kucuk FPS dalgalanmasina dahi izin vermez.
-- Kompakt Yuzen Oynatici Kapsulu: Ekranin altinda akillica suzulen dinamik Spotify yesili oynat/duraklat dairesi, vektorel keskin kontroller ve ses duzeyi cubugu.
-- Yenilenmis Minimalist Arkadaslar & Jam Cekmecesi: Sol ust menuden tek tikla acilan, sifir ag fazlaligiyla calisan arkadas ve Jam yonetimi.
+- v1.0.8 Obsidyen Cam Arayuzu Geri Getirildi: Sevilen monogram harf kutucuklari, ust bar Arkadaslar ve +Indir butonlari, cift katmanli zengin oynatici dock'u birebir korundu.
+- Sifir-FPS-Drop Oyun Modu: Oyundayken veya arka plandayken tum animasyon ve zamanlayici donguleri durdurulur (%0.000 CPU, sifir GPU takilmasi).
+- Sadece Oynatici Alani Guncelleme: Muzik calarken her saniye tum liste degil, sadece alt oynatici cubugu (rcDock) cizilir; islemci ve pil tuketimi minimuma indirildi.
+- Donanim Medya Tuslari: Klavye ve kulakliktaki Play/Pause, Next, Prev tuslari oyundayken de arka planda kesintisiz calisir.
+- Toplam boyut yalnizca 277 KB.

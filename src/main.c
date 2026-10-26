@@ -8,6 +8,7 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <dwmapi.h>
+#include <olectl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
@@ -26,32 +27,34 @@
 #endif
 
 // =============================================================================
-// TASARIM 6 — YÜZEN KAPSÜL BAR & SPOTIFY YEŞİLİ RENK PALETİ
+// MODERN OBSIDIAN GLASS & SPOTIFY EMERALD RENK SİSTEMİ
 // =============================================================================
-#define COLOR_BG            RGB(11, 11, 15)      // Saf Derin Kadife Siyah (#0B0B0F)
-#define COLOR_ROW_HOVER     RGB(18, 19, 25)      // Şarkı Satırı Hover
-#define COLOR_ROW_ACTIVE    RGB(14, 28, 20)      // Çalan Şarkı Satırı (Zümrüt Işıltılı)
-#define COLOR_ROW_SEL       RGB(16, 17, 23)      // Seçili Şarkı Satırı
-#define COLOR_CAPSULE_BG    RGB(20, 21, 28)      // Yüzen Alt Kapsül Kartı (#14151C)
-#define COLOR_CAPSULE_BORD  RGB(42, 44, 58)      // Kapsül Cam Kenarlık (#2A2C3A)
-#define COLOR_SIDEBAR_BG    RGB(14, 15, 20)      // Sol Çekmece Katmanı
-#define COLOR_CARD_SURF     RGB(20, 22, 29)      // Yükseltilmiş Kart Yüzeyi
-#define COLOR_CARD_HOVER    RGB(27, 30, 39)      // Kart Hover Yüzeyi
-#define COLOR_CTRL_HOVER    RGB(32, 35, 46)      // İkon Düğme Hover
-#define COLOR_CTRL_PRESS    RGB(42, 46, 60)      // İkon Düğme Basılı
-#define COLOR_ACCENT        RGB(29, 185, 84)     // Spotify Yeşili (#1DB954)
-#define COLOR_ACCENT_HOV    RGB(30, 215, 96)     // Parlak Yeşil (#1ED760)
-#define COLOR_ACCENT_DARK   RGB(20, 142, 64)     // Koyu Basılı Yeşil
-#define COLOR_AMBER         RGB(245, 176, 65)    // Bekleyen Davet Vurgusu
-#define COLOR_DANGER        RGB(235, 87, 87)     // Ayrıl / Kaldır Vurgusu
-#define COLOR_TEXT_WHITE    RGB(240, 240, 246)   // Birincil Parlak Metin
-#define COLOR_TEXT_MUTED    RGB(124, 126, 140)   // İkincil Sanatçı Metni
-#define COLOR_TEXT_DIM      RGB(88, 90, 104)     // Üçüncül Numara / Süre Metni
-#define COLOR_BAR_BG        RGB(42, 44, 56)      // İlerleme / Ses Çubuğu Arka Planı
-#define COLOR_BAR_HOVER     RGB(58, 62, 78)      // Çubuk Hover Arka Planı
-#define COLOR_BORDER        RGB(34, 36, 48)      // İnce Kenarlık
-#define COLOR_BORDER_LIGHT  RGB(46, 50, 66)      // Vurgulu Kenarlık
-#define COLOR_INPUT_BG      RGB(19, 19, 26)      // Arama & Giriş Kutusu İç Yüzeyi (#13131A)
+#define COLOR_BG_TOP        RGB(12, 14, 20)     // Üst Tuval Derin Obsidyen
+#define COLOR_BG_BOT        RGB(8, 9, 13)       // Alt Tuval Saf Koyu
+#define COLOR_BG_JAM_TOP    RGB(12, 28, 20)     // Canlı Jam Aktifken Üst Zümrüt Aura
+#define COLOR_HEADER_SURF   RGB(15, 18, 25)     // Üst Bar Yüzeyi
+#define COLOR_DOCK_SURF     RGB(19, 22, 30)     // Yüzen Alt Oynatıcı Kartı
+#define COLOR_SIDEBAR_SURF  RGB(15, 18, 25)     // Sol Çekmece Katmanı
+#define COLOR_CARD_SURF     RGB(23, 27, 37)     // Yükseltilmiş Kart Yüzeyi
+#define COLOR_CARD_HOVER    RGB(30, 35, 47)     // Kart Hover Yüzeyi
+#define COLOR_ROW_HOVER     RGB(22, 26, 36)     // Şarkı Satırı Hover
+#define COLOR_ROW_ACTIVE    RGB(17, 39, 27)     // Çalan Şarkı Satırı (Zümrüt Işıltılı)
+#define COLOR_ROW_SEL       RGB(20, 24, 34)     // Seçili Şarkı Satırı
+#define COLOR_CTRL_HOVER    RGB(34, 39, 52)     // İkon Düğme Hover
+#define COLOR_CTRL_PRESS    RGB(44, 50, 66)     // İkon Düğme Basılı
+#define COLOR_ACCENT        RGB(29, 185, 84)    // Spotify Yeşili (#1DB954)
+#define COLOR_ACCENT_HOV    RGB(30, 215, 96)    // Parlak Yeşil (#1ED760)
+#define COLOR_ACCENT_DARK   RGB(20, 142, 64)    // Koyu Basılı Yeşil
+#define COLOR_AMBER         RGB(245, 176, 65)   // Bekleyen Davet / İndirme Vurgusu
+#define COLOR_DANGER        RGB(235, 87, 87)    // Uyarı / Ayrıl Vurgusu
+#define COLOR_TEXT_WHITE    RGB(244, 246, 250)  // Birincil Parlak Metin
+#define COLOR_TEXT_MUTED    RGB(142, 150, 168)  // İkincil Sanatçı Metni
+#define COLOR_TEXT_DIM      RGB(92, 100, 118)   // Üçüncül Numara / Süre Metni
+#define COLOR_BAR_BG        RGB(44, 50, 64)     // İlerleme / Ses Çubuğu Arka Planı
+#define COLOR_BAR_HOVER     RGB(60, 68, 86)     // Çubuk Hover Arka Planı
+#define COLOR_BORDER        RGB(34, 40, 54)     // İnce Cam Kenarlık
+#define COLOR_BORDER_LIGHT  RGB(48, 56, 74)     // Vurgulu Kart Kenarlığı
+#define COLOR_INPUT_BG      RGB(21, 25, 34)     // Arama & Giriş Kutusu İç Yüzeyi
 
 #define IDT_UPDATE_TIMER        1001
 #define IDT_ANIM_TIMER          1002
@@ -67,7 +70,10 @@
 typedef enum {
     ZONE_NONE = 0,
     ZONE_HAMBURGER,
+    ZONE_HEADER_FRIENDS,
+    ZONE_QUICK_DOWNLOAD,
     ZONE_SEARCH_CLEAR,
+    ZONE_SHUFFLE,
     ZONE_PREV,
     ZONE_PLAY,
     ZONE_NEXT,
@@ -102,24 +108,28 @@ typedef enum {
 static int g_dpi = 96;
 static inline int   S(int px)    { return MulDiv(px, g_dpi, 96); }
 static inline float SF(float px) { return px * ((float)g_dpi / 96.0f); }
-static inline int GetHeaderH(void)   { return S(46); }
-static inline int GetCapsuleH(void)  { return S(52); }
-static inline int GetItemH(void)     { return S(38); }
-static inline int GetSidebarW(void)  { return S(260); }
+static inline int GetHeaderH(void)   { return S(60); }
+static inline int GetDockH(void)     { return S(104); }
+static inline int GetItemH(void)     { return S(56); }
+static inline int GetSidebarW(void)  { return S(278); }
 
 static HWND    g_hWnd = NULL;
 static HWND    g_hSearchEdit = NULL;
 static WNDPROC g_oldSearchEditProc = NULL;
 static HBRUSH  g_hBrInputBg = NULL;
 
+static HFONT g_hFontBrand = NULL;
 static HFONT g_hFontTitle = NULL;
 static HFONT g_hFontMain = NULL;
 static HFONT g_hFontBold = NULL;
 static HFONT g_hFontSmall = NULL;
 static HFONT g_hFontSmallBold = NULL;
 static HFONT g_hFontMicro = NULL;
+static HFONT g_hFontIcons = NULL;
+static HFONT g_hFontIconsSmall = NULL;
+static HFONT g_hFontIconsLarge = NULL;
 
-// 32-Bit Doğrudan Piksel Çift Tamponlama
+// 32-Bit Doğrudan Piksel Erişimli Kalıcı Çift Tampon (Sıfır GDI Tahsisatı + Gerçek Anti-Aliasing)
 static HDC       g_backDC = NULL;
 static HBITMAP   g_backBmp = NULL;
 static HBITMAP   g_backOldBmp = NULL;
@@ -128,6 +138,7 @@ static int       g_backW = 0;
 static int       g_backH = 0;
 static RECT      g_pxClip = {0};
 
+static IPicture *g_pMainThumb = NULL;
 static HICON     g_hAppIcon = NULL;
 static AppConfig g_cfg;
 static int       g_currentTrack = -1;
@@ -135,12 +146,7 @@ static int       g_selectedTrack = -1;
 static int       g_hoverTrack = -1;
 static int       g_preMuteVol = 80;
 
-// Sıfır FPS Düşüşü / Espor Modu Durum Takibi
-static BOOL g_isWindowActive = TRUE;
-static BOOL g_isMinimized = FALSE;
-static BOOL g_socialNetworkStarted = FALSE;
-
-// 60 FPS Kesintiye Uğratılabilir Yay Fiziği (Durduğunda %0.000 İşlemci!)
+// 60 FPS Kesintiye Uğratılabilir Yay Fiziği (Durduğunda %0.0 İşlemci!)
 static float g_scrollPosPx = 0.0f;
 static float g_scrollTargetPx = 0.0f;
 static float g_scrollVelPx = 0.0f;
@@ -150,8 +156,13 @@ static float g_sidebarAnim = 0.0f;
 static float g_sidebarVel = 0.0f;
 static int   g_sidebarHoverItem = -1;
 
+static float g_jamBannerAnim = 0.0f; // 0.0 = gizli, 1.0 = açık
+static float g_jamBannerVel = 0.0f;
+
 static BOOL  g_animTimerActive = FALSE;
 static DWORD g_lastAnimTick = 0;
+static BOOL  g_isWindowActive = TRUE;
+static BOOL  g_isMinimized = FALSE;
 
 static UiZone g_hotZone = ZONE_NONE;
 static UiZone g_pressedZone = ZONE_NONE;
@@ -194,9 +205,9 @@ static volatile LONG g_jamAutoDlBusy = 0;
 static wchar_t       g_jamAutoDlTrack[256] = {0};
 
 // Tıklama (Hit-Test) Bölgeleri
-static RECT rcHamburger, rcSearchBox, rcSearchClear;
-static RECT rcCapsule, rcPrev, rcPlay, rcNext, rcRepeat;
-static RECT rcSeekBar, rcSeekHit, rcVolBar, rcVolHit, rcSpeaker;
+static RECT rcHamburger, rcHeaderFriends, rcQuickDownload, rcSearchBox, rcSearchClear;
+static RECT rcShuffle, rcPrev, rcPlay, rcNext, rcRepeat;
+static RECT rcSeekBar, rcSeekHit, rcVolBar, rcVolHit, rcSpeaker, rcDock;
 static RECT rcToastBox, rcToastAccept, rcToastReject;
 static RECT rcJamStage, rcJamLeave, rcJamMissingBtn;
 static RECT rcFriendsBack, rcFriendsRefresh, rcCopyTag;
@@ -208,7 +219,7 @@ static RECT rcReqAcceptBtns[MAX_REQUESTS];
 static RECT rcReqRejectBtns[MAX_REQUESTS];
 
 // =============================================================================
-// YAZI TİPLERİ
+// YAZI TİPİ VE YÜKSEK DPI YÖNETİMİ
 // =============================================================================
 static int CALLBACK EnumFontCheckProc(const LOGFONTW *lpelfe, const TEXTMETRICW *lpntme, DWORD FontType, LPARAM lParam) {
     (void)lpelfe; (void)lpntme; (void)FontType;
@@ -233,31 +244,44 @@ static void InitDpiFonts(int dpi) {
     if (dpi <= 0) dpi = 96;
     g_dpi = dpi;
 
+    if (g_hFontBrand)      DeleteObject(g_hFontBrand);
     if (g_hFontTitle)      DeleteObject(g_hFontTitle);
     if (g_hFontBold)       DeleteObject(g_hFontBold);
     if (g_hFontMain)       DeleteObject(g_hFontMain);
     if (g_hFontSmall)      DeleteObject(g_hFontSmall);
     if (g_hFontSmallBold)  DeleteObject(g_hFontSmallBold);
     if (g_hFontMicro)      DeleteObject(g_hFontMicro);
+    if (g_hFontIcons)      DeleteObject(g_hFontIcons);
+    if (g_hFontIconsSmall) DeleteObject(g_hFontIconsSmall);
+    if (g_hFontIconsLarge) DeleteObject(g_hFontIconsLarge);
 
+    int sBrand     = -MulDiv(15, dpi, 72);
     int sTitle     = -MulDiv(12, dpi, 72);
     int sMain      = -MulDiv(10, dpi, 72);
     int sSmall     = -MulDiv(9,  dpi, 72);
     int sMicro     = -MulDiv(8,  dpi, 72);
+    int sIconSmall = -MulDiv(10, dpi, 72);
+    int sIcon      = -MulDiv(12, dpi, 72);
+    int sIconLarge = -MulDiv(15, dpi, 72);
 
     const wchar_t *uiFont   = FontExists(L"Segoe UI Variable Text") ? L"Segoe UI Variable Text" : L"Segoe UI";
     const wchar_t *dispFont = FontExists(L"Segoe UI Variable Display") ? L"Segoe UI Variable Display" : uiFont;
+    const wchar_t *iconFont = FontExists(L"Segoe Fluent Icons") ? L"Segoe Fluent Icons" : L"Segoe MDL2 Assets";
 
-    g_hFontTitle      = CreateFontW(sTitle, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, dispFont);
-    g_hFontBold       = CreateFontW(sMain,  0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
-    g_hFontMain       = CreateFontW(sMain,  0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
-    g_hFontSmall      = CreateFontW(sSmall, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
-    g_hFontSmallBold  = CreateFontW(sSmall, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
-    g_hFontMicro      = CreateFontW(sMicro, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontBrand      = CreateFontW(sBrand,     0, 0, 0, FW_BOLD,     FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, dispFont);
+    g_hFontTitle      = CreateFontW(sTitle,     0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, dispFont);
+    g_hFontBold       = CreateFontW(sMain,      0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontMain       = CreateFontW(sMain,      0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontSmall      = CreateFontW(sSmall,     0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontSmallBold  = CreateFontW(sSmall,     0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontMicro      = CreateFontW(sMicro,     0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
+    g_hFontIconsSmall = CreateFontW(sIconSmall, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, iconFont);
+    g_hFontIcons      = CreateFontW(sIcon,      0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, iconFont);
+    g_hFontIconsLarge = CreateFontW(sIconLarge, 0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, iconFont);
 }
 
 // =============================================================================
-// DOĞRUDAN PİKSEL ANTI-ALIASED (SDF) GRAFİK MOTORU
+// DOĞRUDAN PİKSEL ANTI-ALIASED (SDF) GRAFİK MOTORU (SIFIR HARİCİ KÜTÜPHANE!)
 // =============================================================================
 static void EnsureBackbuffer(HDC refDC, int w, int h) {
     if (w <= 0 || h <= 0) return;
@@ -337,16 +361,25 @@ static inline void BlendPixelBGRA(uint32_t *dst, uint32_t sr, uint32_t sg, uint3
     *dst = ob | (og << 8) | (or_ << 16) | 0xFF000000u;
 }
 
-static void FillSolidPx(int x, int y, int w, int h, COLORREF col) {
+static void FillVerticalGradientPx(int x, int y, int w, int h, COLORREF topCol, COLORREF botCol) {
     if (!g_backPixels || w <= 0 || h <= 0) return;
+    GdiFlush();
     int x0 = (x < g_pxClip.left) ? g_pxClip.left : x;
     int y0 = (y < g_pxClip.top)  ? g_pxClip.top  : y;
     int x1 = (x + w > g_pxClip.right)  ? g_pxClip.right  : (x + w);
     int y1 = (y + h > g_pxClip.bottom) ? g_pxClip.bottom : (y + h);
     if (x0 >= x1 || y0 >= y1) return;
 
-    uint32_t pxVal = ColorToBGRA(col);
+    int r0 = GetRValue(topCol), g0 = GetGValue(topCol), b0 = GetBValue(topCol);
+    int r1 = GetRValue(botCol), g1 = GetGValue(botCol), b1 = GetBValue(botCol);
+    int denom = (h > 1) ? (h - 1) : 1;
+
     for (int py = y0; py < y1; py++) {
+        int t = py - y;
+        uint32_t cr = (uint32_t)(r0 + ((r1 - r0) * t) / denom);
+        uint32_t cg = (uint32_t)(g0 + ((g1 - g0) * t) / denom);
+        uint32_t cb = (uint32_t)(b0 + ((b1 - b0) * t) / denom);
+        uint32_t pxVal = cb | (cg << 8) | (cr << 16) | 0xFF000000u;
         uint32_t *row = g_backPixels + py * g_backW;
         for (int px = x0; px < x1; px++) {
             row[px] = pxVal;
@@ -356,6 +389,7 @@ static void FillSolidPx(int x, int y, int w, int h, COLORREF col) {
 
 static void DimRectPx(int x, int y, int w, int h, BYTE dimAlpha) {
     if (!g_backPixels || dimAlpha == 0 || w <= 0 || h <= 0) return;
+    GdiFlush();
     int x0 = (x < 0) ? 0 : x;
     int y0 = (y < 0) ? 0 : y;
     int x1 = (x + w > g_backW) ? g_backW : (x + w);
@@ -373,12 +407,13 @@ static void DimRectPx(int x, int y, int w, int h, BYTE dimAlpha) {
     }
 }
 
-// Pürüzsüz SDF Yuvarlatılmış Dikdörtgen
+// Pürüzsüz SDF Yuvarlatılmış Dikdörtgen (İç Dolgu + 1px Anti-Aliased Cam Kenarlık)
 static void DrawSmoothRoundRect(const RECT *rc, int radiusPx, COLORREF fillCol, BYTE fillAlpha, COLORREF borderCol, BYTE borderAlpha) {
     if (!g_backPixels || !rc) return;
     int w = rc->right - rc->left;
     int h = rc->bottom - rc->top;
     if (w <= 0 || h <= 0) return;
+    GdiFlush();
 
     int x0 = (rc->left < g_pxClip.left) ? g_pxClip.left : rc->left;
     int y0 = (rc->top  < g_pxClip.top)  ? g_pxClip.top  : rc->top;
@@ -408,6 +443,7 @@ static void DrawSmoothRoundRect(const RECT *rc, int radiusPx, COLORREF fillCol, 
         float dy = fabsf(((float)py + 0.5f) - cy) - by;
         uint32_t *row = g_backPixels + py * g_backW;
 
+        // Orta düz şerit optimizasyonu (köşe dışında sıfır sqrtf maliyeti!)
         if (dy <= -1.2f && borderAlpha == 0 && fillAlpha == 255) {
             for (int px = x0; px < x1; px++) {
                 float dx = fabsf(((float)px + 0.5f) - cx) - bx;
@@ -444,6 +480,7 @@ static void DrawSmoothRoundRect(const RECT *rc, int radiusPx, COLORREF fillCol, 
             if (outerCov > 1.0f) outerCov = 1.0f;
 
             if (borderAlpha > 0) {
+                // 1.1px kalınlığında pürüzsüz cam kenarlık
                 float innerCov = 0.5f - (dist + 1.1f);
                 if (innerCov < 0.0f) innerCov = 0.0f;
                 if (innerCov > 1.0f) innerCov = 1.0f;
@@ -462,8 +499,9 @@ static void DrawSmoothRoundRect(const RECT *rc, int radiusPx, COLORREF fillCol, 
     }
 }
 
-static void DrawSdfCircle(float cx, float cy, float radius, COLORREF col, BYTE alpha) {
+static void DrawSmoothCircle(float cx, float cy, float radius, COLORREF col, BYTE alpha) {
     if (!g_backPixels || radius <= 0.0f || alpha == 0) return;
+    GdiFlush();
     int x0 = (int)floorf(cx - radius - 1.0f);
     int y0 = (int)floorf(cy - radius - 1.0f);
     int x1 = (int)ceilf(cx + radius + 1.0f);
@@ -495,6 +533,7 @@ static void DrawSdfCircle(float cx, float cy, float radius, COLORREF col, BYTE a
 
 static void DrawHairlineH(int x1, int x2, int y, COLORREF col, BYTE alpha) {
     if (!g_backPixels || y < g_pxClip.top || y >= g_pxClip.bottom) return;
+    GdiFlush();
     if (x1 < g_pxClip.left)  x1 = g_pxClip.left;
     if (x2 > g_pxClip.right) x2 = g_pxClip.right;
     if (x1 >= x2) return;
@@ -508,6 +547,7 @@ static void DrawHairlineH(int x1, int x2, int y, COLORREF col, BYTE alpha) {
 
 static void DrawHairlineV(int x, int y1, int y2, COLORREF col, BYTE alpha) {
     if (!g_backPixels || x < g_pxClip.left || x >= g_pxClip.right) return;
+    GdiFlush();
     if (y1 < g_pxClip.top)    y1 = g_pxClip.top;
     if (y2 > g_pxClip.bottom) y2 = g_pxClip.bottom;
     if (y1 >= y2) return;
@@ -518,274 +558,22 @@ static void DrawHairlineV(int x, int y1, int y2, COLORREF col, BYTE alpha) {
     }
 }
 
-// Subpixel Anti-Aliased Doğru Parçası (Yuvarlak Uçlu)
-static void DrawSdfLine(float x1, float y1, float x2, float y2, float halfThick, COLORREF col, BYTE alpha) {
-    if (!g_backPixels || alpha == 0) return;
-    float minX = (x1 < x2 ? x1 : x2) - halfThick - 1.0f;
-    float maxX = (x1 > x2 ? x1 : x2) + halfThick + 1.0f;
-    float minY = (y1 < y2 ? y1 : y2) - halfThick - 1.0f;
-    float maxY = (y1 > y2 ? y1 : y2) + halfThick + 1.0f;
-
-    int ix0 = (int)floorf(minX); if (ix0 < g_pxClip.left)   ix0 = g_pxClip.left;
-    int iy0 = (int)floorf(minY); if (iy0 < g_pxClip.top)    iy0 = g_pxClip.top;
-    int ix1 = (int)ceilf(maxX);  if (ix1 > g_pxClip.right)  ix1 = g_pxClip.right;
-    int iy1 = (int)ceilf(maxY);  if (iy1 > g_pxClip.bottom) iy1 = g_pxClip.bottom;
-    if (ix0 >= ix1 || iy0 >= iy1) return;
-
-    float vx = x2 - x1, vy = y2 - y1;
-    float len2 = vx * vx + vy * vy;
-    uint32_t sr = GetRValue(col), sg = GetGValue(col), sb = GetBValue(col);
-    uint32_t a256 = ((uint32_t)alpha * 256u + 127u) / 255u;
-
-    for (int py = iy0; py < iy1; py++) {
-        float pyc = (float)py + 0.5f;
-        uint32_t *row = g_backPixels + py * g_backW;
-        for (int px = ix0; px < ix1; px++) {
-            float pxc = (float)px + 0.5f;
-            float t = (len2 > 0.0001f) ? (((pxc - x1) * vx + (pyc - y1) * vy) / len2) : 0.0f;
-            if (t < 0.0f) t = 0.0f; else if (t > 1.0f) t = 1.0f;
-            float dx = pxc - (x1 + t * vx);
-            float dy = pyc - (y1 + t * vy);
-            float dist = sqrtf(dx * dx + dy * dy) - halfThick;
-            if (dist < 0.65f) {
-                float cov = 0.5f - dist;
-                if (cov < 0.0f) cov = 0.0f;
-                if (cov > 1.0f) cov = 1.0f;
-                BlendPixelBGRA(&row[px], sr, sg, sb, (uint32_t)(cov * (float)a256));
-            }
-        }
-    }
-}
-
-// Subpixel Anti-Aliased İçi Dolu Üçgen
-static void DrawSdfTriangle(float x1, float y1, float x2, float y2, float x3, float y3, COLORREF col, BYTE alpha) {
-    if (!g_backPixels || alpha == 0) return;
-    float minX = fminf(x1, fminf(x2, x3)) - 1.0f;
-    float maxX = fmaxf(x1, fmaxf(x2, x3)) + 1.0f;
-    float minY = fminf(y1, fminf(y2, y3)) - 1.0f;
-    float maxY = fmaxf(y1, fmaxf(y2, y3)) + 1.0f;
-
-    int ix0 = (int)floorf(minX); if (ix0 < g_pxClip.left)   ix0 = g_pxClip.left;
-    int iy0 = (int)floorf(minY); if (iy0 < g_pxClip.top)    iy0 = g_pxClip.top;
-    int ix1 = (int)ceilf(maxX);  if (ix1 > g_pxClip.right)  ix1 = g_pxClip.right;
-    int iy1 = (int)ceilf(maxY);  if (iy1 > g_pxClip.bottom) iy1 = g_pxClip.bottom;
-    if (ix0 >= ix1 || iy0 >= iy1) return;
-
-    // Saat yönü sıralamasını garanti et
-    if ((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1) < 0.0f) {
-        float tx = x2; x2 = x3; x3 = tx;
-        float ty = y2; y2 = y3; y3 = ty;
-    }
-
-    uint32_t sr = GetRValue(col), sg = GetGValue(col), sb = GetBValue(col);
-    uint32_t a256 = ((uint32_t)alpha * 256u + 127u) / 255u;
-
-    for (int py = iy0; py < iy1; py++) {
-        float pyc = (float)py + 0.5f;
-        uint32_t *row = g_backPixels + py * g_backW;
-        for (int px = ix0; px < ix1; px++) {
-            float pxc = (float)px + 0.5f;
-
-            // 3 kenarın mesafesi
-            float d1 = (pxc - x1) * (y2 - y1) - (pyc - y1) * (x2 - x1);
-            float d2 = (pxc - x2) * (y3 - y2) - (pyc - y2) * (x3 - x2);
-            float d3 = (pxc - x3) * (y1 - y3) - (pyc - y3) * (x1 - x3);
-
-            if (d1 <= 0.0f && d2 <= 0.0f && d3 <= 0.0f) {
-                // İçeride
-                float dist1 = -d1 / sqrtf((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1));
-                float dist2 = -d2 / sqrtf((y3 - y2) * (y3 - y2) + (x3 - x2) * (x3 - x2));
-                float dist3 = -d3 / sqrtf((y1 - y3) * (y1 - y3) + (x1 - x3) * (x1 - x3));
-                float minDist = fminf(dist1, fminf(dist2, dist3));
-                float cov = 0.5f + minDist;
-                if (cov > 1.0f) cov = 1.0f;
-                BlendPixelBGRA(&row[px], sr, sg, sb, (uint32_t)(cov * (float)a256));
-            } else {
-                // Dışarıda kenar yumuşatma
-                float dist1 = d1 > 0.0f ? (d1 / sqrtf((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1))) : 0.0f;
-                float dist2 = d2 > 0.0f ? (d2 / sqrtf((y3 - y2) * (y3 - y2) + (x3 - x2) * (x3 - x2))) : 0.0f;
-                float dist3 = d3 > 0.0f ? (d3 / sqrtf((y1 - y3) * (y1 - y3) + (x1 - x3) * (x1 - x3))) : 0.0f;
-                float maxOut = fmaxf(dist1, fmaxf(dist2, dist3));
-                if (maxOut < 0.65f) {
-                    float cov = 0.5f - maxOut;
-                    if (cov > 0.0f) BlendPixelBGRA(&row[px], sr, sg, sb, (uint32_t)(cov * (float)a256));
-                }
-            }
-        }
-    }
-}
-
 // =============================================================================
-// VEKTÖREL VE KESKİN İKON ÇİZİMLERİ (HER SİSTEMDE NET VE SIFIR HARİCİ YAZI TİPİ)
+// DÜZEN, FİZİK MOTORU VE JAM SENKRONİZASYON YARDIMCILARI
 // =============================================================================
-static void DrawVecHamburger(float x, float y, COLORREF col) {
-    float barW = (float)S(16);
-    float hThick = SF(0.9f);
-    DrawSdfLine(x, y, x + barW, y, hThick, col, 240);
-    DrawSdfLine(x, y + SF(5.2f), x + barW, y + SF(5.2f), hThick, col, 240);
-    DrawSdfLine(x, y + SF(10.4f), x + barW * 0.70f, y + SF(10.4f), hThick, col, 240);
+static inline int GetJamStageHeight(void) {
+    return (int)(g_jamBannerAnim * (float)S(54) + 0.5f);
 }
 
-static void DrawVecSearch(float cx, float cy, COLORREF col) {
-    float r = SF(4.8f);
-    float hThick = SF(0.85f);
-    // Halka
-    int x0 = (int)floorf(cx - r - 2.0f);
-    int y0 = (int)floorf(cy - r - 2.0f);
-    int x1 = (int)ceilf(cx + r + 2.0f);
-    int y1 = (int)ceilf(cy + r + 2.0f);
-    if (x0 < g_pxClip.left)   x0 = g_pxClip.left;
-    if (y0 < g_pxClip.top)    y0 = g_pxClip.top;
-    if (x1 > g_pxClip.right)  x1 = g_pxClip.right;
-    if (y1 > g_pxClip.bottom) y1 = g_pxClip.bottom;
-
-    uint32_t sr = GetRValue(col), sg = GetGValue(col), sb = GetBValue(col);
-    for (int py = y0; py < y1; py++) {
-        float dy = ((float)py + 0.5f) - cy;
-        uint32_t *row = g_backPixels + py * g_backW;
-        for (int px = x0; px < x1; px++) {
-            float dx = ((float)px + 0.5f) - cx;
-            float dist = fabsf(sqrtf(dx * dx + dy * dy) - r) - hThick;
-            if (dist < 0.65f) {
-                float cov = 0.5f - dist;
-                if (cov < 0.0f) cov = 0.0f;
-                if (cov > 1.0f) cov = 1.0f;
-                BlendPixelBGRA(&row[px], sr, sg, sb, (uint32_t)(cov * 255.0f));
-            }
-        }
-    }
-    // Sap
-    DrawSdfLine(cx + r * 0.70f, cy + r * 0.70f, cx + r + SF(4.5f), cy + r + SF(4.5f), hThick, col, 240);
+static inline int GetTracklistTop(void) {
+    return GetHeaderH() + GetJamStageHeight();
 }
 
-static void DrawVecCross(float cx, float cy, float sz, COLORREF col) {
-    float hThick = SF(0.85f);
-    float hs = sz * 0.5f;
-    DrawSdfLine(cx - hs, cy - hs, cx + hs, cy + hs, hThick, col, 230);
-    DrawSdfLine(cx - hs, cy + hs, cx + hs, cy - hs, hThick, col, 230);
-}
-
-static void DrawVecPlay(float cx, float cy, float sz, COLORREF col) {
-    float hs = sz * 0.5f;
-    float x1 = cx - hs * 0.65f, y1 = cy - hs;
-    float x2 = cx - hs * 0.65f, y2 = cy + hs;
-    float x3 = cx + hs * 0.90f, y3 = cy;
-    DrawSdfTriangle(x1, y1, x2, y2, x3, y3, col, 255);
-}
-
-static void DrawVecPause(float cx, float cy, float w, float h, COLORREF col) {
-    float hw = w * 0.5f, hh = h * 0.5f;
-    float barW = w * 0.32f;
-    RECT r1 = { (int)(cx - hw), (int)(cy - hh), (int)(cx - hw + barW), (int)(cy + hh) };
-    RECT r2 = { (int)(cx + hw - barW), (int)(cy - hh), (int)(cx + hw), (int)(cy + hh) };
-    DrawSmoothRoundRect(&r1, (int)SF(1.5f), col, 255, 0, 0);
-    DrawSmoothRoundRect(&r2, (int)SF(1.5f), col, 255, 0, 0);
-}
-
-static void DrawVecPrev(float cx, float cy, float sz, COLORREF col) {
-    float hs = sz * 0.5f;
-    float hThick = SF(0.9f);
-    DrawSdfLine(cx - hs * 0.85f, cy - hs * 0.85f, cx - hs * 0.85f, cy + hs * 0.85f, hThick, col, 255);
-    DrawSdfTriangle(cx - hs * 0.70f, cy, cx + hs * 0.85f, cy - hs * 0.90f, cx + hs * 0.85f, cy + hs * 0.90f, col, 255);
-}
-
-static void DrawVecNext(float cx, float cy, float sz, COLORREF col) {
-    float hs = sz * 0.5f;
-    float hThick = SF(0.9f);
-    DrawSdfLine(cx + hs * 0.85f, cy - hs * 0.85f, cx + hs * 0.85f, cy + hs * 0.85f, hThick, col, 255);
-    DrawSdfTriangle(cx + hs * 0.70f, cy, cx - hs * 0.85f, cy - hs * 0.90f, cx - hs * 0.85f, cy + hs * 0.90f, col, 255);
-}
-
-static void DrawVecRepeat(float cx, float cy, float sz, COLORREF col) {
-    float w = sz * 0.95f;
-    float h = sz * 0.62f;
-    float x = cx - w * 0.5f;
-    float y = cy - h * 0.5f;
-    float hThick = SF(0.85f);
-
-    // Üst şerit
-    DrawSdfLine(x, cy + SF(1.0f), x, y + SF(2.0f), hThick, col, 255);
-    DrawSdfLine(x, y, x + w - SF(2.5f), y, hThick, col, 255);
-    DrawSdfTriangle(x + w + SF(1.2f), y, x + w - SF(3.2f), y - SF(2.8f), x + w - SF(3.2f), y + SF(2.8f), col, 255);
-
-    // Alt şerit
-    DrawSdfLine(x + w, cy - SF(1.0f), x + w, y + h - SF(2.0f), hThick, col, 255);
-    DrawSdfLine(x + w, y + h, x + SF(2.5f), y + h, hThick, col, 255);
-    DrawSdfTriangle(x - SF(1.2f), y + h, x + SF(3.2f), y + h - SF(2.8f), x + SF(3.2f), y + h + SF(2.8f), col, 255);
-}
-
-static void DrawVecSpeaker(float cx, float cy, COLORREF col) {
-    float hThick = SF(0.8f);
-    float x1 = cx - SF(5.5f), y1 = cy - SF(2.2f);
-    float x2 = cx - SF(2.5f), y2 = cy - SF(2.2f);
-    float x3 = cx + SF(1.0f), y3 = cy - SF(5.5f);
-    float x4 = cx + SF(1.0f), y4 = cy + SF(5.5f);
-    float x5 = cx - SF(2.5f), y5 = cy + SF(2.2f);
-    float x6 = cx - SF(5.5f), y6 = cy + SF(2.2f);
-
-    DrawSdfTriangle(x1, y1, x2, y2, x6, y6, col, 255);
-    DrawSdfTriangle(x2, y2, x5, y5, x6, y6, col, 255);
-    DrawSdfTriangle(x2, y2, x3, y3, x4, y4, col, 255);
-    DrawSdfTriangle(x2, y2, x4, y4, x5, y5, col, 255);
-
-    // Ses Dalgası (yay)
-    DrawSdfLine(cx + SF(3.0f), cy - SF(3.0f), cx + SF(4.5f), cy, hThick, col, 255);
-    DrawSdfLine(cx + SF(4.5f), cy, cx + SF(3.0f), cy + SF(3.0f), hThick, col, 255);
-}
-
-// =============================================================================
-// OPTİMİZE ZAMANLAYICI VE OYUN MODU YÖNETİMİ
-// =============================================================================
 static BOOL IsSocialRefreshActive(void) {
     return ((g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_FRIENDS) || Jam_GetState() != JAM_STATE_NONE);
 }
 
-static void UpdateTimerSchedule(HWND hWnd) {
-    if (!hWnd) return;
-
-    // Pencere simge durumundaysa veya arka plandaysa (örneğin oyundayken):
-    if (!g_isWindowActive || g_isMinimized) {
-        if (g_animTimerActive) {
-            KillTimer(hWnd, IDT_ANIM_TIMER);
-            g_animTimerActive = FALSE;
-            g_scrollPosPx = g_scrollTargetPx;
-            g_sidebarAnim = g_sidebarOpen ? 1.0f : 0.0f;
-        }
-
-        // Jam aktif değilse IDT_UPDATE_TIMER'ı TAMAMEN KAPAT! (%0.000 CPU)
-        if (Jam_GetState() == JAM_STATE_NONE) {
-            KillTimer(hWnd, IDT_UPDATE_TIMER);
-        } else {
-            // Jam aktifse 2000ms'de bir hafif timeout kontrolü (arka planda InvalidateRect çağrılmaz!)
-            SetTimer(hWnd, IDT_UPDATE_TIMER, 2000, NULL);
-        }
-        return;
-    }
-
-    // Pencere önde ve odaktayken:
-    if (Player_IsPlaying() || IsSocialRefreshActive()) {
-        SetTimer(hWnd, IDT_UPDATE_TIMER, 1000, NULL); // 1 Hz (250ms değil!)
-    } else {
-        KillTimer(hWnd, IDT_UPDATE_TIMER);
-    }
-}
-
-static void EnsureSocialNetworkStarted(void) {
-    if (g_socialNetworkStarted) return;
-    wchar_t myInitTag[32] = {0};
-    Friends_GetMyTag(myInitTag, 32);
-    char myInitKey[64] = {0};
-    Network_TagToTopicKeyW(myInitTag, myInitKey, sizeof(myInitKey));
-    Network_Init(g_hWnd, myInitKey);
-
-    char myInboxTopic[160];
-    snprintf(myInboxTopic, sizeof(myInboxTopic), "seloplayer/u/%s", myInitKey);
-    Network_Subscribe(myInboxTopic);
-    g_socialNetworkStarted = TRUE;
-}
-
 static void TriggerImmediateFriendsRefresh(void) {
-    EnsureSocialNetworkStarted();
     g_lastFriendsRefreshTick = GetTickCount();
     Friends_RequestAllStatuses();
 }
@@ -798,12 +586,12 @@ static void SyncLocalTrackToFriends(void) {
 static int GetMaxScrollPx(HWND hWnd) {
     RECT rc;
     GetClientRect(hWnd, &rc);
-    int listTop = GetHeaderH();
-    int listBottom = rc.bottom;
+    int listTop = GetTracklistTop() + S(26); // Sütun başlığı altından başlar
+    int listBottom = rc.bottom - GetDockH();
     int viewH = listBottom - listTop;
     if (viewH < 0) viewH = 0;
     int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
-    int contentH = totalCount * GetItemH() + S(84); // Alttaki kapsülün arkasında kalmaması için ek pay
+    int contentH = totalCount * GetItemH() + S(12);
     int maxPx = contentH - viewH;
     return (maxPx > 0) ? maxPx : 0;
 }
@@ -825,9 +613,51 @@ static void UpdateSidebarEditPosition(void) {
     }
     int sbW = GetSidebarW();
     int offX = (int)((g_sidebarAnim - 1.0f) * (float)sbW);
-    int inputTop = GetHeaderH() + S(176);
-    MoveWindow(g_hFriendAddEdit, offX + S(18), inputTop + S(6), sbW - S(36), S(24), TRUE);
+    int inputTop = GetHeaderH() + S(204);
+    MoveWindow(g_hFriendAddEdit, offX + S(22), inputTop + S(8), sbW - S(44), S(22), TRUE);
     if (!IsWindowVisible(g_hFriendAddEdit)) ShowWindow(g_hFriendAddEdit, SW_SHOW);
+}
+
+static BOOL g_networkStarted = FALSE;
+static void EnsureSocialNetworkStarted(void) {
+    if (g_networkStarted || !g_hWnd) return;
+    g_networkStarted = TRUE;
+    wchar_t myInitTag[32] = {0};
+    Friends_GetMyTag(myInitTag, 32);
+    char myInitKey[64] = {0};
+    Network_TagToTopicKeyW(myInitTag, myInitKey, sizeof(myInitKey));
+    Network_Init(g_hWnd, myInitKey);
+
+    char myInboxTopic[160];
+    snprintf(myInboxTopic, sizeof(myInboxTopic), "seloplayer/u/%s", myInitKey);
+    Network_Subscribe(myInboxTopic);
+}
+
+static void UpdateTimerSchedule(HWND hWnd) {
+    if (!hWnd) return;
+    if (!g_isWindowActive || g_isMinimized) {
+        if (g_animTimerActive) {
+            KillTimer(hWnd, IDT_ANIM_TIMER);
+            g_animTimerActive = FALSE;
+            g_sidebarAnim = g_sidebarOpen ? 1.0f : 0.0f;
+            g_jamBannerAnim = (Jam_GetState() != JAM_STATE_NONE) ? 1.0f : 0.0f;
+            g_scrollPosPx = g_scrollTargetPx;
+        }
+        if (Jam_GetState() == JAM_STATE_NONE) {
+            KillTimer(hWnd, IDT_UPDATE_TIMER);
+        } else {
+            SetTimer(hWnd, IDT_UPDATE_TIMER, 2000, NULL);
+        }
+        return;
+    }
+
+    if (Player_IsPlaying()) {
+        SetTimer(hWnd, IDT_UPDATE_TIMER, 1000, NULL);
+    } else if (Jam_GetState() != JAM_STATE_NONE || (g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_FRIENDS)) {
+        SetTimer(hWnd, IDT_UPDATE_TIMER, 1500, NULL);
+    } else {
+        KillTimer(hWnd, IDT_UPDATE_TIMER);
+    }
 }
 
 static void StartAnimLoop(HWND hWnd) {
@@ -910,7 +740,10 @@ static void ApplyFilter(const wchar_t *query) {
     g_scrollPosPx = 0.0f;
     g_scrollTargetPx = 0.0f;
     g_scrollVelPx = 0.0f;
-    if (g_hWnd && g_isWindowActive && !g_isMinimized) InvalidateRect(g_hWnd, NULL, FALSE);
+    if (g_hWnd) {
+        InvalidateRect(g_hWnd, NULL, FALSE);
+        UpdateTimerSchedule(g_hWnd);
+    }
 }
 
 static void ScrollTrackIntoView(int trackIdx) {
@@ -926,7 +759,7 @@ static void ScrollTrackIntoView(int trackIdx) {
 
     RECT rc;
     GetClientRect(g_hWnd, &rc);
-    int viewH = rc.bottom - GetHeaderH();
+    int viewH = (rc.bottom - GetDockH()) - (GetTracklistTop() + S(26));
     int itemH = GetItemH();
     float itemTop = (float)(displayIdx * itemH);
     float itemBot = itemTop + (float)itemH;
@@ -935,10 +768,34 @@ static void ScrollTrackIntoView(int trackIdx) {
         g_scrollTargetPx = itemTop;
         ClampScrollTargets(g_hWnd);
         StartAnimLoop(g_hWnd);
-    } else if (itemBot > g_scrollTargetPx + (float)viewH - (float)S(80)) {
-        g_scrollTargetPx = itemBot - (float)viewH + (float)S(84);
+    } else if (itemBot > g_scrollTargetPx + (float)viewH - (float)S(8)) {
+        g_scrollTargetPx = itemBot - (float)viewH + (float)S(12);
         ClampScrollTargets(g_hWnd);
         StartAnimLoop(g_hWnd);
+    }
+}
+
+static void LoadTrackThumbnail(const wchar_t *filePath) {
+    if (g_pMainThumb) {
+        g_pMainThumb->lpVtbl->Release(g_pMainThumb);
+        g_pMainThumb = NULL;
+    }
+    if (!filePath || !filePath[0]) return;
+
+    wchar_t base[MAX_PATH];
+    wcsncpy(base, filePath, MAX_PATH - 1);
+    base[MAX_PATH - 1] = L'\0';
+    PathRemoveExtensionW(base);
+
+    static const wchar_t *exts[] = { L".jpg", L".jpeg", L".png", L".webp" };
+    for (int i = 0; i < 4; i++) {
+        wchar_t candidate[MAX_PATH];
+        _snwprintf(candidate, MAX_PATH - 1, L"%s%s", base, exts[i]);
+        candidate[MAX_PATH - 1] = L'\0';
+        if (GetFileAttributesW(candidate) != INVALID_FILE_ATTRIBUTES) {
+            OleLoadPicturePath(candidate, NULL, 0, 0, &IID_IPicture, (void**)&g_pMainThumb);
+            if (g_pMainThumb) break;
+        }
     }
 }
 
@@ -961,6 +818,7 @@ static void PlayTrack(int index) {
 
     g_currentTrack = index;
     g_selectedTrack = index;
+    LoadTrackThumbnail(item->filePath);
     Player_OpenFile(item->filePath);
     SyncLocalTrackToFriends();
 
@@ -970,15 +828,14 @@ static void PlayTrack(int index) {
         Jam_SetSyncStatus(L"✓ Canlı senkronize", FALSE, NULL);
         Jam_BroadcastState(TRUE, item->title, ytId, 0);
     }
-
-    if (g_hWnd && g_isWindowActive && !g_isMinimized) {
+    if (g_hWnd) {
         InvalidateRect(g_hWnd, NULL, FALSE);
+        UpdateTimerSchedule(g_hWnd);
     }
-    UpdateTimerSchedule(g_hWnd);
 }
 
 // =============================================================================
-// JAM OTOMATİK EKSİK ŞARKI İNDİRİCİ
+// JAM OTOMATİK EKSİK ŞARKI İNDİRİCİ (ARKA PLAN YT-DLP ENTEGRASYONU)
 // =============================================================================
 typedef struct {
     wchar_t title[256];
@@ -1082,6 +939,7 @@ static void ApplyRemoteJamSync(const JamRemoteSync *rs) {
 
     if (rs->posOnly) {
         if (rs->ytId[0] == L'S') {
+            // Sadece sarma (seek)
             if (rs->posSec >= 0) Player_SetPosition(rs->posSec);
         } else if (!rs->isPlaying) {
             if (Player_IsPlaying()) Player_Pause();
@@ -1102,6 +960,7 @@ static void ApplyRemoteJamSync(const JamRemoteSync *rs) {
         return;
     }
 
+    // 1. Halihazırda çalan şarkı aynı mı?
     if (g_currentTrack >= 0 && Playlist_IsSameTrack(g_currentTrack, rs->trackTitle, rs->ytId)) {
         int curPos = Player_GetPosition();
         if (rs->posSec >= 0 && abs(curPos - rs->posSec) > 2) {
@@ -1118,6 +977,7 @@ static void ApplyRemoteJamSync(const JamRemoteSync *rs) {
         return;
     }
 
+    // 2. Kütüphanede en doğru eşleşmeyi ara (ASLA alakasız başka şarkı açmaz!)
     int found = Playlist_FindBestMatch(rs->trackTitle, rs->ytId);
     if (found >= 0) {
         PlayTrack(found);
@@ -1127,6 +987,7 @@ static void ApplyRemoteJamSync(const JamRemoteSync *rs) {
         Jam_SetSyncStatus(rs->isPlaying ? L"✓ Canlı senkronize" : L"⏸ Ortak duraklatıldı", FALSE, NULL);
         SyncLocalTrackToFriends();
     } else {
+        // 3. Bu bilgisayarda şarkı YOK -> Yanlış şarkıyı sustur ve otomatik indir!
         Player_Stop();
         g_currentTrack = -1;
         SyncLocalTrackToFriends();
@@ -1145,6 +1006,7 @@ static void ToggleSidebar(BOOL open) {
         ShowWindow(g_hFriendAddEdit, SW_HIDE);
     }
     if (open && g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
+        EnsureSocialNetworkStarted();
         TriggerImmediateFriendsRefresh();
     }
     if (g_hWnd) StartAnimLoop(g_hWnd);
@@ -1248,185 +1110,359 @@ static void SubmitFriendRequest(HWND hWnd) {
         wcscpy(g_friendAddMsg, L"Lütfen bir kullanıcı etiketi yazın.");
     } else if (wcschr(inTag, L'#') == NULL) {
         wcscpy(g_friendAddMsg, L"Etiket '#' içermelidir (Örn: Selim#8421)");
+    } else if (Friends_SendRequest(inTag)) {
+        wcscpy(g_friendAddMsg, L"✓ Arkadaşlık isteği gönderildi!");
+        SetWindowTextW(g_hFriendAddEdit, L"");
     } else {
-        EnsureSocialNetworkStarted();
-        if (Friends_SendRequest(inTag)) {
-            wcscpy(g_friendAddMsg, L"✓ Arkadaşlık isteği gönderildi!");
-            SetWindowTextW(g_hFriendAddEdit, L"");
-        } else {
-            wcscpy(g_friendAddMsg, L"İstek gönderilemedi. Etiketi veya interneti kontrol edin.");
-        }
+        wcscpy(g_friendAddMsg, L"İstek gönderilemedi. Etiketi veya interneti kontrol edin.");
     }
     InvalidateRect(hWnd, NULL, FALSE);
 }
 
 // =============================================================================
-// MODERN ARAYÜZ ÇİZİM MOTORU (TASARIM 6 + SPOTIFY YEŞİLİ #1DB954)
+// MODERN ARAYÜZ ÇİZİM MOTORU (BAŞTAN AŞAĞI YENİLENMİŞ PREMIUM TASARIM)
 // =============================================================================
+static COLORREF GetAvatarJewelColor(const wchar_t *text) {
+    static const COLORREF palette[] = {
+        RGB(28, 52, 88),   // Derin Safir
+        RGB(58, 34, 84),   // Asil Mor
+        RGB(22, 66, 68),   // Okyanus Petrolü
+        RGB(76, 36, 54),   // Koyu Yakut
+        RGB(34, 62, 46),   // Zümrüt Gölgesi
+        RGB(68, 48, 28)    // Koyu Kehribar
+    };
+    unsigned int hash = 2166136261u;
+    if (text) {
+        for (int i = 0; text[i]; i++) {
+            hash ^= (unsigned int)(text[i] | 0x20);
+            hash *= 16777619u;
+        }
+    }
+    return palette[hash % 6];
+}
+
+static wchar_t GetInitialChar(const wchar_t *text) {
+    if (!text) return L'♪';
+    for (int i = 0; text[i]; i++) {
+        if (text[i] > L' ' && text[i] != L'(' && text[i] != L'[') {
+            wchar_t ch = text[i];
+            if (ch == L'i') return 0x0130;
+            if (ch == 0x0131) return L'I';
+            CharUpperBuffW(&ch, 1);
+            return ch;
+        }
+    }
+    return L'♪';
+}
+
+static void DrawIconCircleBtn(HDC hdc, const RECT *rc, UiZone zone, const wchar_t *glyph, COLORREF activeColor, BOOL showDot) {
+    BOOL isHot = (g_hotZone == zone);
+    BOOL isPress = (g_pressedZone == zone);
+    float cx = (float)(rc->left + rc->right) * 0.5f;
+    float cy = (float)(rc->top + rc->bottom) * 0.5f;
+    float rad = (float)(rc->right - rc->left) * 0.5f;
+
+    if (isHot || isPress) {
+        DrawSmoothCircle(cx, cy, rad, isPress ? COLOR_CTRL_PRESS : COLOR_CTRL_HOVER, 255);
+    }
+
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontIcons);
+    SetTextColor(hdc, activeColor != 0 ? activeColor : (isHot ? COLOR_TEXT_WHITE : RGB(188, 196, 212)));
+    RECT rcG = *rc;
+    if (isPress) OffsetRect(&rcG, 0, 1);
+    DrawTextW(hdc, glyph, -1, &rcG, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+    if (showDot) {
+        DrawSmoothCircle(cx, (float)rc->bottom - (float)S(2), (float)S(2), COLOR_ACCENT_HOV, 255);
+    }
+}
+
 static void RenderUI(HDC hdc, const RECT *clientRc) {
     int w = clientRc->right - clientRc->left;
     int h = clientRc->bottom - clientRc->top;
     int headerH = GetHeaderH();
+    int dockH   = GetDockH();
     int itemH   = GetItemH();
     JamState jamState = Jam_GetState();
 
     SetBkMode(hdc, TRANSPARENT);
     ResetPixelClip();
 
-    // 0. Saf Derin Kadife Siyah Zemin
-    FillSolidPx(0, 0, w, h, COLOR_BG);
+    // 0. Derin Obsidyen / Zümrüt Aura Arka Plan Gradyanı
+    FillVerticalGradientPx(0, 0, w, h, (jamState == JAM_STATE_ACTIVE) ? COLOR_BG_JAM_TOP : COLOR_BG_TOP, COLOR_BG_BOT);
 
     // =========================================================================
-    // 1. ÜST ÇUBUK: ÇERÇEVESİZ, MINIMAL & FERAH (46px)
+    // 1. ÜST BÖLGE: MODERN CAM ÜST ÇUBUK (HEADER)
     // =========================================================================
-    rcHamburger = (RECT){ S(14), (headerH - S(32)) / 2, S(46), (headerH + S(32)) / 2 };
+    RECT rcHeader = { 0, 0, w, headerH };
+    DrawSmoothRoundRect(&rcHeader, 0, COLOR_HEADER_SURF, 220, 0, 0);
+    DrawHairlineH(0, w, headerH - 1, COLOR_BORDER, 190);
+
+    // Sol Menü Düğmesi
+    rcHamburger = (RECT){ S(12), (headerH - S(36)) / 2, S(48), (headerH + S(36)) / 2 };
     {
         BOOL hHot = (g_hotZone == ZONE_HAMBURGER);
         BOOL hPrs = (g_pressedZone == ZONE_HAMBURGER);
         if (hHot || hPrs || g_sidebarOpen) {
-            DrawSmoothRoundRect(&rcHamburger, S(8), hPrs ? COLOR_CTRL_PRESS : COLOR_CTRL_HOVER, 255, COLOR_BORDER_LIGHT, 120);
+            DrawSmoothRoundRect(&rcHamburger, S(10), hPrs ? COLOR_CTRL_PRESS : COLOR_CTRL_HOVER, 255, COLOR_BORDER_LIGHT, 120);
         }
-        DrawVecHamburger((float)(rcHamburger.left + S(7)), (float)(rcHamburger.top + S(10)),
-                         g_sidebarOpen ? COLOR_ACCENT_HOV : (hHot ? COLOR_TEXT_WHITE : RGB(215, 215, 225)));
+        SetBkMode(hdc, TRANSPARENT);
+        SelectObject(hdc, g_hFontIcons);
+        SetTextColor(hdc, g_sidebarOpen ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+        DrawTextW(hdc, L"\uE700", -1, &rcHamburger, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
         if (Friends_GetPendingCount() > 0 && !g_sidebarOpen) {
-            DrawSdfCircle((float)(rcHamburger.right - S(5)), (float)(rcHamburger.top + S(5)), SF(3.5f), COLOR_ACCENT_HOV, 255);
+            DrawSmoothCircle((float)(rcHamburger.right - S(6)), (float)(rcHamburger.top + S(6)), (float)S(4), COLOR_ACCENT_HOV, 255);
         }
     }
 
-    // Arama Kapsülü (Sağda, Tasarım 6'daki kompakt yuvarlak hap)
-    int searchW = (w >= S(560)) ? S(208) : S(156);
-    int searchH = S(28);
-    int searchX = w - searchW - S(14);
+    // Marka İsmi ("Selo")
+    RECT rcBrand = { S(56), 0, S(126), headerH };
+    SetBkMode(hdc, TRANSPARENT);
+    SelectObject(hdc, g_hFontBrand);
+    SetTextColor(hdc, COLOR_TEXT_WHITE);
+    DrawTextW(hdc, L"Selo", -1, &rcBrand, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+    // Sağ Arama Kutusu Hapı
+    int searchW = (w >= S(560)) ? S(190) : S(148);
+    int searchH = S(34);
+    int searchX = w - searchW - S(12);
     int searchY = (headerH - searchH) / 2;
     rcSearchBox = (RECT){ searchX, searchY, searchX + searchW, searchY + searchH };
 
     BOOL searchFocused = (GetFocus() == g_hSearchEdit);
     DrawSmoothRoundRect(&rcSearchBox, searchH / 2, COLOR_INPUT_BG, 255,
-                        searchFocused ? COLOR_ACCENT : COLOR_BORDER,
-                        searchFocused ? 230 : 150);
+                        searchFocused ? COLOR_ACCENT : COLOR_BORDER_LIGHT,
+                        searchFocused ? 230 : 140);
 
-    DrawVecSearch((float)(searchX + S(14)), (float)(searchY + searchH / 2),
-                  searchFocused ? COLOR_ACCENT_HOV : COLOR_TEXT_DIM);
+    RECT rcSearchIcon = { searchX + S(10), searchY, searchX + S(28), searchY + searchH };
+    SelectObject(hdc, g_hFontIconsSmall);
+    SetTextColor(hdc, searchFocused ? COLOR_ACCENT_HOV : COLOR_TEXT_DIM);
+    DrawTextW(hdc, L"\uE721", -1, &rcSearchIcon, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     if (g_searchQuery[0]) {
-        rcSearchClear = (RECT){ rcSearchBox.right - S(26), searchY + S(2), rcSearchBox.right - S(4), searchY + searchH - S(2) };
-        DrawVecCross((float)(rcSearchClear.left + rcSearchClear.right) * 0.5f,
-                     (float)(rcSearchClear.top + rcSearchClear.bottom) * 0.5f,
-                     SF(7.5f), (g_hotZone == ZONE_SEARCH_CLEAR) ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED);
+        rcSearchClear = (RECT){ rcSearchBox.right - S(28), searchY + S(3), rcSearchBox.right - S(4), searchY + searchH - S(3) };
+        SelectObject(hdc, g_hFontIconsSmall);
+        SetTextColor(hdc, (g_hotZone == ZONE_SEARCH_CLEAR) ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED);
+        DrawTextW(hdc, L"\uE711", -1, &rcSearchClear, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     } else {
         rcSearchClear = (RECT){0};
     }
 
-    // Canlı Jam Bildirim Rozeti (Yalnızca Jam aktifken sol üstte menünün yanında yer kaplar!)
+    // Hızlı "+ İndir" Hap Düğmesi
+    int dlW = S(78);
+    int dlRight = searchX - S(8);
+    int dlLeft  = dlRight - dlW;
+    if (dlLeft > S(116)) {
+        rcQuickDownload = (RECT){ dlLeft, searchY, dlRight, searchY + searchH };
+        BOOL qHot = (g_hotZone == ZONE_QUICK_DOWNLOAD);
+        BOOL qPrs = (g_pressedZone == ZONE_QUICK_DOWNLOAD);
+        DrawSmoothRoundRect(&rcQuickDownload, searchH / 2,
+                            qPrs ? COLOR_CTRL_PRESS : (qHot ? COLOR_CARD_HOVER : COLOR_CARD_SURF), 255,
+                            qHot ? COLOR_ACCENT : COLOR_BORDER_LIGHT, qHot ? 180 : 120);
+        SelectObject(hdc, g_hFontSmallBold);
+        SetTextColor(hdc, qHot ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+        DrawTextW(hdc, L"+ İndir", -1, &rcQuickDownload, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    } else {
+        rcQuickDownload = (RECT){0};
+    }
+
+    // Hızlı "Arkadaşlar / Jam" Hap Düğmesi (Üst Çubuktan Tek Tıkla Erişim!)
+    int frW = S(116);
+    int frRight = (rcQuickDownload.right > 0 ? rcQuickDownload.left : searchX) - S(8);
+    int frLeft  = frRight - frW;
+    if (frLeft > S(112)) {
+        rcHeaderFriends = (RECT){ frLeft, searchY, frRight, searchY + searchH };
+        BOOL fHot = (g_hotZone == ZONE_HEADER_FRIENDS);
+        BOOL fPrs = (g_pressedZone == ZONE_HEADER_FRIENDS);
+        BOOL fActive = ((g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_FRIENDS) || jamState == JAM_STATE_ACTIVE);
+
+        COLORREF fFill = fActive ? RGB(18, 48, 31) : (fPrs ? COLOR_CTRL_PRESS : (fHot ? COLOR_CARD_HOVER : COLOR_CARD_SURF));
+        COLORREF fBord = fActive ? COLOR_ACCENT : (fHot ? COLOR_BORDER_LIGHT : COLOR_BORDER);
+        DrawSmoothRoundRect(&rcHeaderFriends, searchH / 2, fFill, 255, fBord, fActive ? 210 : 140);
+
+        RECT rcFIcon = { frLeft + S(14), searchY, frLeft + S(32), searchY + searchH };
+        SelectObject(hdc, g_hFontIconsSmall);
+        SetTextColor(hdc, fActive ? COLOR_ACCENT_HOV : COLOR_TEXT_MUTED);
+        DrawTextW(hdc, L"\uE716", -1, &rcFIcon, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+        RECT rcFTxt = { frLeft + S(34), searchY, frRight - S(10), searchY + searchH };
+        SelectObject(hdc, g_hFontSmallBold);
+        SetTextColor(hdc, fActive ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+        DrawTextW(hdc, (jamState == JAM_STATE_ACTIVE) ? L"Jam Aktif" : L"Arkadaşlar", -1, &rcFTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+        if (Friends_GetPendingCount() > 0) {
+            DrawSmoothCircle((float)(rcHeaderFriends.right - S(8)), (float)(rcHeaderFriends.top + S(7)), (float)S(4), COLOR_ACCENT_HOV, 255);
+        }
+    } else {
+        rcHeaderFriends = (RECT){0};
+    }
+
+    // =========================================================================
+    // 2. CANLI JAM SAHNE ÇUBUĞU (JAM'DE OLDUĞUNU ANINDA HİSSETTİREN ÖZEL KATMAN)
+    // =========================================================================
+    int jamStageH = GetJamStageHeight();
     rcJamStage = (RECT){0};
     rcJamLeave = (RECT){0};
     rcJamMissingBtn = (RECT){0};
 
-    if (jamState != JAM_STATE_NONE) {
+    if (jamStageH > S(8) && jamState != JAM_STATE_NONE) {
+        int stageClipBot = headerH + jamStageH;
+        int savedJam = SaveDC(hdc);
+        IntersectClipRect(hdc, 0, headerH, w, stageClipBot);
+        SetPixelClip(0, headerH, w, stageClipBot);
+
+        rcJamStage = (RECT){ S(12), headerH + S(6), w - S(12), headerH + S(50) };
         BOOL isInviting = (jamState == JAM_STATE_INVITING);
-        int jLeft = S(52);
-        int jRight = searchX - S(12);
-        if (jRight > jLeft + S(120)) {
-            rcJamStage = (RECT){ jLeft, searchY, jRight, searchY + searchH };
-            COLORREF jBg   = isInviting ? RGB(32, 26, 15) : RGB(14, 33, 21);
-            COLORREF jBord = isInviting ? COLOR_AMBER     : COLOR_ACCENT;
-            DrawSmoothRoundRect(&rcJamStage, searchH / 2, jBg, 255, jBord, 200);
 
-            // Canlı Yeşil Nokta
-            float jDotX = (float)(rcJamStage.left + S(12));
-            float jDotY = (float)(rcJamStage.top + rcJamStage.bottom) * 0.5f;
-            DrawSdfCircle(jDotX, jDotY, SF(3.5f), isInviting ? COLOR_AMBER : COLOR_ACCENT_HOV, 255);
+        COLORREF stageBg   = isInviting ? RGB(36, 29, 16) : RGB(15, 42, 27);
+        COLORREF stageBord = isInviting ? COLOR_AMBER     : COLOR_ACCENT_HOV;
+        DrawSmoothRoundRect(&rcJamStage, S(12), stageBg, 245, stageBord, 200);
 
-            // Ayrıl Düğmesi
-            rcJamLeave = (RECT){ rcJamStage.right - S(50), rcJamStage.top + S(2), rcJamStage.right - S(4), rcJamStage.bottom - S(2) };
-            BOOL lvHot = (g_hotZone == ZONE_JAM_LEAVE);
-            DrawSmoothRoundRect(&rcJamLeave, S(6), lvHot ? RGB(68, 28, 32) : RGB(26, 30, 38), 240, 0, 0);
-            SelectObject(hdc, g_hFontMicro);
-            SetTextColor(hdc, lvHot ? RGB(255, 160, 160) : COLOR_TEXT_WHITE);
-            DrawTextW(hdc, isInviting ? L"İptal" : L"Ayrıl", -1, &rcJamLeave, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        // Sol Canlı Işıltı Noktası
+        float dotX = (float)(rcJamStage.left + S(20));
+        float dotY = (float)(rcJamStage.top + rcJamStage.bottom) * 0.5f;
+        COLORREF dotCol = isInviting ? COLOR_AMBER : COLOR_ACCENT_HOV;
+        DrawSmoothCircle(dotX, dotY, (float)S(8), dotCol, 55);
+        DrawSmoothCircle(dotX, dotY, (float)S(4), dotCol, 255);
 
-            int textRight = rcJamLeave.left - S(6);
+        // Sağ "Ayrıl / İptal" Düğmesi
+        rcJamLeave = (RECT){ rcJamStage.right - S(74), rcJamStage.top + S(8), rcJamStage.right - S(10), rcJamStage.bottom - S(8) };
+        BOOL lvHot = (g_hotZone == ZONE_JAM_LEAVE);
+        DrawSmoothRoundRect(&rcJamLeave, S(8), lvHot ? RGB(68, 28, 32) : RGB(28, 34, 42), 235,
+                            lvHot ? COLOR_DANGER : COLOR_BORDER_LIGHT, 160);
+        SelectObject(hdc, g_hFontSmallBold);
+        SetTextColor(hdc, lvHot ? RGB(255, 150, 150) : COLOR_TEXT_WHITE);
+        DrawTextW(hdc, isInviting ? L"İptal" : L"Ayrıl", -1, &rcJamLeave, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // Eksik şarkı indir düğmesi
-            wchar_t missingTitle[256] = {0};
-            Jam_GetMissingTrack(missingTitle, 256);
-            if (!isInviting && missingTitle[0] && !Jam_IsDownloadingTrack()) {
-                rcJamMissingBtn = (RECT){ rcJamLeave.left - S(52), rcJamStage.top + S(2), rcJamLeave.left - S(4), rcJamStage.bottom - S(2) };
-                BOOL mHot = (g_hotZone == ZONE_JAM_MISSING_DL);
-                DrawSmoothRoundRect(&rcJamMissingBtn, S(6), mHot ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
-                SelectObject(hdc, g_hFontMicro);
-                SetTextColor(hdc, RGB(8, 12, 10));
-                DrawTextW(hdc, L"İndir", -1, &rcJamMissingBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-                textRight = rcJamMissingBtn.left - S(6);
-            }
-
-            wchar_t partnerName[64] = {0};
-            Jam_GetPartnerName(partnerName, 64);
-            wchar_t jamTxt[160];
-            if (isInviting) {
-                _snwprintf(jamTxt, 159, L"%s bekleniyor...", partnerName[0] ? partnerName : L"Arkadaşın");
-            } else {
-                wchar_t syncSub[128] = {0};
-                Jam_GetSyncStatus(syncSub, 128);
-                _snwprintf(jamTxt, 159, L"%s ile Jam  ·  %s", partnerName[0] ? partnerName : L"Ortak", syncSub[0] ? syncSub : L"Canlı");
-            }
-            jamTxt[159] = L'\0';
-
-            RECT rcJMsg = { rcJamStage.left + S(22), rcJamStage.top, textRight, rcJamStage.bottom };
-            SelectObject(hdc, g_hFontMicro);
-            SetTextColor(hdc, isInviting ? COLOR_AMBER : COLOR_ACCENT_HOV);
-            DrawTextW(hdc, jamTxt, -1, &rcJMsg, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        // Eksik şarkı varsa manuel "+ İndir" kısayolu
+        wchar_t missingTitle[256] = {0};
+        Jam_GetMissingTrack(missingTitle, 256);
+        int textRightLimit = rcJamLeave.left - S(10);
+        if (!isInviting && missingTitle[0] && !Jam_IsDownloadingTrack()) {
+            rcJamMissingBtn = (RECT){ rcJamLeave.left - S(82), rcJamStage.top + S(8), rcJamLeave.left - S(6), rcJamStage.bottom - S(8) };
+            BOOL mHot = (g_hotZone == ZONE_JAM_MISSING_DL);
+            DrawSmoothRoundRect(&rcJamMissingBtn, S(8), mHot ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
+            SelectObject(hdc, g_hFontSmallBold);
+            SetTextColor(hdc, RGB(8, 12, 10));
+            DrawTextW(hdc, L"İndir", -1, &rcJamMissingBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            textRightLimit = rcJamMissingBtn.left - S(8);
         }
+
+        // Başlık & Alt Durum Metni
+        wchar_t partnerName[64] = {0};
+        Jam_GetPartnerName(partnerName, 64);
+        wchar_t jamHeadline[160];
+        if (isInviting) {
+            _snwprintf(jamHeadline, 159, L"JAM DAVETİ  •  %s bekleniyor", partnerName[0] ? partnerName : L"Arkadaşın");
+        } else {
+            _snwprintf(jamHeadline, 159, L"CANLI JAM  •  %s ile birlikte dinliyorsun", partnerName[0] ? partnerName : L"Arkadaşın");
+        }
+        jamHeadline[159] = L'\0';
+
+        wchar_t syncSub[128] = {0};
+        Jam_GetSyncStatus(syncSub, 128);
+
+        RECT rcJTop = { rcJamStage.left + S(36), rcJamStage.top + S(5), textRightLimit, rcJamStage.top + S(24) };
+        RECT rcJSub = { rcJamStage.left + S(36), rcJamStage.top + S(23), textRightLimit, rcJamStage.bottom - S(4) };
+
+        SelectObject(hdc, g_hFontSmallBold);
+        SetTextColor(hdc, isInviting ? COLOR_AMBER : COLOR_ACCENT_HOV);
+        DrawTextW(hdc, jamHeadline, -1, &rcJTop, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+        SelectObject(hdc, g_hFontSmall);
+        SetTextColor(hdc, COLOR_TEXT_WHITE);
+        DrawTextW(hdc, syncSub, -1, &rcJSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+        RestoreDC(hdc, savedJam);
+        SetBkMode(hdc, TRANSPARENT);
+    ResetPixelClip();
     }
 
     // =========================================================================
-    // 2. ORTA BÖLGE: ÇERÇEVESİZ FERAH ŞARKI LİSTESİ (TASARIM 6 SÜTUNSUZ AKIŞI)
+    // 3. ORTA BÖLGE: MODERN ÇİFT SATIRLI ŞARKI LİSTESİ
     // =========================================================================
-    int listTop    = headerH + S(2);
-    int listBottom = h;
+    int sectionTop = headerH + jamStageH;
+    int colHeaderH = S(26);
+    int listTop    = sectionTop + colHeaderH;
+    int listBottom = h - dockH - S(4);
     int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
+
+    // Sütun Mikro Başlığı ("#   PARÇA VE SANATÇI               TOPLAM")
+    if (listBottom > listTop) {
+        RECT rcColNum  = { S(18), sectionTop + S(2), S(48), listTop };
+        RECT rcColName = { S(56), sectionTop + S(2), w - S(120), listTop };
+        RECT rcColCnt  = { w - S(120), sectionTop + S(2), w - S(20), listTop };
+
+        SelectObject(hdc, g_hFontMicro);
+        SetTextColor(hdc, COLOR_TEXT_DIM);
+        DrawTextW(hdc, L"#", -1, &rcColNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        DrawTextW(hdc, L"PARÇA VE SANATÇI", -1, &rcColName, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+        wchar_t cntStr[48];
+        _snwprintf(cntStr, 47, L"%d PARÇA", totalCount);
+        cntStr[47] = L'\0';
+        DrawTextW(hdc, cntStr, -1, &rcColCnt, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+
+        DrawHairlineH(S(14), w - S(14), listTop - 1, COLOR_BORDER, 130);
+    }
 
     int savedList = SaveDC(hdc);
     IntersectClipRect(hdc, 0, listTop, w, listBottom);
     SetPixelClip(0, listTop, w, listBottom);
 
     if (totalCount == 0) {
-        int midY = (listTop + listBottom) / 2 - S(20);
-        RECT rcEmpty = { S(24), midY - S(40), w - S(24), midY + S(40) };
+        int midY = (listTop + listBottom) / 2;
+        RECT rcEmptyCard = { S(28), midY - S(58), w - S(28), midY + S(58) };
+        DrawSmoothRoundRect(&rcEmptyCard, S(14), COLOR_CARD_SURF, 180, COLOR_BORDER, 140);
+
         SetBkMode(hdc, TRANSPARENT);
-        SelectObject(hdc, g_hFontBold);
-        SetTextColor(hdc, COLOR_TEXT_MUTED);
-        DrawTextW(hdc, g_isFiltered ? L"Eşleşen şarkı bulunamadı" : L"Müzik Klasörü Seçmek İçin Sol Üstteki ☰ Menüsünü Açın",
-                  -1, &rcEmpty, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        if (g_isFiltered) {
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, L"Eşleşen şarkı bulunamadı", -1, &rcEmptyCard, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        } else {
+            RECT rcET = { rcEmptyCard.left + S(16), midY - S(42), rcEmptyCard.right - S(16), midY - S(12) };
+            RECT rcES = { rcEmptyCard.left + S(16), midY - S(8),  rcEmptyCard.right - S(16), midY + S(44) };
+            SelectObject(hdc, g_hFontTitle);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, L"Müzik Kitaplığınız Hazır", -1, &rcET, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_TEXT_MUTED);
+            DrawTextW(hdc, L"Üstteki '+ İndir' düğmesiyle şarkı indirebilir, menüden klasör seçebilir\nveya ses dosyalarını doğrudan bu pencereye sürükleyebilirsiniz.", -1, &rcES, DT_CENTER | DT_TOP | DT_WORDBREAK);
+        }
     } else {
         int scrollPx = (int)(g_scrollPosPx + 0.5f);
         int firstIdx = scrollPx / itemH;
         if (firstIdx < 0) firstIdx = 0;
-        int padX = S(16);
+        int padX = S(12);
+        int rowGap = S(4);
+        DWORD tickNow = GetTickCount();
 
         for (int displayIdx = firstIdx; displayIdx < totalCount; displayIdx++) {
-            int itemY = listTop + displayIdx * itemH - scrollPx;
+            int itemY = listTop + S(6) + displayIdx * itemH - scrollPx;
             if (itemY >= listBottom) break;
             if (itemY + itemH < listTop) continue;
 
             int actualIdx = g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
-            RECT rcRow = { padX, itemY + S(1), w - padX, itemY + itemH - S(1) };
+            RECT rcRow = { padX, itemY, w - S(18), itemY + itemH - rowGap };
 
             BOOL isPlayingTrack = (actualIdx == g_currentTrack);
             BOOL isSelected     = (actualIdx == g_selectedTrack);
-            BOOL isHovered      = (actualIdx == g_hoverTrack && g_sidebarAnim < 0.05f);
+            BOOL isHovered      = (actualIdx == g_hoverTrack && g_sidebarAnim < 0.08f);
 
             if (isPlayingTrack) {
-                DrawSmoothRoundRect(&rcRow, S(8), COLOR_ROW_ACTIVE, 255, 0, 0);
+                DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_ACTIVE, 255, COLOR_ACCENT, 115);
             } else if (isHovered) {
-                DrawSmoothRoundRect(&rcRow, S(8), COLOR_ROW_HOVER, 255, 0, 0);
+                DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_HOVER, 255, COLOR_BORDER_LIGHT, 80);
             } else if (isSelected) {
-                DrawSmoothRoundRect(&rcRow, S(8), COLOR_ROW_SEL, 200, 0, 0);
+                DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_SEL, 200, 0, 0);
             }
 
             if (g_isDraggingList && !g_isFiltered && displayIdx == g_dragTargetIndex) {
                 DrawHairlineH(rcRow.left + S(8), rcRow.right - S(8), rcRow.top, COLOR_ACCENT_HOV, 255);
+                DrawHairlineH(rcRow.left + S(8), rcRow.right - S(8), rcRow.top + 1, COLOR_ACCENT_HOV, 255);
             }
 
             const PlaylistItem *item = Playlist_Get(actualIdx);
@@ -1437,47 +1473,94 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             Playlist_SplitArtistSong(item->title, artistStr, 128, songStr, 160);
             if (!artistStr[0]) wcscpy(artistStr, L"Yerel Parça");
 
-            // Çalan Şarkıda Sol Kenarda Canlı Yeşil Nokta (Tasarım 6 İmza Vurgusu!)
-            int textLeft = rcRow.left + S(14);
+            // Sol Numara / Oynat / Canlı Ekolayzır Sütunu
+            RECT rcNum = { rcRow.left + S(4), rcRow.top, rcRow.left + S(34), rcRow.bottom };
             if (isPlayingTrack) {
-                float dotY = (float)(rcRow.top + rcRow.bottom) * 0.5f;
-                DrawSdfCircle((float)(rcRow.left + S(12)), dotY, SF(3.5f), COLOR_ACCENT_HOV, 255);
-                textLeft = rcRow.left + S(26);
+                int eqBaseY = (rcRow.top + rcRow.bottom) / 2 + S(7);
+                int eqCx    = (rcNum.left + rcNum.right) / 2;
+                int barW    = S(3);
+                if (barW < 2) barW = 2;
+                int gapB    = S(2);
+                BOOL animEq = Player_IsPlaying();
+                int h1 = animEq ? (S(5) + (int)((tickNow / 90)  % (unsigned)S(10))) : S(6);
+                int h2 = animEq ? (S(7) + (int)(((tickNow + 170) / 75) % (unsigned)S(9)))  : S(12);
+                int h3 = animEq ? (S(4) + (int)(((tickNow + 310) / 105) % (unsigned)S(11))) : S(8);
+                RECT b1 = { eqCx - barW - gapB - barW / 2, eqBaseY - h1, eqCx - gapB - barW / 2, eqBaseY };
+                RECT b2 = { eqCx - barW / 2,               eqBaseY - h2, eqCx + barW - barW / 2, eqBaseY };
+                RECT b3 = { eqCx + barW - barW / 2 + gapB, eqBaseY - h3, eqCx + barW * 2 - barW / 2 + gapB, eqBaseY };
+                DrawSmoothRoundRect(&b1, 2, COLOR_ACCENT_HOV, 255, 0, 0);
+                DrawSmoothRoundRect(&b2, 2, COLOR_ACCENT_HOV, 255, 0, 0);
+                DrawSmoothRoundRect(&b3, 2, COLOR_ACCENT_HOV, 255, 0, 0);
+            } else if (isHovered) {
+                SetBkMode(hdc, TRANSPARENT);
+                SelectObject(hdc, g_hFontIconsSmall);
+                SetTextColor(hdc, COLOR_TEXT_WHITE);
+                DrawTextW(hdc, L"\uE768", -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            } else {
+                wchar_t numBuf[16];
+                _snwprintf(numBuf, 15, L"%d", displayIdx + 1);
+                numBuf[15] = L'\0';
+                SetBkMode(hdc, TRANSPARENT);
+                SelectObject(hdc, g_hFontSmall);
+                SetTextColor(hdc, COLOR_TEXT_DIM);
+                DrawTextW(hdc, numBuf, -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
 
-            // Sağda Sanatçı İsmi
-            int artistW = (w >= S(520)) ? S(180) : S(120);
-            int artistRight = rcRow.right - S(14);
-            int artistLeft  = artistRight - artistW;
-            RECT rcArtist   = { artistLeft, rcRow.top, artistRight, rcRow.bottom };
+            // 38x38 Yuvarlatılmış Sanatçı Monogram Kutucuğu
+            int tileSz = S(38);
+            int tileY  = (rcRow.top + rcRow.bottom - tileSz) / 2;
+            RECT rcTile = { rcRow.left + S(38), tileY, rcRow.left + S(38) + tileSz, tileY + tileSz };
+            COLORREF tileCol = isPlayingTrack ? RGB(22, 72, 42) : GetAvatarJewelColor(artistStr);
+            DrawSmoothRoundRect(&rcTile, S(9), tileCol, 255, isPlayingTrack ? COLOR_ACCENT : COLOR_BORDER_LIGHT, isPlayingTrack ? 150 : 90);
 
-            SelectObject(hdc, g_hFontMain);
-            SetTextColor(hdc, isHovered ? RGB(165, 168, 185) : COLOR_TEXT_MUTED);
-            DrawTextW(hdc, artistStr, -1, &rcArtist, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            wchar_t initBuf[2] = { GetInitialChar(artistStr[0] ? artistStr : songStr), L'\0' };
+            SetBkMode(hdc, TRANSPARENT);
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_HOV : RGB(220, 228, 242));
+            DrawTextW(hdc, initBuf, -1, &rcTile, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // Solda Şarkı Adı
-            RECT rcSong = { textLeft, rcRow.top, artistLeft - S(12), rcRow.bottom };
+            // Sağ Durum Rozeti (Çalan satırda)
+            int textRight = rcRow.right - S(12);
+            if (isPlayingTrack && w >= S(460)) {
+                RECT rcPill = { rcRow.right - S(76), (rcRow.top + rcRow.bottom) / 2 - S(11), rcRow.right - S(10), (rcRow.top + rcRow.bottom) / 2 + S(11) };
+                DrawSmoothRoundRect(&rcPill, S(11), RGB(22, 62, 38), 255, COLOR_ACCENT, 140);
+                SelectObject(hdc, g_hFontMicro);
+                SetTextColor(hdc, COLOR_ACCENT_HOV);
+                DrawTextW(hdc, Player_IsPlaying() ? L"ÇALIYOR" : L"DURAKLAT", -1, &rcPill, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                textRight = rcPill.left - S(10);
+            }
+
+            // İki Satırlı Modern Tipografi: Üstte Şarkı (Kalın), Altta Sanatçı (Yumuşak Gri)
+            int textLeft = rcTile.right + S(12);
+            int midRowY  = (rcRow.top + rcRow.bottom) / 2;
+            RECT rcSong   = { textLeft, midRowY - S(19), textRight, midRowY + S(1) };
+            RECT rcArtist = { textLeft, midRowY + S(1),  textRight, midRowY + S(19) };
+
             SelectObject(hdc, g_hFontBold);
             SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
             DrawTextW(hdc, songStr, -1, &rcSong, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, isHovered ? RGB(178, 186, 204) : COLOR_TEXT_MUTED);
+            DrawTextW(hdc, artistStr, -1, &rcArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         }
 
         // İnce Modern Kaydırma Çubuğu (Scrollbar)
         int maxScrollPx = GetMaxScrollPx(g_hWnd);
         if (maxScrollPx > 0) {
-            int sbW = (g_scrollbarHover || g_isDraggingScrollbar) ? S(5) : S(3);
+            int sbW = (g_scrollbarHover || g_isDraggingScrollbar) ? S(7) : S(4);
             int sbRight = w - S(4);
-            int sbTop = listTop + S(4);
-            int sbBottom = listBottom - S(12);
+            int sbTop = listTop + S(6);
+            int sbBottom = listBottom - S(6);
             int trackH = sbBottom - sbTop;
 
-            rcScrollbarTrack = (RECT){ w - S(12), sbTop, w, sbBottom };
+            rcScrollbarTrack = (RECT){ w - S(14), sbTop, w, sbBottom };
 
             if (trackH > S(24)) {
                 int viewH = listBottom - listTop;
-                int contentH = totalCount * itemH + S(84);
+                int contentH = totalCount * itemH + S(12);
                 int thumbH = (int)(((float)viewH / (float)contentH) * (float)trackH);
-                if (thumbH < S(28)) thumbH = S(28);
+                if (thumbH < S(30)) thumbH = S(30);
                 if (thumbH > trackH) thumbH = trackH;
 
                 float ratio = g_scrollPosPx / (float)maxScrollPx;
@@ -1486,7 +1569,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 int thumbTop = sbTop + (int)(ratio * (float)(trackH - thumbH));
 
                 rcScrollbarThumb = (RECT){ sbRight - sbW, thumbTop, sbRight, thumbTop + thumbH };
-                COLORREF sbCol = g_isDraggingScrollbar ? COLOR_ACCENT : (g_scrollbarHover ? RGB(115, 120, 140) : RGB(46, 48, 62));
+                COLORREF sbCol = g_isDraggingScrollbar ? COLOR_ACCENT : (g_scrollbarHover ? RGB(130, 140, 160) : RGB(64, 72, 90));
                 DrawSmoothRoundRect(&rcScrollbarThumb, sbW / 2, sbCol, 220, 0, 0);
             }
         } else {
@@ -1500,208 +1583,261 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     ResetPixelClip();
 
     // =========================================================================
-    // 3. ALT BÖLGE: YÜZEN KOMPAKT KAPSÜL OYNATICI (TASARIM 6 İMZASI)
+    // 4. ALT BÖLGE: YÜZEN CAM OYNATICI KARTI (FLOATING PLAYER DOCK)
     // =========================================================================
-    int capH = GetCapsuleH();
-    int capW = (w - S(28) < S(560)) ? (w - S(28)) : S(560);
-    int capX = (w - capW) / 2;
-    int capY = h - capH - S(16);
-    rcCapsule = (RECT){ capX, capY, capX + capW, capY + capH };
+    rcDock = (RECT){ S(10), h - dockH + S(4), w - S(10), h - S(8) };
+    BOOL jamGlow = (jamState == JAM_STATE_ACTIVE);
+    DrawSmoothRoundRect(&rcDock, S(16), COLOR_DOCK_SURF, 250,
+                        jamGlow ? COLOR_ACCENT : COLOR_BORDER_LIGHT,
+                        jamGlow ? 175 : 130);
 
-    BOOL jamCapsuleGlow = (jamState == JAM_STATE_ACTIVE);
-    DrawSmoothRoundRect(&rcCapsule, capH / 2, COLOR_CAPSULE_BG, 255,
-                        jamCapsuleGlow ? COLOR_ACCENT : COLOR_CAPSULE_BORD,
-                        jamCapsuleGlow ? 180 : 160);
+    int dockMidY     = (rcDock.top + rcDock.bottom) / 2;
+    int ctrlRowY     = rcDock.top + S(31);
+    int seekRowY     = rcDock.bottom - S(22);
 
-    float cy = (float)(capY + capH / 2);
+    // --- ORTA BÖLGE: 2 Katmanlı Oynatma Düğmeleri + İlerleme Çubuğu ---
+    int centerX  = w / 2;
+    int playRad  = S(19);
+    int iconBox  = S(32);
+    int btnStep  = S(40);
 
-    // --- SOL: SPOTIFY YEŞİLİ OYNAT / DURAKLAT DAİRESİ (34x34) ---
-    float playR = SF(17.0f);
-    float playCx = (float)(capX + S(26));
-    rcPlay = (RECT){ (int)(playCx - playR), (int)(cy - playR), (int)(playCx + playR), (int)(cy + playR) };
+    rcPlay    = (RECT){ centerX - playRad, ctrlRowY - playRad, centerX + playRad, ctrlRowY + playRad };
+    rcPrev    = (RECT){ rcPlay.left - S(8) - iconBox,  ctrlRowY - iconBox / 2, rcPlay.left - S(8),  ctrlRowY + iconBox / 2 };
+    rcShuffle = (RECT){ rcPrev.left - S(4) - iconBox,  ctrlRowY - iconBox / 2, rcPrev.left - S(4),  ctrlRowY + iconBox / 2 };
+    rcNext    = (RECT){ rcPlay.right + S(8),           ctrlRowY - iconBox / 2, rcPlay.right + S(8) + iconBox, ctrlRowY + iconBox / 2 };
+    rcRepeat  = (RECT){ rcNext.right + S(4),           ctrlRowY - iconBox / 2, rcNext.right + S(4) + iconBox, ctrlRowY + iconBox / 2 };
+    (void)btnStep;
+
+    DrawIconCircleBtn(hdc, &rcShuffle, ZONE_SHUFFLE, L"\uE8B1", g_cfg.shuffle ? COLOR_ACCENT_HOV : 0, g_cfg.shuffle != 0);
+    DrawIconCircleBtn(hdc, &rcPrev,    ZONE_PREV,    L"\uE892", 0, FALSE);
+
+    // Pürüzsüz Anti-Aliased Ana Oynat/Duraklat Dairesi
     {
         BOOL pHot = (g_hotZone == ZONE_PLAY);
         BOOL pPrs = (g_pressedZone == ZONE_PLAY);
-        COLORREF playBg = pPrs ? COLOR_ACCENT_DARK : (pHot ? COLOR_ACCENT_HOV : COLOR_ACCENT);
-        DrawSdfCircle(playCx, cy, playR, playBg, 255);
+        float pRad = (float)(pPrs ? (playRad - 1) : (pHot ? (playRad + 1) : playRad));
+        COLORREF pBg = pPrs ? RGB(215, 222, 232) : (pHot ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+        DrawSmoothCircle((float)centerX, (float)ctrlRowY, pRad + 2.0f, COLOR_ACCENT, pHot ? 50 : 0);
+        DrawSmoothCircle((float)centerX, (float)ctrlRowY, pRad, pBg, 255);
 
-        COLORREF iconCol = RGB(8, 12, 10); // Spotify kontrast siyah ikonu
-        if (Player_IsPlaying()) {
-            DrawVecPause(playCx, cy, SF(10.0f), SF(11.0f), iconCol);
-        } else {
-            DrawVecPlay(playCx + SF(1.0f), cy, SF(11.0f), iconCol);
-        }
+        SetBkMode(hdc, TRANSPARENT);
+        SelectObject(hdc, g_hFontIconsLarge);
+        SetTextColor(hdc, RGB(10, 12, 16));
+        RECT rcPG = rcPlay;
+        if (!Player_IsPlaying()) OffsetRect(&rcPG, S(1), 0);
+        DrawTextW(hdc, Player_IsPlaying() ? L"\uE769" : L"\uE768", -1, &rcPG, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
-    // --- SOL YAN: ŞARKI ADI & SANATÇI ---
-    int metaLeft  = capX + S(52);
-    int metaW     = (capW >= S(500)) ? S(135) : S(95);
-    int metaRight = metaLeft + metaW;
-    RECT rcDTitle = { metaLeft, capY + S(9),  metaRight, capY + S(26) };
-    RECT rcDSub   = { metaLeft, capY + S(26), metaRight, capY + S(43) };
-
-    const PlaylistItem *cur = (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) ? Playlist_Get(g_currentTrack) : NULL;
-    wchar_t dSong[160] = L"Hazır";
-    wchar_t dArt[128]  = L"Parça seçin";
-    if (cur) {
-        Playlist_SplitArtistSong(cur->title, dArt, 128, dSong, 160);
-        if (!dArt[0]) wcscpy(dArt, L"Yerel Parça");
-    }
-
-    SelectObject(hdc, g_hFontSmallBold);
-    SetTextColor(hdc, COLOR_TEXT_WHITE);
-    DrawTextW(hdc, dSong, -1, &rcDTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-
-    // İlerleme çubuğu üzerine gelindiğinde süreyi alt satırda akıllıca göster!
-    int duration = Player_GetDuration();
-    int position = g_isDraggingSeek ? g_seekDragSec : Player_GetPosition();
-    if (duration > 0 && position > duration) position = duration;
-
-    BOOL seekHover = (g_hotZone == ZONE_SEEK || g_isDraggingSeek);
-    if (seekHover && duration > 0) {
-        wchar_t tPos[16], tDur[16], tFull[48];
-        FormatTime(position, tPos);
-        FormatTime(duration, tDur);
-        _snwprintf(tFull, 47, L"%s / %s", tPos, tDur);
-        tFull[47] = L'\0';
-        SelectObject(hdc, g_hFontMicro);
-        SetTextColor(hdc, COLOR_ACCENT_HOV);
-        DrawTextW(hdc, tFull, -1, &rcDSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-    } else {
-        SelectObject(hdc, g_hFontMicro);
-        SetTextColor(hdc, COLOR_TEXT_MUTED);
-        DrawTextW(hdc, dArt, -1, &rcDSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-    }
-
-    // --- SAĞ: KONTROL DÜĞMELERİ (SAĞDAN SOLA ANKRAJLI) ---
-    int curVol = Player_GetVolume();
-
-    // Ses Çubuğu
-    int volW = S(38);
-    int volRight = rcCapsule.right - S(16);
-    int volLeft  = volRight - volW;
-    BOOL volActive = (g_hotZone == ZONE_VOL || g_isDraggingVol);
-    int vBarH = volActive ? S(5) : S(3);
-    rcVolBar = (RECT){ volLeft, (int)cy - vBarH / 2, volRight, (int)cy + (vBarH - vBarH / 2) };
-    rcVolHit = (RECT){ volLeft - S(4), capY + S(12), volRight + S(6), capY + capH - S(12) };
-
-    DrawSmoothRoundRect(&rcVolBar, vBarH / 2, volActive ? COLOR_BAR_HOVER : COLOR_BAR_BG, 255, 0, 0);
-    int vFillW = (int)((float)volW * ((float)curVol / 100.0f));
-    if (vFillW > 0) {
-        RECT rcVFill = { rcVolBar.left, rcVolBar.top, rcVolBar.left + vFillW, rcVolBar.bottom };
-        DrawSmoothRoundRect(&rcVFill, vBarH / 2, volActive ? COLOR_ACCENT_HOV : RGB(220, 220, 230), 255, 0, 0);
-    }
-
-    // Hoparlör (Sessiz)
-    int spkSz = S(22);
-    rcSpeaker = (RECT){ volLeft - spkSz - S(2), (int)cy - spkSz / 2, volLeft - S(2), (int)cy + spkSz / 2 };
-    DrawVecSpeaker((float)(rcSpeaker.left + rcSpeaker.right) * 0.5f, cy,
-                   (curVol == 0) ? COLOR_DANGER : ((g_hotZone == ZONE_SPEAKER) ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED));
-
-    // Tekrar (Repeat)
-    int btnSz = S(24);
-    rcRepeat = (RECT){ rcSpeaker.left - btnSz - S(2), (int)cy - btnSz / 2, rcSpeaker.left - S(2), (int)cy + btnSz / 2 };
-    COLORREF repCol = (g_cfg.repeat > 0) ? COLOR_ACCENT_HOV : ((g_hotZone == ZONE_REPEAT) ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED);
-    DrawVecRepeat((float)(rcRepeat.left + rcRepeat.right) * 0.5f, cy, SF(13.0f), repCol);
+    DrawIconCircleBtn(hdc, &rcNext, ZONE_NEXT, L"\uE893", 0, FALSE);
+    const wchar_t *repGlyph = (g_cfg.repeat == 2) ? L"\uE8ED" : L"\uE8EE";
+    DrawIconCircleBtn(hdc, &rcRepeat, ZONE_REPEAT, repGlyph, (g_cfg.repeat > 0) ? COLOR_ACCENT_HOV : 0, g_cfg.repeat > 0);
     if (g_cfg.repeat == 2) {
-        RECT rcOne = { rcRepeat.right - S(8), rcRepeat.top, rcRepeat.right, rcRepeat.top + S(10) };
+        RECT rcOne = { rcRepeat.right - S(12), rcRepeat.top + S(1), rcRepeat.right, rcRepeat.top + S(13) };
         SelectObject(hdc, g_hFontMicro);
         SetTextColor(hdc, COLOR_ACCENT_HOV);
         DrawTextW(hdc, L"1", -1, &rcOne, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
-    // Sonraki (Next)
-    rcNext = (RECT){ rcRepeat.left - btnSz - S(2), (int)cy - btnSz / 2, rcRepeat.left - S(2), (int)cy + btnSz / 2 };
-    DrawVecNext((float)(rcNext.left + rcNext.right) * 0.5f, cy, SF(10.5f),
-                (g_hotZone == ZONE_NEXT) ? COLOR_TEXT_WHITE : RGB(195, 195, 208));
+    // Orta Alt: Zaman Damgalı Pürüzsüz İlerleme Çubuğu
+    int duration = Player_GetDuration();
+    int position = g_isDraggingSeek ? g_seekDragSec : Player_GetPosition();
+    if (duration > 0 && position > duration) position = duration;
 
-    // Önceki (Prev)
-    rcPrev = (RECT){ rcNext.left - btnSz - S(2), (int)cy - btnSz / 2, rcNext.left - S(2), (int)cy + btnSz / 2 };
-    DrawVecPrev((float)(rcPrev.left + rcPrev.right) * 0.5f, cy, SF(10.5f),
-                (g_hotZone == ZONE_PREV) ? COLOR_TEXT_WHITE : RGB(195, 195, 208));
+    int seekHalfW = (w >= S(760)) ? S(140) : S(104);
+    int maxSeekHalf = (w / 2) - S(240);
+    if (maxSeekHalf < S(56)) maxSeekHalf = S(56);
+    if (seekHalfW > maxSeekHalf) seekHalfW = maxSeekHalf;
 
-    // --- ORTA: İNCE YEŞİL İLERLEME ÇUBUĞU ---
-    int seekLeft  = metaRight + S(12);
-    int seekRight = rcPrev.left - S(14);
-    if (seekRight > seekLeft + S(40)) {
-        int sBarH = seekHover ? S(5) : S(3);
-        rcSeekBar = (RECT){ seekLeft, (int)cy - sBarH / 2, seekRight, (int)cy + (sBarH - sBarH / 2) };
-        rcSeekHit = (RECT){ seekLeft - S(4), capY + S(10), seekRight + S(4), capY + capH - S(10) };
+    BOOL seekActive = (g_hotZone == ZONE_SEEK || g_isDraggingSeek);
+    int barH = seekActive ? S(6) : S(4);
+    if (barH < 4) barH = 4;
 
-        DrawSmoothRoundRect(&rcSeekBar, sBarH / 2, seekHover ? COLOR_BAR_HOVER : COLOR_BAR_BG, 255, 0, 0);
+    rcSeekBar = (RECT){ centerX - seekHalfW, seekRowY - barH / 2, centerX + seekHalfW, seekRowY + (barH - barH / 2) };
+    rcSeekHit = (RECT){ rcSeekBar.left - S(8), seekRowY - S(11), rcSeekBar.right + S(8), seekRowY + S(11) };
 
-        float progRatio = (duration > 0) ? ((float)position / (float)duration) : 0.0f;
-        if (progRatio < 0.0f) progRatio = 0.0f;
-        if (progRatio > 1.0f) progRatio = 1.0f;
-        int sFillW = (int)((float)(seekRight - seekLeft) * progRatio);
-        if (sFillW > 0) {
-            RECT rcSFill = { rcSeekBar.left, rcSeekBar.top, rcSeekBar.left + sFillW, rcSeekBar.bottom };
-            DrawSmoothRoundRect(&rcSFill, sBarH / 2, seekHover ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
-        }
-        if (seekHover && duration > 0) {
-            DrawSdfCircle((float)(rcSeekBar.left + sFillW), cy, SF(4.5f), COLOR_TEXT_WHITE, 255);
+    DrawSmoothRoundRect(&rcSeekBar, barH / 2, seekActive ? COLOR_BAR_HOVER : COLOR_BAR_BG, 255, 0, 0);
+
+    float progRatio = (duration > 0) ? ((float)position / (float)duration) : 0.0f;
+    if (progRatio < 0.0f) progRatio = 0.0f;
+    if (progRatio > 1.0f) progRatio = 1.0f;
+    int fillW = (int)((float)(rcSeekBar.right - rcSeekBar.left) * progRatio);
+    if (fillW > 0) {
+        RECT rcFill = { rcSeekBar.left, rcSeekBar.top, rcSeekBar.left + fillW, rcSeekBar.bottom };
+        DrawSmoothRoundRect(&rcFill, barH / 2, seekActive ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
+    }
+    if (seekActive && duration > 0) {
+        DrawSmoothCircle((float)(rcSeekBar.left + fillW), (float)seekRowY, (float)S(6), COLOR_TEXT_WHITE, 255);
+    }
+
+    wchar_t tPos[16], tDur[16];
+    FormatTime(position, tPos);
+    FormatTime(duration, tDur);
+
+    RECT rcTimeL = { rcSeekBar.left - S(42), seekRowY - S(9), rcSeekBar.left - S(6), seekRowY + S(9) };
+    RECT rcTimeR = { rcSeekBar.right + S(6), seekRowY - S(9), rcSeekBar.right + S(44), seekRowY + S(9) };
+    SelectObject(hdc, g_hFontMicro);
+    SetTextColor(hdc, COLOR_TEXT_DIM);
+    DrawTextW(hdc, tPos, -1, &rcTimeL, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(hdc, tDur, -1, &rcTimeR, DT_LEFT  | DT_VCENTER | DT_SINGLELINE);
+
+    // --- SOL BÖLGE: Kapak Görseli + Şarkı & Sanatçı ---
+    int artSize = S(56);
+    int artX    = rcDock.left + S(14);
+    int artY    = dockMidY - artSize / 2;
+    RECT rcArt  = { artX, artY, artX + artSize, artY + artSize };
+
+    DrawSmoothRoundRect(&rcArt, S(10), RGB(26, 30, 42), 255, COLOR_BORDER_LIGHT, 140);
+    if (g_pMainThumb) {
+        OLE_XSIZE_HIMETRIC hmW = 0;
+        OLE_YSIZE_HIMETRIC hmH = 0;
+        g_pMainThumb->lpVtbl->get_Width(g_pMainThumb, &hmW);
+        g_pMainThumb->lpVtbl->get_Height(g_pMainThumb, &hmH);
+        if (hmW > 0 && hmH > 0) {
+            int savedArt = SaveDC(hdc);
+            HRGN hRgn = CreateRoundRectRgn(artX + 1, artY + 1, artX + artSize, artY + artSize, S(9), S(9));
+            SelectClipRgn(hdc, hRgn);
+            int oldStretch = SetStretchBltMode(hdc, HALFTONE);
+            SetBrushOrgEx(hdc, 0, 0, NULL);
+            g_pMainThumb->lpVtbl->Render(g_pMainThumb, hdc, artX, artY, artSize, artSize, 0, hmH, hmW, -hmH, NULL);
+            SetStretchBltMode(hdc, oldStretch);
+            RestoreDC(hdc, savedArt);
+            DeleteObject(hRgn);
         }
     } else {
-        rcSeekBar = rcSeekHit = (RECT){0};
+        DrawSmoothCircle((float)(artX + artSize / 2), (float)(artY + artSize / 2), (float)S(16), RGB(34, 40, 54), 255);
+        SetBkMode(hdc, TRANSPARENT);
+        SelectObject(hdc, g_hFontIcons);
+        SetTextColor(hdc, g_currentTrack >= 0 ? COLOR_ACCENT_HOV : COLOR_TEXT_DIM);
+        DrawTextW(hdc, L"\uEC4F", -1, &rcArt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
+
+    int metaLeft    = rcArt.right + S(12);
+    int titleRight  = rcShuffle.left - S(10);
+    int artistRight = (rcShuffle.left < rcTimeL.left ? rcShuffle.left : rcTimeL.left) - S(6);
+    if (titleRight > metaLeft + S(28)) {
+        RECT rcDTitle  = { metaLeft, dockMidY - S(19), titleRight,  dockMidY + S(1) };
+        RECT rcDArtist = { metaLeft, dockMidY + S(1),  artistRight, dockMidY + S(19) };
+
+        if (g_currentTrack >= 0 && g_currentTrack < Playlist_Count()) {
+            const PlaylistItem *cur = Playlist_Get(g_currentTrack);
+            wchar_t dArt[128] = {0}, dSong[160] = {0};
+            Playlist_SplitArtistSong(cur->title, dArt, 128, dSong, 160);
+            if (!dArt[0]) wcscpy(dArt, Player_IsPlaying() ? L"Şu an çalıyor" : L"Duraklatıldı");
+
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, dSong, -1, &rcDTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_TEXT_MUTED);
+            DrawTextW(hdc, dArt, -1, &rcDArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        } else {
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, COLOR_TEXT_WHITE);
+            DrawTextW(hdc, L"Hazır", -1, &rcDTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+            SelectObject(hdc, g_hFontSmall);
+            SetTextColor(hdc, COLOR_TEXT_DIM);
+            DrawTextW(hdc, L"Bir parçaya tıklayın", -1, &rcDArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        }
+    }
+
+    // --- SAĞ BÖLGE: Hoparlör (Mute) + Ses Çubuğu ---
+    int volW     = S(72);
+    int volRight = rcDock.right - S(16);
+    int volLeft  = volRight - volW;
+    int minRightStart = (rcRepeat.right > rcTimeR.right ? rcRepeat.right : rcTimeR.right) + S(36);
+    if (volLeft > minRightStart) {
+        BOOL volActive = (g_hotZone == ZONE_VOL || g_isDraggingVol);
+        int vBarH = volActive ? S(6) : S(4);
+        if (vBarH < 4) vBarH = 4;
+
+        rcVolBar  = (RECT){ volLeft, dockMidY - vBarH / 2, volRight, dockMidY + (vBarH - vBarH / 2) };
+        rcVolHit  = (RECT){ volLeft - S(6), dockMidY - S(12), volRight + S(6), dockMidY + S(12) };
+        rcSpeaker = (RECT){ volLeft - S(34), dockMidY - S(15), volLeft - S(4), dockMidY + S(15) };
+
+        int curVol = Player_GetVolume();
+        const wchar_t *spkGlyph = (curVol == 0) ? L"\uE74F" : (curVol < 50 ? L"\uE993" : L"\uE767");
+        DrawIconCircleBtn(hdc, &rcSpeaker, ZONE_SPEAKER, spkGlyph, (curVol == 0) ? COLOR_DANGER : 0, FALSE);
+
+        DrawSmoothRoundRect(&rcVolBar, vBarH / 2, volActive ? COLOR_BAR_HOVER : COLOR_BAR_BG, 255, 0, 0);
+        int vFillW = (int)((float)(rcVolBar.right - rcVolBar.left) * ((float)curVol / 100.0f));
+        if (vFillW > 0) {
+            RECT rcVFill = { rcVolBar.left, rcVolBar.top, rcVolBar.left + vFillW, rcVolBar.bottom };
+            DrawSmoothRoundRect(&rcVFill, vBarH / 2, volActive ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE, 255, 0, 0);
+        }
+        if (volActive) {
+            DrawSmoothCircle((float)(rcVolBar.left + vFillW), (float)dockMidY, (float)S(5), COLOR_TEXT_WHITE, 255);
+        }
+    } else {
+        rcVolBar = rcVolHit = rcSpeaker = (RECT){0};
     }
 
     // =========================================================================
-    // 4. SOL ÇEKMECE: ☰ MENÜ VE ARKADAŞLAR / JAM MERKEZİ
+    // 5. AKIŞKAN YAN ÇEKMECE & MODERN ARKADAŞLAR / JAM MERKEZİ
     // =========================================================================
     if (g_sidebarAnim > 0.005f) {
         int sbW  = GetSidebarW();
         int offX = (int)((g_sidebarAnim - 1.0f) * (float)sbW);
 
-        BYTE scrimAlpha = (BYTE)(g_sidebarAnim * 140.0f);
-        DimRectPx(0, 0, w, h, scrimAlpha);
+        // Arka planı orantılı karart
+        BYTE scrimAlpha = (BYTE)(g_sidebarAnim * 135.0f);
+        DimRectPx(0, headerH, w, h - headerH, scrimAlpha);
 
         int clipRight = offX + sbW + 1;
         if (clipRight > w) clipRight = w;
         int savedSide = SaveDC(hdc);
-        IntersectClipRect(hdc, 0, 0, clipRight, h);
-        SetPixelClip(0, 0, clipRight, h);
+        IntersectClipRect(hdc, 0, headerH, clipRight, h);
+        SetPixelClip(0, headerH, clipRight, h);
 
-        FillSolidPx(offX, 0, sbW, h, COLOR_SIDEBAR_BG);
-        DrawHairlineV(offX + sbW - 1, 0, h, COLOR_BORDER, 200);
+        FillVerticalGradientPx(offX, headerH, sbW, h - headerH, COLOR_SIDEBAR_SURF, RGB(11, 13, 19));
+        DrawHairlineV(offX + sbW - 1, headerH, h, COLOR_BORDER_LIGHT, 180);
 
         if (g_sidebarView == SIDEBAR_VIEW_MENU) {
-            static const struct { const wchar_t *label; BOOL accent; } items[] = {
-                { L"Müzik Klasörü Seç",      FALSE },
-                { L"Müzik Ara ve İndir",     TRUE  },
-                { L"Arkadaşlar ve Jam",      TRUE  },
-                { L"M3U İçe Aktar",          FALSE },
-                { L"M3U Dışa Aktar",         FALSE },
-                { L"Listeyi Temizle",        FALSE },
-                { L"Güncellemeleri Denetle", FALSE }
+            static const struct { const wchar_t *icon; const wchar_t *label; const wchar_t *sub; BOOL accent; } items[] = {
+                { L"\uE8B7", L"Müzik Klasörü Seç",      L"Yerel arşivi tara",          FALSE },
+                { L"\uE896", L"Müzik Ara ve İndir",     L"YouTube'dan yüksek kalite",  TRUE  },
+                { L"\uE716", L"Arkadaşlar ve Jam",      L"Birlikte canlı dinle",       TRUE  },
+                { L"\uE8E5", L"M3U Listesi İçe Aktar",  L"Kayıtlı listeyi yükle",      FALSE },
+                { L"\uE74E", L"M3U Listesi Dışa Aktar", L"Mevcut listeyi kaydet",      FALSE },
+                { L"\uE74D", L"Listeyi Temizle",        L"Ekranı sıfırla",             FALSE },
+                { L"\uE72C", L"Güncellemeleri Denetle", L"v" APP_VERSION_STR L" sürümü", FALSE }
             };
 
-            RECT rcMenuTitle = { offX + S(18), S(14), offX + sbW - S(18), S(38) };
-            SelectObject(hdc, g_hFontTitle);
-            SetTextColor(hdc, COLOR_TEXT_WHITE);
-            DrawTextW(hdc, L"Selo Player", -1, &rcMenuTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-
             for (int m = 0; m < 7; m++) {
-                int itemTop = S(48) + m * S(44);
-                RECT rcMenu = { offX + S(12), itemTop, offX + sbW - S(12), itemTop + S(38) };
+                int itemTop = headerH + S(14) + m * S(52);
+                RECT rcMenu = { offX + S(12), itemTop, offX + sbW - S(12), itemTop + S(46) };
                 BOOL isHov = (m == g_sidebarHoverItem);
 
                 if (isHov || items[m].accent) {
-                    COLORREF mFill = isHov ? COLOR_CARD_HOVER : RGB(14, 24, 18);
-                    COLORREF mBord = items[m].accent ? COLOR_ACCENT : COLOR_BORDER;
-                    DrawSmoothRoundRect(&rcMenu, S(8), mFill, isHov ? 255 : 160, mBord, isHov ? 160 : 70);
+                    COLORREF mFill = isHov ? COLOR_CARD_HOVER : RGB(18, 28, 24);
+                    COLORREF mBord = items[m].accent ? COLOR_ACCENT : COLOR_BORDER_LIGHT;
+                    DrawSmoothRoundRect(&rcMenu, S(10), mFill, isHov ? 255 : 150, mBord, isHov ? 160 : 80);
                 }
 
-                RECT rcLbl = { rcMenu.left + S(14), rcMenu.top, rcMenu.right - S(32), rcMenu.bottom };
-                SelectObject(hdc, g_hFontBold);
+                RECT rcIc = { rcMenu.left + S(10), rcMenu.top, rcMenu.left + S(38), rcMenu.bottom };
+                SetBkMode(hdc, TRANSPARENT);
+                SelectObject(hdc, g_hFontIcons);
                 SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_HOV : (isHov ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED));
+                DrawTextW(hdc, items[m].icon, -1, &rcIc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                RECT rcLbl = { rcMenu.left + S(42), rcMenu.top + S(6),  rcMenu.right - S(36), rcMenu.top + S(25) };
+                RECT rcSub = { rcMenu.left + S(42), rcMenu.top + S(24), rcMenu.right - S(36), rcMenu.bottom - S(5) };
+
+                SelectObject(hdc, g_hFontBold);
+                SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
                 DrawTextW(hdc, items[m].label, -1, &rcLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+                SelectObject(hdc, g_hFontMicro);
+                SetTextColor(hdc, COLOR_TEXT_DIM);
+                DrawTextW(hdc, items[m].sub, -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
                 if (m == 2 && Friends_GetPendingCount() > 0) {
                     wchar_t bTxt[16];
                     _snwprintf(bTxt, 15, L"%d", Friends_GetPendingCount());
                     bTxt[15] = L'\0';
-                    RECT rcBadge = { rcMenu.right - S(26), rcMenu.top + S(10), rcMenu.right - S(8), rcMenu.bottom - S(10) };
-                    DrawSmoothRoundRect(&rcBadge, S(8), COLOR_ACCENT, 255, 0, 0);
+                    RECT rcBadge = { rcMenu.right - S(30), rcMenu.top + S(13), rcMenu.right - S(10), rcMenu.bottom - S(13) };
+                    DrawSmoothRoundRect(&rcBadge, S(10), COLOR_ACCENT, 255, 0, 0);
                     SelectObject(hdc, g_hFontMicro);
                     SetTextColor(hdc, RGB(8, 12, 10));
                     DrawTextW(hdc, bTxt, -1, &rcBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -1709,43 +1845,49 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             }
         }
         else if (g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
-            // Başlık: Geri + "Arkadaşlar & Jam" + Yenile
-            rcFriendsBack = (RECT){ offX + S(12), S(10), offX + S(38), S(36) };
-            DrawSmoothRoundRect(&rcFriendsBack, S(6), (g_hotZone == ZONE_FRIENDS_BACK) ? COLOR_CARD_HOVER : 0, 255, 0, 0);
-            DrawVecCross((float)(rcFriendsBack.left + rcFriendsBack.right) * 0.5f,
-                         (float)(rcFriendsBack.top + rcFriendsBack.bottom) * 0.5f,
-                         SF(8.0f), COLOR_TEXT_WHITE);
+            // Üst Başlık: Geri + "Arkadaşlar & Jam" + Yenile Düğmesi
+            rcFriendsBack = (RECT){ offX + S(12), headerH + S(10), offX + S(42), headerH + S(40) };
+            DrawIconCircleBtn(hdc, &rcFriendsBack, ZONE_FRIENDS_BACK, L"\uE72B", 0, FALSE);
 
-            rcFriendsRefresh = (RECT){ offX + sbW - S(38), S(10), offX + sbW - S(12), S(36) };
-            DrawSmoothRoundRect(&rcFriendsRefresh, S(6), (g_hotZone == ZONE_FRIENDS_REFRESH) ? COLOR_CARD_HOVER : 0, 255, 0, 0);
-            DrawSdfCircle((float)(rcFriendsRefresh.left + rcFriendsRefresh.right) * 0.5f,
-                          (float)(rcFriendsRefresh.top + rcFriendsRefresh.bottom) * 0.5f,
-                          SF(4.5f), COLOR_TEXT_MUTED, 255);
+            rcFriendsRefresh = (RECT){ offX + sbW - S(42), headerH + S(10), offX + sbW - S(12), headerH + S(40) };
+            DrawIconCircleBtn(hdc, &rcFriendsRefresh, ZONE_FRIENDS_REFRESH, L"\uE72C", 0, FALSE);
 
-            RECT rcFHead = { offX + S(42), S(10), offX + sbW - S(42), S(36) };
+            RECT rcFHead = { offX + S(46), headerH + S(10), offX + sbW - S(46), headerH + S(40) };
             SelectObject(hdc, g_hFontTitle);
             SetTextColor(hdc, COLOR_TEXT_WHITE);
-            DrawTextW(hdc, L"Arkadaşlar & Jam", -1, &rcFHead, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            DrawTextW(hdc, L"Arkadaşlar & Jam", -1, &rcFHead, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Kullanıcı Kimlik Kartı
-            RECT rcMyCard = { offX + S(12), S(44), offX + sbW - S(12), S(88) };
-            DrawSmoothRoundRect(&rcMyCard, S(10), COLOR_CARD_SURF, 255, COLOR_BORDER, 140);
+            // Kullanıcı Kimlik Kartı (Profil Avatarı + Etiket + Kopyala Hapı)
+            RECT rcMyCard = { offX + S(12), headerH + S(46), offX + sbW - S(12), headerH + S(98) };
+            DrawSmoothRoundRect(&rcMyCard, S(12), COLOR_CARD_SURF, 255, COLOR_BORDER_LIGHT, 130);
 
             wchar_t myName[64] = {0}, myTag[32] = {0};
             Friends_GetMyName(myName, 64);
             Friends_GetMyTag(myTag, 32);
 
+            float myAvX = (float)(rcMyCard.left + S(26));
+            float myAvY = (float)(rcMyCard.top + rcMyCard.bottom) * 0.5f;
+            DrawSmoothCircle(myAvX, myAvY, (float)S(16), RGB(22, 74, 44), 255);
+            DrawSmoothCircle(myAvX + (float)S(11), myAvY + (float)S(11), SF(5.0f), COLOR_CARD_SURF, 255);
+            DrawSmoothCircle(myAvX + (float)S(11), myAvY + (float)S(11), SF(3.5f), COLOR_ACCENT_HOV, 255);
+
+            RECT rcMyInit = { (int)(myAvX - S(16)), (int)(myAvY - S(16)), (int)(myAvX + S(16)), (int)(myAvY + S(16)) };
+            wchar_t myInit[2] = { GetInitialChar(myName[0] ? myName : myTag), L'\0' };
+            SelectObject(hdc, g_hFontBold);
+            SetTextColor(hdc, COLOR_ACCENT_HOV);
+            DrawTextW(hdc, myInit, -1, &rcMyInit, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
             BOOL recentlyCopied = (g_copiedTagTick != 0 && (GetTickCount() - g_copiedTagTick) < 2000);
-            rcCopyTag = (RECT){ rcMyCard.right - S(74), rcMyCard.top + S(10), rcMyCard.right - S(8), rcMyCard.bottom - S(10) };
-            DrawSmoothRoundRect(&rcCopyTag, S(6),
-                                recentlyCopied ? COLOR_ACCENT : ((g_hotZone == ZONE_COPY_TAG) ? COLOR_CARD_HOVER : RGB(28, 32, 42)),
-                                255, 0, 0);
+            rcCopyTag = (RECT){ rcMyCard.right - S(76), rcMyCard.top + S(12), rcMyCard.right - S(10), rcMyCard.bottom - S(12) };
+            DrawSmoothRoundRect(&rcCopyTag, S(8),
+                                recentlyCopied ? COLOR_ACCENT : ((g_hotZone == ZONE_COPY_TAG) ? COLOR_CARD_HOVER : RGB(30, 36, 48)),
+                                255, COLOR_BORDER_LIGHT, 140);
             SelectObject(hdc, g_hFontMicro);
             SetTextColor(hdc, recentlyCopied ? RGB(8, 12, 10) : COLOR_TEXT_WHITE);
             DrawTextW(hdc, recentlyCopied ? L"✓ Kopyalandı" : L"Kopyala", -1, &rcCopyTag, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            RECT rcMyLbl = { rcMyCard.left + S(12), rcMyCard.top + S(7),  rcCopyTag.left - S(4), rcMyCard.top + S(22) };
-            RECT rcMyTag = { rcMyCard.left + S(12), rcMyCard.top + S(22), rcCopyTag.left - S(4), rcMyCard.bottom - S(6) };
+            RECT rcMyLbl = { rcMyCard.left + S(50), rcMyCard.top + S(8),  rcCopyTag.left - S(6), rcMyCard.top + S(26) };
+            RECT rcMyTag = { rcMyCard.left + S(50), rcMyCard.top + S(25), rcCopyTag.left - S(6), rcMyCard.bottom - S(6) };
             SelectObject(hdc, g_hFontMicro);
             SetTextColor(hdc, COLOR_TEXT_DIM);
             DrawTextW(hdc, L"SENİN ETİKETİN", -1, &rcMyLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
@@ -1753,14 +1895,14 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             SetTextColor(hdc, COLOR_TEXT_WHITE);
             DrawTextW(hdc, myTag, -1, &rcMyTag, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-            // Sekmeler (Liste | İstekler | Ekle)
-            RECT rcTabTray = { offX + S(12), S(96), offX + sbW - S(12), S(128) };
-            DrawSmoothRoundRect(&rcTabTray, S(8), RGB(17, 19, 25), 255, COLOR_BORDER, 120);
+            // Segmented Pill Sekmeler (Arkadaşlar | İstekler | Ekle)
+            RECT rcTabTray = { offX + S(12), headerH + S(106), offX + sbW - S(12), headerH + S(140) };
+            DrawSmoothRoundRect(&rcTabTray, S(10), RGB(19, 22, 30), 255, COLOR_BORDER, 140);
 
-            int trayW = (rcTabTray.right - rcTabTray.left - S(6)) / 3;
-            rcFriendsTab0 = (RECT){ rcTabTray.left + S(3),              rcTabTray.top + S(2), rcTabTray.left + S(3) + trayW,     rcTabTray.bottom - S(2) };
-            rcFriendsTab1 = (RECT){ rcFriendsTab0.right,                rcTabTray.top + S(2), rcFriendsTab0.right + trayW,       rcTabTray.bottom - S(2) };
-            rcFriendsTab2 = (RECT){ rcFriendsTab1.right,                rcTabTray.top + S(2), rcTabTray.right - S(3),            rcTabTray.bottom - S(2) };
+            int trayW = (rcTabTray.right - rcTabTray.left - S(8)) / 3;
+            rcFriendsTab0 = (RECT){ rcTabTray.left + S(4),              rcTabTray.top + S(3), rcTabTray.left + S(4) + trayW,     rcTabTray.bottom - S(3) };
+            rcFriendsTab1 = (RECT){ rcFriendsTab0.right,                rcTabTray.top + S(3), rcFriendsTab0.right + trayW,       rcTabTray.bottom - S(3) };
+            rcFriendsTab2 = (RECT){ rcFriendsTab1.right,                rcTabTray.top + S(3), rcTabTray.right - S(4),            rcTabTray.bottom - S(3) };
 
             const RECT *tabRects[3] = { &rcFriendsTab0, &rcFriendsTab1, &rcFriendsTab2 };
             wchar_t tab0Txt[32], tab1Txt[32];
@@ -1777,14 +1919,14 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             for (int t = 0; t < 3; t++) {
                 BOOL sel = ((int)g_friendsTab == t);
                 if (sel) {
-                    DrawSmoothRoundRect(tabRects[t], S(6), COLOR_CARD_HOVER, 255, COLOR_ACCENT, 140);
+                    DrawSmoothRoundRect(tabRects[t], S(7), COLOR_CARD_HOVER, 255, COLOR_ACCENT, 150);
                 }
                 SelectObject(hdc, sel ? g_hFontSmallBold : g_hFontSmall);
                 SetTextColor(hdc, sel ? COLOR_ACCENT_HOV : COLOR_TEXT_MUTED);
                 DrawTextW(hdc, tabLabels[t], -1, (RECT*)tabRects[t], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
 
-            int contentTop = S(136);
+            int contentTop = headerH + S(150);
 
             // SEKME 0: ARKADAŞ LİSTESİ
             if (g_friendsTab == FRIENDS_TAB_LIST) {
@@ -1795,7 +1937,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 }
 
                 if (fCount == 0) {
-                    RECT rcEmptyF = { offX + S(16), contentTop + S(20), offX + sbW - S(16), contentTop + S(110) };
+                    RECT rcEmptyF = { offX + S(18), contentTop + S(20), offX + sbW - S(18), contentTop + S(110) };
                     SelectObject(hdc, g_hFontSmall);
                     SetTextColor(hdc, COLOR_TEXT_MUTED);
                     DrawTextW(hdc, L"Henüz ekli arkadaşın yok.\n\n'+ Ekle' sekmesinden arkadaşının etiketini girerek davet gönderebilirsin.", -1, &rcEmptyF, DT_CENTER | DT_TOP | DT_WORDBREAK);
@@ -1804,38 +1946,50 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                     Jam_GetPartnerTag(jamPartner, 32);
 
                     for (int i = 0; i < fCount; i++) {
-                        int cardY = contentTop + i * S(54);
-                        if (cardY + S(48) > h - S(8)) break;
+                        int cardY = contentTop + i * S(60);
+                        if (cardY + S(54) > h - S(8)) break;
 
                         const FriendItem *fi = Friends_GetFriend(i);
                         if (!fi) continue;
 
                         BOOL inJamWithFriend = (jamState != JAM_STATE_NONE && _wcsicmp(jamPartner, fi->tag) == 0);
-                        RECT rcFC = { offX + S(12), cardY, offX + sbW - S(12), cardY + S(48) };
-                        DrawSmoothRoundRect(&rcFC, S(8),
-                                            inJamWithFriend ? RGB(14, 34, 22) : COLOR_CARD_SURF, 255,
-                                            inJamWithFriend ? COLOR_ACCENT : COLOR_BORDER, 140);
+                        RECT rcFC = { offX + S(12), cardY, offX + sbW - S(12), cardY + S(54) };
+                        DrawSmoothRoundRect(&rcFC, S(11),
+                                            inJamWithFriend ? RGB(17, 42, 28) : COLOR_CARD_SURF, 255,
+                                            inJamWithFriend ? COLOR_ACCENT : COLOR_BORDER, 150);
 
-                        // Çevrimiçi Durum Noktası
-                        float avX = (float)(rcFC.left + S(16));
+                        // Avatar + Çevrimiçi Noktası
+                        float avX = (float)(rcFC.left + S(24));
                         float avY = (float)(rcFC.top + rcFC.bottom) * 0.5f;
-                        DrawSdfCircle(avX, avY, (float)S(4.0f), fi->isOnline ? COLOR_ACCENT_HOV : RGB(88, 92, 105), 255);
+                        DrawSmoothCircle(avX, avY, (float)S(15), GetAvatarJewelColor(fi->name), 255);
 
-                        // Jam Düğmesi & Sil Düğmesi
-                        rcFriendRemoveBtns[i] = (RECT){ rcFC.right - S(26), cardY + S(12), rcFC.right - S(6), cardY + S(36) };
-                        DrawVecCross((float)(rcFriendRemoveBtns[i].left + rcFriendRemoveBtns[i].right) * 0.5f,
-                                     (float)(rcFriendRemoveBtns[i].top + rcFriendRemoveBtns[i].bottom) * 0.5f,
-                                     SF(6.5f), COLOR_TEXT_DIM);
+                        RECT rcAvTxt = { (int)(avX - S(15)), (int)(avY - S(15)), (int)(avX + S(15)), (int)(avY + S(15)) };
+                        wchar_t fInit[2] = { GetInitialChar(fi->name), L'\0' };
+                        SelectObject(hdc, g_hFontSmallBold);
+                        SetTextColor(hdc, COLOR_TEXT_WHITE);
+                        DrawTextW(hdc, fInit, -1, &rcAvTxt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        rcFriendActionBtns[i] = (RECT){ rcFC.right - S(72), cardY + S(11), rcFC.right - S(28), cardY + S(37) };
-                        COLORREF actBg = inJamWithFriend ? RGB(68, 28, 32) : (fi->isOnline ? COLOR_ACCENT : RGB(28, 32, 42));
-                        DrawSmoothRoundRect(&rcFriendActionBtns[i], S(6), actBg, 255, 0, 0);
+                        // Durum Rozeti (Yeşil = Çevrimiçi, Gri = Çevrimdışı)
+                        DrawSmoothCircle(avX + (float)S(11), avY + (float)S(11), SF(5.2f), COLOR_CARD_SURF, 255);
+                        DrawSmoothCircle(avX + (float)S(11), avY + (float)S(11), SF(3.8f),
+                                         fi->isOnline ? COLOR_ACCENT_HOV : RGB(95, 102, 118), 255);
+
+                        // Sağ: Jam Düğmesi + Sil Düğmesi
+                        rcFriendRemoveBtns[i] = (RECT){ rcFC.right - S(28), cardY + S(15), rcFC.right - S(6), cardY + S(39) };
+                        SelectObject(hdc, g_hFontIconsSmall);
+                        SetTextColor(hdc, COLOR_TEXT_DIM);
+                        DrawTextW(hdc, L"\uE711", -1, &rcFriendRemoveBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                        rcFriendActionBtns[i] = (RECT){ rcFC.right - S(78), cardY + S(13), rcFC.right - S(30), cardY + S(41) };
+                        COLORREF actBg = inJamWithFriend ? RGB(68, 28, 32) : (fi->isOnline ? COLOR_ACCENT : RGB(32, 37, 48));
+                        DrawSmoothRoundRect(&rcFriendActionBtns[i], S(8), actBg, 255, 0, 0);
                         SelectObject(hdc, g_hFontMicro);
                         SetTextColor(hdc, inJamWithFriend ? RGB(255, 165, 165) : (fi->isOnline ? RGB(8, 12, 10) : COLOR_TEXT_DIM));
                         DrawTextW(hdc, inJamWithFriend ? L"Ayrıl" : L"Jam", -1, &rcFriendActionBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        RECT rcFN = { rcFC.left + S(28), cardY + S(6),  rcFriendActionBtns[i].left - S(4), cardY + S(24) };
-                        RECT rcFS = { rcFC.left + S(28), cardY + S(24), rcFriendActionBtns[i].left - S(4), cardY + S(42) };
+                        // İsim + Ne Dinliyor / Çevrimiçi Bilgilendirmesi
+                        RECT rcFN = { rcFC.left + S(46), cardY + S(8),  rcFriendActionBtns[i].left - S(6), cardY + S(27) };
+                        RECT rcFS = { rcFC.left + S(46), cardY + S(26), rcFriendActionBtns[i].left - S(6), cardY + S(46) };
 
                         SelectObject(hdc, g_hFontBold);
                         SetTextColor(hdc, COLOR_TEXT_WHITE);
@@ -1848,7 +2002,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                             _snwprintf(subLine, 159, L"♫ %s", fi->currentTrack);
                             subLine[159] = L'\0';
                         } else {
-                            wcscpy(subLine, L"Çevrimiçi");
+                            wcscpy(subLine, L"Çevrimiçi • Boşta");
                         }
 
                         SelectObject(hdc, g_hFontMicro);
@@ -1866,23 +2020,23 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 }
 
                 if (pCount == 0) {
-                    RECT rcEmptyR = { offX + S(16), contentTop + S(24), offX + sbW - S(16), contentTop + S(90) };
+                    RECT rcEmptyR = { offX + S(18), contentTop + S(24), offX + sbW - S(18), contentTop + S(90) };
                     SelectObject(hdc, g_hFontSmall);
                     SetTextColor(hdc, COLOR_TEXT_MUTED);
                     DrawTextW(hdc, L"Bekleyen arkadaşlık isteği yok.", -1, &rcEmptyR, DT_CENTER | DT_TOP | DT_WORDBREAK);
                 } else {
                     for (int i = 0; i < pCount; i++) {
-                        int cardY = contentTop + i * S(54);
-                        if (cardY + S(48) > h - S(8)) break;
+                        int cardY = contentTop + i * S(58);
+                        if (cardY + S(52) > h - S(8)) break;
 
                         const FriendRequest *rq = Friends_GetPending(i);
                         if (!rq) continue;
 
-                        RECT rcCard = { offX + S(12), cardY, offX + sbW - S(12), cardY + S(48) };
-                        DrawSmoothRoundRect(&rcCard, S(8), COLOR_CARD_SURF, 255, COLOR_BORDER, 130);
+                        RECT rcCard = { offX + S(12), cardY, offX + sbW - S(12), cardY + S(52) };
+                        DrawSmoothRoundRect(&rcCard, S(11), COLOR_CARD_SURF, 255, COLOR_BORDER_LIGHT, 130);
 
-                        RECT rcName = { rcCard.left + S(12), cardY + S(6),  rcCard.right - S(64), cardY + S(24) };
-                        RECT rcTag  = { rcCard.left + S(12), cardY + S(24), rcCard.right - S(64), cardY + S(42) };
+                        RECT rcName = { rcCard.left + S(12), cardY + S(7),  rcCard.right - S(74), cardY + S(26) };
+                        RECT rcTag  = { rcCard.left + S(12), cardY + S(25), rcCard.right - S(74), cardY + S(44) };
 
                         SelectObject(hdc, g_hFontBold);
                         SetTextColor(hdc, COLOR_TEXT_WHITE);
@@ -1892,24 +2046,24 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                         SetTextColor(hdc, COLOR_TEXT_MUTED);
                         DrawTextW(hdc, rq->tag, -1, &rcTag, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
-                        rcReqAcceptBtns[i] = (RECT){ rcCard.right - S(58), cardY + S(10), rcCard.right - S(32), cardY + S(38) };
-                        DrawSmoothRoundRect(&rcReqAcceptBtns[i], S(6), COLOR_ACCENT, 255, 0, 0);
-                        SelectObject(hdc, g_hFontMicro);
+                        rcReqAcceptBtns[i] = (RECT){ rcCard.right - S(68), cardY + S(11), rcCard.right - S(38), cardY + S(41) };
+                        DrawSmoothRoundRect(&rcReqAcceptBtns[i], S(8), COLOR_ACCENT, 255, 0, 0);
+                        SelectObject(hdc, g_hFontIconsSmall);
                         SetTextColor(hdc, RGB(8, 12, 10));
-                        DrawTextW(hdc, L"Kabul", -1, &rcReqAcceptBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                        DrawTextW(hdc, L"\uE73E", -1, &rcReqAcceptBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        rcReqRejectBtns[i] = (RECT){ rcCard.right - S(28), cardY + S(10), rcCard.right - S(6), cardY + S(38) };
-                        DrawSmoothRoundRect(&rcReqRejectBtns[i], S(6), COLOR_CTRL_HOVER, 255, COLOR_BORDER, 120);
-                        DrawVecCross((float)(rcReqRejectBtns[i].left + rcReqRejectBtns[i].right) * 0.5f,
-                                     (float)(rcReqRejectBtns[i].top + rcReqRejectBtns[i].bottom) * 0.5f,
-                                     SF(6.5f), COLOR_TEXT_MUTED);
+                        rcReqRejectBtns[i] = (RECT){ rcCard.right - S(34), cardY + S(11), rcCard.right - S(6), cardY + S(41) };
+                        DrawSmoothRoundRect(&rcReqRejectBtns[i], S(8), COLOR_CTRL_HOVER, 255, COLOR_BORDER_LIGHT, 120);
+                        SelectObject(hdc, g_hFontIconsSmall);
+                        SetTextColor(hdc, COLOR_TEXT_MUTED);
+                        DrawTextW(hdc, L"\uE711", -1, &rcReqRejectBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                     }
                 }
             }
             // SEKME 2: ARKADAŞ EKLE
             else if (g_friendsTab == FRIENDS_TAB_ADD) {
-                RECT rcLbl = { offX + S(14), contentTop + S(2),  offX + sbW - S(14), contentTop + S(20) };
-                RECT rcSub = { offX + S(14), contentTop + S(20), offX + sbW - S(14), contentTop + S(38) };
+                RECT rcLbl = { offX + S(14), contentTop + S(2),  offX + sbW - S(14), contentTop + S(22) };
+                RECT rcSub = { offX + S(14), contentTop + S(22), offX + sbW - S(14), contentTop + S(42) };
                 SelectObject(hdc, g_hFontBold);
                 SetTextColor(hdc, COLOR_TEXT_WHITE);
                 DrawTextW(hdc, L"Etiket ile Arkadaş Ekle", -1, &rcLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
@@ -1918,21 +2072,21 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 SetTextColor(hdc, COLOR_TEXT_MUTED);
                 DrawTextW(hdc, L"Arkadaşının etiketini gir (Örn: Selim#8421)", -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-                RECT rcInputBox = { offX + S(12), S(176), offX + sbW - S(12), S(212) };
+                RECT rcInputBox = { offX + S(12), headerH + S(204), offX + sbW - S(12), headerH + S(242) };
                 BOOL addFocused = (GetFocus() == g_hFriendAddEdit);
-                DrawSmoothRoundRect(&rcInputBox, S(8), COLOR_INPUT_BG, 255,
-                                    addFocused ? COLOR_ACCENT : COLOR_BORDER, addFocused ? 220 : 140);
+                DrawSmoothRoundRect(&rcInputBox, S(10), COLOR_INPUT_BG, 255,
+                                    addFocused ? COLOR_ACCENT : COLOR_BORDER_LIGHT, addFocused ? 220 : 150);
 
-                rcFriendSendBtn = (RECT){ offX + S(12), S(222), offX + sbW - S(12), S(258) };
+                rcFriendSendBtn = (RECT){ offX + S(12), headerH + S(252), offX + sbW - S(12), headerH + S(290) };
                 COLORREF btnCol = (g_pressedZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_DARK :
                                   ((g_hotZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_HOV : COLOR_ACCENT);
-                DrawSmoothRoundRect(&rcFriendSendBtn, S(8), btnCol, 255, 0, 0);
+                DrawSmoothRoundRect(&rcFriendSendBtn, S(10), btnCol, 255, 0, 0);
                 SelectObject(hdc, g_hFontBold);
                 SetTextColor(hdc, RGB(8, 12, 10));
-                DrawTextW(hdc, L"İstek Gönder", -1, &rcFriendSendBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                DrawTextW(hdc, L"Arkadaşlık İsteği Gönder", -1, &rcFriendSendBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                 if (g_friendAddMsg[0]) {
-                    RECT rcMsg = { offX + S(14), S(268), offX + sbW - S(14), S(320) };
+                    RECT rcMsg = { offX + S(14), headerH + S(300), offX + sbW - S(14), headerH + S(356) };
                     SelectObject(hdc, g_hFontSmall);
                     SetTextColor(hdc, wcsstr(g_friendAddMsg, L"gönderildi") ? COLOR_ACCENT_HOV : COLOR_DANGER);
                     DrawTextW(hdc, g_friendAddMsg, -1, &rcMsg, DT_LEFT | DT_WORDBREAK);
@@ -1946,37 +2100,37 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     }
 
     // =========================================================================
-    // 5. GELEN CANLI JAM DAVETİ YÜZEN BİLDİRİMİ
+    // 6. GELEN CANLI JAM DAVETİ YÜZEN BİLDİRİMİ (FLOATING INVITE BANNER)
     // =========================================================================
     if (Jam_HasPendingInvite()) {
         wchar_t invName[64] = {0}, invTag[32] = {0};
         Jam_GetPendingInviteInfo(invName, invTag);
 
-        int bannerW = S(380);
+        int bannerW = S(390);
         if (bannerW > w - S(24)) bannerW = w - S(24);
-        int topY = S(10);
-        rcToastBox = (RECT){ (w - bannerW) / 2, topY, (w + bannerW) / 2, topY + S(46) };
-        DrawSmoothRoundRect(&rcToastBox, S(12), RGB(16, 38, 26), 250, COLOR_ACCENT_HOV, 220);
+        int topY = headerH + S(10);
+        rcToastBox = (RECT){ (w - bannerW) / 2, topY, (w + bannerW) / 2, topY + S(54) };
+        DrawSmoothRoundRect(&rcToastBox, S(14), RGB(16, 40, 27), 250, COLOR_ACCENT_HOV, 230);
 
-        DrawSdfCircle((float)(rcToastBox.left + S(16)), (float)(topY + S(23)), SF(4.5f), COLOR_ACCENT_HOV, 255);
+        DrawSmoothCircle((float)(rcToastBox.left + S(20)), (float)(topY + S(27)), (float)S(5), COLOR_ACCENT_HOV, 255);
 
         wchar_t toastTitle[128];
-        _snwprintf(toastTitle, 127, L"%s seni Jam'e davet etti!", invName[0] ? invName : invTag);
+        _snwprintf(toastTitle, 127, L"%s seni Canlı Jam'e davet etti!", invName[0] ? invName : invTag);
         toastTitle[127] = L'\0';
 
-        rcToastAccept = (RECT){ rcToastBox.right - S(96), rcToastBox.top + S(9), rcToastBox.right - S(42), rcToastBox.bottom - S(9) };
-        DrawSmoothRoundRect(&rcToastAccept, S(6), (g_hotZone == ZONE_TOAST_ACCEPT) ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
+        rcToastAccept = (RECT){ rcToastBox.right - S(104), rcToastBox.top + S(11), rcToastBox.right - S(42), rcToastBox.bottom - S(11) };
+        DrawSmoothRoundRect(&rcToastAccept, S(9), (g_hotZone == ZONE_TOAST_ACCEPT) ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
         SelectObject(hdc, g_hFontSmallBold);
         SetTextColor(hdc, RGB(8, 12, 10));
         DrawTextW(hdc, L"Katıl", -1, &rcToastAccept, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-        rcToastReject = (RECT){ rcToastBox.right - S(36), rcToastBox.top + S(9), rcToastBox.right - S(8), rcToastBox.bottom - S(9) };
-        DrawSmoothRoundRect(&rcToastReject, S(6), COLOR_CTRL_HOVER, 255, COLOR_BORDER, 140);
-        DrawVecCross((float)(rcToastReject.left + rcToastReject.right) * 0.5f,
-                     (float)(rcToastReject.top + rcToastReject.bottom) * 0.5f,
-                     SF(7.0f), COLOR_TEXT_MUTED);
+        rcToastReject = (RECT){ rcToastBox.right - S(36), rcToastBox.top + S(11), rcToastBox.right - S(8), rcToastBox.bottom - S(11) };
+        DrawSmoothRoundRect(&rcToastReject, S(9), COLOR_CTRL_HOVER, 255, COLOR_BORDER_LIGHT, 140);
+        SelectObject(hdc, g_hFontIconsSmall);
+        SetTextColor(hdc, COLOR_TEXT_MUTED);
+        DrawTextW(hdc, L"\uE711", -1, &rcToastReject, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-        RECT rcToastTxt = { rcToastBox.left + S(28), rcToastBox.top, rcToastAccept.left - S(6), rcToastBox.bottom };
+        RECT rcToastTxt = { rcToastBox.left + S(34), rcToastBox.top, rcToastAccept.left - S(8), rcToastBox.bottom };
         SelectObject(hdc, g_hFontBold);
         SetTextColor(hdc, COLOR_TEXT_WHITE);
         DrawTextW(hdc, toastTitle, -1, &rcToastTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
@@ -1985,18 +2139,17 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     }
 }
 
-// =============================================================================
-// HIT-TEST VE TIKLAMA HESABI
-// =============================================================================
 static UiZone HitTestZones(POINT pt) {
     if (Jam_HasPendingInvite()) {
         if (PtInRect(&rcToastAccept, pt)) return ZONE_TOAST_ACCEPT;
         if (PtInRect(&rcToastReject, pt)) return ZONE_TOAST_REJECT;
     }
     if (PtInRect(&rcHamburger, pt)) return ZONE_HAMBURGER;
+    if (rcHeaderFriends.right > 0 && PtInRect(&rcHeaderFriends, pt)) return ZONE_HEADER_FRIENDS;
     if (g_searchQuery[0] && PtInRect(&rcSearchClear, pt)) return ZONE_SEARCH_CLEAR;
+    if (rcQuickDownload.right > 0 && PtInRect(&rcQuickDownload, pt)) return ZONE_QUICK_DOWNLOAD;
 
-    if (g_sidebarOpen && pt.x < GetSidebarW()) {
+    if (g_sidebarOpen && pt.x < GetSidebarW() && pt.y >= GetHeaderH()) {
         if (g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
             if (PtInRect(&rcFriendsBack, pt))    return ZONE_FRIENDS_BACK;
             if (PtInRect(&rcFriendsRefresh, pt)) return ZONE_FRIENDS_REFRESH;
@@ -2008,47 +2161,25 @@ static UiZone HitTestZones(POINT pt) {
         }
         return ZONE_NONE;
     }
-    if (g_sidebarOpen) return ZONE_NONE;
+    if (g_sidebarOpen && pt.y >= GetHeaderH()) return ZONE_NONE;
 
     if (Jam_GetState() != JAM_STATE_NONE) {
         if (rcJamLeave.right > 0 && PtInRect(&rcJamLeave, pt)) return ZONE_JAM_LEAVE;
         if (rcJamMissingBtn.right > 0 && PtInRect(&rcJamMissingBtn, pt)) return ZONE_JAM_MISSING_DL;
     }
-
-    // Yüzen Kapsül İçi Hit-Test
-    if (PtInRect(&rcCapsule, pt)) {
-        if (PtInRect(&rcPlay, pt))    return ZONE_PLAY;
-        if (PtInRect(&rcPrev, pt))    return ZONE_PREV;
-        if (PtInRect(&rcNext, pt))    return ZONE_NEXT;
-        if (PtInRect(&rcRepeat, pt))  return ZONE_REPEAT;
-        if (rcSpeaker.right > 0 && PtInRect(&rcSpeaker, pt)) return ZONE_SPEAKER;
-        if (rcVolHit.right > 0 && PtInRect(&rcVolHit, pt))   return ZONE_VOL;
-        if (rcSeekHit.right > 0 && PtInRect(&rcSeekHit, pt)) return ZONE_SEEK;
-        return ZONE_NONE;
-    }
-
+    if (PtInRect(&rcPlay, pt))    return ZONE_PLAY;
+    if (PtInRect(&rcPrev, pt))    return ZONE_PREV;
+    if (PtInRect(&rcNext, pt))    return ZONE_NEXT;
+    if (PtInRect(&rcShuffle, pt)) return ZONE_SHUFFLE;
+    if (PtInRect(&rcRepeat, pt))  return ZONE_REPEAT;
+    if (rcSpeaker.right > 0 && PtInRect(&rcSpeaker, pt)) return ZONE_SPEAKER;
+    if (PtInRect(&rcSeekHit, pt)) return ZONE_SEEK;
+    if (rcVolHit.right > 0 && PtInRect(&rcVolHit, pt)) return ZONE_VOL;
     return ZONE_NONE;
 }
 
-static int HitTestTrackRowIndex(HWND hWnd, POINT pt, int *outDisplayIdx) {
-    if (PtInRect(&rcCapsule, pt)) return -1; // Kapsülün arkasını tıklatmaz!
-
-    RECT rcClient;
-    GetClientRect(hWnd, &rcClient);
-    int listTop    = GetHeaderH() + S(2);
-    int listBottom = rcClient.bottom;
-    if (pt.y < listTop || pt.y >= listBottom || pt.x < S(16) || pt.x > rcClient.right - S(16)) {
-        return -1;
-    }
-    int displayIdx = (int)(((float)(pt.y - listTop) + g_scrollPosPx) / (float)GetItemH());
-    int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
-    if (displayIdx < 0 || displayIdx >= totalCount) return -1;
-    if (outDisplayIdx) *outDisplayIdx = displayIdx;
-    return g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
-}
-
 // =============================================================================
-// GİRİŞ KUTULARI VE ALT SINIFLAMA
+// GİRİŞ KUTUSU ALT SINIFLAMA VE PENCERE OLAY DÖNGÜSÜ
 // =============================================================================
 static LRESULT CALLBACK SearchBoxSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg == WM_KEYDOWN) {
@@ -2079,7 +2210,7 @@ static LRESULT CALLBACK SearchBoxSubclassProc(HWND hWnd, UINT msg, WPARAM wParam
                 SetBkMode(hdc, TRANSPARENT);
                 HGDIOBJ oldF = SelectObject(hdc, g_hFontMain);
                 SetTextColor(hdc, COLOR_TEXT_DIM);
-                DrawTextW(hdc, L"Ara...", -1, &rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                DrawTextW(hdc, L"Parça ara...", -1, &rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
                 SelectObject(hdc, oldF);
                 ReleaseDC(hWnd, hdc);
             }
@@ -2103,7 +2234,10 @@ static LRESULT CALLBACK FriendEditSubclassProc(HWND hWnd, UINT msg, WPARAM wPara
         return 0;
     } else if (msg == WM_SETFOCUS || msg == WM_KILLFOCUS) {
         InvalidateRect(hWnd, NULL, FALSE);
-        if (g_hWnd) InvalidateRect(g_hWnd, NULL, FALSE);
+        if (g_hWnd) {
+        InvalidateRect(g_hWnd, NULL, FALSE);
+        UpdateTimerSchedule(g_hWnd);
+    }
     } else if (msg == WM_PAINT) {
         LRESULT res = CallWindowProcW(g_oldFriendAddEditProc, hWnd, msg, wParam, lParam);
         if (GetWindowTextLengthW(hWnd) == 0 && GetFocus() != hWnd) {
@@ -2126,25 +2260,38 @@ static LRESULT CALLBACK FriendEditSubclassProc(HWND hWnd, UINT msg, WPARAM wPara
 
 static void LayoutHeaderInputs(int clientW) {
     int headerH  = GetHeaderH();
-    int searchW  = (clientW >= S(560)) ? S(208) : S(156);
-    int searchH  = S(28);
-    int searchX  = clientW - searchW - S(14);
+    int searchW  = (clientW >= S(560)) ? S(190) : S(148);
+    int searchH  = S(34);
+    int searchX  = clientW - searchW - S(12);
     int searchY  = (headerH - searchH) / 2;
-    int rightPad = g_searchQuery[0] ? S(28) : S(10);
+    int rightPad = g_searchQuery[0] ? S(30) : S(12);
     if (g_hSearchEdit) {
-        MoveWindow(g_hSearchEdit, searchX + S(28), searchY + S(4), searchW - S(28) - rightPad, searchH - S(8), TRUE);
+        MoveWindow(g_hSearchEdit, searchX + S(28), searchY + S(7), searchW - S(28) - rightPad, searchH - S(14), TRUE);
     }
     UpdateSidebarEditPosition();
 }
 
-// =============================================================================
-// ANA PENCERE OLAY DÖNGÜSÜ
-// =============================================================================
+static int HitTestTrackRowIndex(HWND hWnd, POINT pt, int *outDisplayIdx) {
+    RECT rcClient;
+    GetClientRect(hWnd, &rcClient);
+    int listTop    = GetTracklistTop() + S(26);
+    int listBottom = rcClient.bottom - GetDockH();
+    if (pt.y < listTop || pt.y >= listBottom || pt.x < S(12) || pt.x > rcClient.right - S(18)) {
+        return -1;
+    }
+    int displayIdx = (int)(((float)(pt.y - (listTop + S(6))) + g_scrollPosPx) / (float)GetItemH());
+    int totalCount = g_isFiltered ? g_filterCount : Playlist_Count();
+    if (displayIdx < 0 || displayIdx >= totalCount) return -1;
+    if (outDisplayIdx) *outDisplayIdx = displayIdx;
+    return g_isFiltered ? g_filterIndices[displayIdx] : displayIdx;
+}
+
 static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CREATE: {
             g_hWnd = hWnd;
 
+            // Koyu Başlık Çubuğu & Windows 11 Yuvarlatılmış Köşe Desteği
             BOOL useDark = TRUE;
             DwmSetWindowAttribute(hWnd, 20, &useDark, sizeof(useDark));
             DwmSetWindowAttribute(hWnd, 19, &useDark, sizeof(useDark));
@@ -2167,7 +2314,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 hWnd, (HMENU)IDC_HEADER_SEARCH, GetModuleHandle(NULL), NULL
             );
             SendMessageW(g_hSearchEdit, WM_SETFONT, (WPARAM)g_hFontMain, TRUE);
-            SendMessageW(g_hSearchEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Ara...");
+            SendMessageW(g_hSearchEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"Parça ara...");
             g_oldSearchEditProc = (WNDPROC)SetWindowLongPtrW(g_hSearchEdit, GWLP_WNDPROC, (LONG_PTR)SearchBoxSubclassProc);
 
             g_hFriendAddEdit = CreateWindowExW(
@@ -2185,7 +2332,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             Friends_Init();
             Jam_Init();
 
-            // Eğer kayıtlı arkadaş varsa gelen kutusunu arka planda uyandır
+            // Yalnızca kayıtlı arkadaş varsa gelen kutusunu arka planda uyandır
             if (Friends_GetFriendCount() > 0) {
                 EnsureSocialNetworkStarted();
             }
@@ -2270,48 +2417,6 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             break;
         }
 
-        case WM_APPCOMMAND: {
-            int cmd = GET_APPCOMMAND_LPARAM(lParam);
-            switch (cmd) {
-                case APPCOMMAND_MEDIA_PLAY_PAUSE:
-                case APPCOMMAND_MEDIA_PLAY:
-                case APPCOMMAND_MEDIA_PAUSE:
-                    if (Player_IsPlaying()) {
-                        Player_Pause();
-                        SyncLocalTrackToFriends();
-                        if (Jam_IsActive()) Jam_BroadcastPause(Player_GetPosition());
-                    } else if (g_currentTrack >= 0) {
-                        Player_Play();
-                        SyncLocalTrackToFriends();
-                        BroadcastCurrentJamTrack(Player_GetPosition());
-                    } else if (Playlist_Count() > 0) {
-                        PlayTrack(g_selectedTrack >= 0 ? g_selectedTrack : 0);
-                    }
-                    if (g_isWindowActive && !g_isMinimized && rcCapsule.right > 0) {
-                        InvalidateRect(hWnd, &rcCapsule, FALSE);
-                    }
-                    UpdateTimerSchedule(hWnd);
-                    return 1;
-                case APPCOMMAND_MEDIA_NEXTTRACK: {
-                    int next = Playlist_FindNext(g_currentTrack, g_cfg.shuffle, g_cfg.repeat == 2 ? 1 : g_cfg.repeat);
-                    if (next >= 0) { PlayTrack(next); ScrollTrackIntoView(next); }
-                    return 1;
-                }
-                case APPCOMMAND_MEDIA_PREVIOUSTRACK: {
-                    int prev = Playlist_FindPrev(g_currentTrack);
-                    if (prev >= 0) { PlayTrack(prev); ScrollTrackIntoView(prev); }
-                    return 1;
-                }
-                case APPCOMMAND_MEDIA_STOP:
-                    Player_Stop();
-                    SyncLocalTrackToFriends();
-                    if (g_isWindowActive && !g_isMinimized) InvalidateRect(hWnd, NULL, FALSE);
-                    UpdateTimerSchedule(hWnd);
-                    return 1;
-            }
-            break;
-        }
-
         case 0x02E0 /* WM_DPICHANGED */: {
             int newDpi = HIWORD(wParam);
             InitDpiFonts(newDpi);
@@ -2328,8 +2433,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             BOOL wasActive = g_isWindowActive;
             g_isWindowActive = (LOWORD(wParam) != WA_INACTIVE);
             if (g_isWindowActive && !wasActive) {
-                // Pencereye dönüldü: Tek karede hemen yenile ve gerekirse timer'ı aç
-                InvalidateRect(hWnd, NULL, FALSE);
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
             }
             UpdateTimerSchedule(hWnd);
             break;
@@ -2343,10 +2447,10 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
             } else {
                 g_isMinimized = FALSE;
+                UpdateTimerSchedule(hWnd);
                 int w = LOWORD(lParam);
                 ClampScrollTargets(hWnd);
                 LayoutHeaderInputs(w);
-                UpdateTimerSchedule(hWnd);
                 InvalidateRect(hWnd, NULL, FALSE);
             }
             break;
@@ -2359,13 +2463,16 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 g_lastAnimTick = now;
                 if (dt <= 0.0f || dt > 0.05f) dt = 0.016f;
 
-                BOOL mScroll  = StepSpring(&g_scrollPosPx, &g_scrollVelPx, g_scrollTargetPx,           24.0f, 1.0f,  dt, 0.35f);
-                BOOL mSidebar = StepSpring(&g_sidebarAnim, &g_sidebarVel,  g_sidebarOpen ? 1.0f : 0.0f, 26.0f, 0.94f, dt, 0.003f);
+                float jamTarget = (Jam_GetState() != JAM_STATE_NONE) ? 1.0f : 0.0f;
+
+                BOOL mScroll  = StepSpring(&g_scrollPosPx,   &g_scrollVelPx,   g_scrollTargetPx,           24.0f, 1.0f,  dt, 0.35f);
+                BOOL mSidebar = StepSpring(&g_sidebarAnim,   &g_sidebarVel,    g_sidebarOpen ? 1.0f : 0.0f, 26.0f, 0.94f, dt, 0.003f);
+                BOOL mJamBar  = StepSpring(&g_jamBannerAnim, &g_jamBannerVel,  jamTarget,                  24.0f, 0.94f, dt, 0.004f);
 
                 UpdateSidebarEditPosition();
                 InvalidateRect(hWnd, NULL, FALSE);
 
-                if (!mScroll && !mSidebar) {
+                if (!mScroll && !mSidebar && !mJamBar) {
                     KillTimer(hWnd, IDT_ANIM_TIMER);
                     g_animTimerActive = FALSE;
                 }
@@ -2375,6 +2482,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             if (wParam == IDT_UPDATE_TIMER) {
                 DWORD now = GetTickCount();
 
+                // SADECE Arkadaşlar sekmesi açıkken VEYA Jam aktifken ağ sorgusu yap! Boşta %0 ağ ve işlemci yükü!
                 if (IsSocialRefreshActive()) {
                     Jam_CheckTimeouts();
                     Friends_CheckTimeouts();
@@ -2384,23 +2492,22 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         Friends_RequestAllStatuses();
                     }
 
+                    if (Jam_GetState() == JAM_STATE_NONE && g_jamBannerAnim > 0.01f) {
+                        StartAnimLoop(hWnd);
+                    }
                     if (g_isWindowActive && !g_isMinimized) {
                         InvalidateRect(hWnd, NULL, FALSE);
                     }
                 } else if (Jam_HasPendingInvite()) {
-                    if (g_isWindowActive && !g_isMinimized) {
+                    if (g_isWindowActive && !g_isMinimized && rcToastBox.right > 0) {
                         InvalidateRect(hWnd, &rcToastBox, FALSE);
                     }
                 }
 
-                if (Player_IsPlaying() || g_isDraggingSeek) {
-                    if (g_isWindowActive && !g_isMinimized) {
-                        // Sadece kapsül alanını yenile! (500.000 px yerine ~25.000 px!)
-                        if (rcCapsule.right > rcCapsule.left) {
-                            InvalidateRect(hWnd, &rcCapsule, FALSE);
-                        } else {
-                            InvalidateRect(hWnd, NULL, FALSE);
-                        }
+                // Şarkı çalıyorsa sadece ve sadece alt oynatıcı kartını yenile (bütün listeyi değil!)
+                if (g_isWindowActive && !g_isMinimized) {
+                    if (Player_IsPlaying() && !g_isDraggingSeek && rcDock.right > 0) {
+                        InvalidateRect(hWnd, &rcDock, FALSE);
                     }
                 }
             }
@@ -2415,9 +2522,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             } else {
                 Player_Stop();
                 SyncLocalTrackToFriends();
-                if (g_isWindowActive && !g_isMinimized) InvalidateRect(hWnd, NULL, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
             }
-            UpdateTimerSchedule(hWnd);
             return 0;
         }
 
@@ -2429,9 +2535,12 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         TriggerImmediateFriendsRefresh();
                     }
                 } else if (evt->type == NET_EVENT_MESSAGE) {
+                    JamState beforeState = Jam_GetState();
+
                     Friends_HandleNetworkMessage(evt->topic, evt->payload);
                     Jam_HandleNetworkMessage(evt->topic, evt->payload);
 
+                    // Karşı taraf Jam'e yeni katıldıysa veya şarkı indirmeyi bitirdiyse anlık saniyemizi gönder!
                     if (Jam_PollNeedSendCurrentState()) {
                         BroadcastCurrentJamTrack(Player_GetPosition());
                     }
@@ -2440,9 +2549,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     if (Jam_PollRemoteSync(&rs)) {
                         ApplyRemoteJamSync(&rs);
                     }
+
+                    if (Jam_GetState() != beforeState) {
+                        StartAnimLoop(hWnd);
+                    }
                 }
                 free(evt);
-                if (g_isWindowActive && !g_isMinimized) InvalidateRect(hWnd, NULL, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
             }
             return 0;
         }
@@ -2470,11 +2583,11 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         Jam_SetSyncStatus(L"⚠ Şarkı bulunamadı • 'İndir' ile manuel ekleyebilirsin", FALSE, task->title);
                     }
                 } else if (Jam_IsActive()) {
-                    Jam_SetSyncStatus(L"⚠ Otomatik indirilemedi • 'İndir' düğmesini kullan", FALSE, task->title);
+                    Jam_SetSyncStatus(L"⚠ Otomatik indirilemedi • Sağdaki 'İndir' düğmesini kullan", FALSE, task->title);
                 }
                 free(task);
             }
-            if (g_isWindowActive && !g_isMinimized) InvalidateRect(hWnd, NULL, FALSE);
+            InvalidateRect(hWnd, NULL, FALSE);
             return 0;
         }
 
@@ -2509,6 +2622,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     g_scrollTargetPx = 0.0f;
                     StartAnimLoop(hWnd);
 
+                    // Jam sırasında eksik şarkıyı manuel indirdiyse hemen senkronla!
                     wchar_t missing[256] = {0};
                     Jam_GetMissingTrack(missing, 256);
                     if (Jam_IsActive() && missing[0]) {
@@ -2597,13 +2711,15 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
             ScreenToClient(hWnd, &pt);
 
-            if (PtInRect(&rcCapsule, pt)) {
+            RECT rcClient;
+            GetClientRect(hWnd, &rcClient);
+            if (pt.y >= rcClient.bottom - GetDockH()) {
                 int vol = Player_GetVolume() + (delta > 0 ? 5 : -5);
                 Player_SetVolume(vol);
                 if (Player_GetVolume() > 0) g_preMuteVol = Player_GetVolume();
                 g_cfg.volume = Player_GetVolume();
                 Config_Save(&g_cfg, L"config.json");
-                InvalidateRect(hWnd, &rcCapsule, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
             } else if (!g_sidebarOpen || pt.x >= GetSidebarW()) {
                 float step = ((float)delta / 120.0f) * ((float)GetItemH() * 2.2f);
                 g_scrollTargetPx -= step;
@@ -2633,8 +2749,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             if (g_isDraggingScrollbar) {
                 RECT rcClient;
                 GetClientRect(hWnd, &rcClient);
-                int sbTop = GetHeaderH() + S(4);
-                int sbBottom = rcClient.bottom - S(12);
+                int sbTop = GetTracklistTop() + S(26) + S(6);
+                int sbBottom = rcClient.bottom - GetDockH() - S(6);
                 int trackH = sbBottom - sbTop;
                 int thumbH = rcScrollbarThumb.bottom - rcScrollbarThumb.top;
                 int maxScrollPx = GetMaxScrollPx(hWnd);
@@ -2656,7 +2772,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     if (ratio < 0.0f) ratio = 0.0f;
                     if (ratio > 1.0f) ratio = 1.0f;
                     g_seekDragSec = (int)(ratio * (float)duration);
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                 }
                 return 0;
             }
@@ -2670,7 +2786,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     Player_SetVolume(vol);
                     if (vol > 0) g_preMuteVol = vol;
                     g_cfg.volume = vol;
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                 }
                 return 0;
             }
@@ -2680,7 +2796,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     g_isDraggingList = TRUE;
                 }
                 if (g_isDraggingList) {
-                    int listTop = GetHeaderH() + S(2);
+                    int listTop = GetTracklistTop() + S(26) + S(6);
                     int target = (int)(((float)(pt.y - listTop) + g_scrollPosPx) / (float)GetItemH());
                     if (target < 0) target = 0;
                     if (target >= Playlist_Count()) target = Playlist_Count() - 1;
@@ -2706,8 +2822,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             }
 
             int newSideHover = -1;
-            if (g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_MENU && pt.x < GetSidebarW() && pt.y >= S(48)) {
-                int m = (pt.y - S(48)) / S(44);
+            if (g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_MENU && pt.x < GetSidebarW() && pt.y >= GetHeaderH() + S(14)) {
+                int m = (pt.y - (GetHeaderH() + S(14))) / S(52);
                 if (m >= 0 && m < 7) newSideHover = m;
             }
             if (newSideHover != g_sidebarHoverItem) {
@@ -2729,7 +2845,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_RBUTTONUP: {
             POINT pt = { (short)LOWORD(lParam), (short)HIWORD(lParam) };
-            if (!g_sidebarOpen && !PtInRect(&rcCapsule, pt)) {
+            if (!g_sidebarOpen) {
                 int rowIdx = HitTestTrackRowIndex(hWnd, pt, NULL);
                 if (rowIdx >= 0) {
                     g_selectedTrack = rowIdx;
@@ -2761,9 +2877,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             UiZone hit = HitTestZones(pt);
             g_pressedZone = hit;
 
-            // Jam Davet Bildirimi
+            // 0. Jam Davet Bildirimi
             if (hit == ZONE_TOAST_ACCEPT) {
-                EnsureSocialNetworkStarted();
                 Jam_AcceptInvite();
                 TriggerImmediateFriendsRefresh();
                 StartAnimLoop(hWnd);
@@ -2780,11 +2895,21 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
 
-            // Hamburger Menü
+            // 1. Üst Çubuk Düğmeleri
             if (hit == ZONE_HAMBURGER) {
                 if (!g_sidebarOpen) g_sidebarView = SIDEBAR_VIEW_MENU;
                 ToggleSidebar(!g_sidebarOpen);
                 InvalidateRect(hWnd, NULL, FALSE);
+                return 0;
+            }
+            if (hit == ZONE_HEADER_FRIENDS) {
+                if (g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_FRIENDS) {
+                    ToggleSidebar(FALSE);
+                } else {
+                    OpenFriendsDrawer();
+                }
+                g_pressedZone = ZONE_NONE;
+                ReleaseCapture();
                 return 0;
             }
             if (hit == ZONE_SEARCH_CLEAR) {
@@ -2797,9 +2922,16 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 ReleaseCapture();
                 return 0;
             }
+            if (hit == ZONE_QUICK_DOWNLOAD) {
+                g_pressedZone = ZONE_NONE;
+                ReleaseCapture();
+                InvalidateRect(hWnd, NULL, FALSE);
+                Search_ShowDialog(hWnd, g_cfg.lastFolder);
+                return 0;
+            }
 
-            // Yan Çekmece Tıklamaları
-            if (g_sidebarOpen) {
+            // 2. Yan Çekmece Etkileşimleri
+            if (g_sidebarOpen && pt.y >= GetHeaderH()) {
                 int sbW = GetSidebarW();
                 if (pt.x >= sbW) {
                     ToggleSidebar(FALSE);
@@ -2809,8 +2941,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 }
 
                 if (g_sidebarView == SIDEBAR_VIEW_MENU) {
-                    if (pt.y >= S(48)) {
-                        int item = (pt.y - S(48)) / S(44);
+                    if (pt.y >= GetHeaderH() + S(14)) {
+                        int item = (pt.y - (GetHeaderH() + S(14))) / S(52);
                         g_pressedZone = ZONE_NONE;
                         ReleaseCapture();
                         if (item == 0) { ToggleSidebar(FALSE); SelectFolderDialog(); }
@@ -2888,7 +3020,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                                         Jam_Leave();
                                         StartAnimLoop(hWnd);
                                     } else {
-                                        EnsureSocialNetworkStarted();
+                                        // Çevrimiçi görünmese bile daveti gönderir ve anında durum yoklar!
                                         Jam_InviteFriend(fItem->tag, fItem->name);
                                         ToggleSidebar(FALSE);
                                         StartAnimLoop(hWnd);
@@ -2902,12 +3034,12 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                             if (PtInRect(&rcFriendRemoveBtns[fi], pt)) {
                                 const FriendItem *fItem = Friends_GetFriend(fi);
                                 if (fItem) {
-                                    wchar_t msgBuf[128];
-                                    _snwprintf(msgBuf, 127, L"%s arkadaş listenden çıkarılsın mı?", fItem->name);
-                                    msgBuf[127] = L'\0';
+                                    wchar_t msg[128];
+                                    _snwprintf(msg, 127, L"%s arkadaş listenden çıkarılsın mı?", fItem->name);
+                                    msg[127] = L'\0';
                                     g_pressedZone = ZONE_NONE;
                                     ReleaseCapture();
-                                    if (MessageBoxW(hWnd, msgBuf, L"Arkadaşı Kaldır", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                                    if (MessageBoxW(hWnd, msg, L"Arkadaşı Kaldır", MB_YESNO | MB_ICONQUESTION) == IDYES) {
                                         Friends_Remove(fItem->tag);
                                         InvalidateRect(hWnd, NULL, FALSE);
                                     }
@@ -2921,7 +3053,6 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                             if (PtInRect(&rcReqAcceptBtns[pi], pt)) {
                                 const FriendRequest *rq = Friends_GetPending(pi);
                                 if (rq) {
-                                    EnsureSocialNetworkStarted();
                                     Friends_AcceptRequest(rq->tag);
                                     g_friendsTab = FRIENDS_TAB_LIST;
                                 }
@@ -2940,7 +3071,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 }
             }
 
-            // Canlı Jam Sahne Çubuğu
+            // 3. Canlı Jam Sahne Çubuğu Düğmeleri
             if (hit == ZONE_JAM_LEAVE) {
                 Jam_Leave();
                 StartAnimLoop(hWnd);
@@ -2962,7 +3093,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
 
-            // Kaydırma Çubuğu
+            // 4. Kaydırma Çubuğu
             if (GetMaxScrollPx(hWnd) > 0 && rcScrollbarTrack.right > 0 && PtInRect(&rcScrollbarTrack, pt)) {
                 if (PtInRect(&rcScrollbarThumb, pt)) {
                     g_isDraggingScrollbar = TRUE;
@@ -2977,7 +3108,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
 
-            // Alt Yüzen Kapsül Kontrolleri
+            // 5. Alt Oynatıcı Kontrolleri
+            if (hit == ZONE_SHUFFLE) {
+                g_cfg.shuffle = !g_cfg.shuffle;
+                Config_Save(&g_cfg, L"config.json");
+                InvalidateRect(hWnd, NULL, FALSE);
+                return 0;
+            }
             if (hit == ZONE_PLAY) {
                 if (Player_IsPlaying()) {
                     Player_Pause();
@@ -2992,26 +3129,25 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         PlayTrack(g_selectedTrack >= 0 ? g_selectedTrack : 0);
                     }
                 }
-                InvalidateRect(hWnd, &rcCapsule, FALSE);
-                UpdateTimerSchedule(hWnd);
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
             if (hit == ZONE_PREV) {
                 int prev = Playlist_FindPrev(g_currentTrack);
                 if (prev >= 0) { PlayTrack(prev); ScrollTrackIntoView(prev); }
-                InvalidateRect(hWnd, &rcCapsule, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
             if (hit == ZONE_NEXT) {
                 int next = Playlist_FindNext(g_currentTrack, g_cfg.shuffle, g_cfg.repeat == 2 ? 1 : g_cfg.repeat);
                 if (next >= 0) { PlayTrack(next); ScrollTrackIntoView(next); }
-                InvalidateRect(hWnd, &rcCapsule, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
             if (hit == ZONE_REPEAT) {
                 g_cfg.repeat = (g_cfg.repeat + 1) % 3;
                 Config_Save(&g_cfg, L"config.json");
-                InvalidateRect(hWnd, &rcCapsule, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
             if (hit == ZONE_SPEAKER) {
@@ -3023,7 +3159,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 }
                 g_cfg.volume = Player_GetVolume();
                 Config_Save(&g_cfg, L"config.json");
-                InvalidateRect(hWnd, &rcCapsule, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
             if (hit == ZONE_SEEK) {
@@ -3036,7 +3172,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     g_isDraggingSeek = TRUE;
                     Player_SetPosition(g_seekDragSec);
                     if (Jam_IsActive()) Jam_BroadcastSeek(g_seekDragSec);
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                 }
                 return 0;
             }
@@ -3046,7 +3182,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
 
-            // Şarkı Satırı Tıklaması
+            // 6. Şarkı Satırına Tıklama
             int actualIdx = HitTestTrackRowIndex(hWnd, pt, NULL);
             if (actualIdx >= 0) {
                 g_dragFromIndex = actualIdx;
@@ -3111,13 +3247,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 if (wParam == 'R' || wParam == 'r') {
                     g_cfg.repeat = (g_cfg.repeat + 1) % 3;
                     Config_Save(&g_cfg, L"config.json");
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 if (wParam == 'S' || wParam == 's') {
                     g_cfg.shuffle = !g_cfg.shuffle;
                     Config_Save(&g_cfg, L"config.json");
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 if (wParam == 'F' || wParam == 'f') {
@@ -3138,8 +3274,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     } else if (Playlist_Count() > 0) {
                         PlayTrack(g_selectedTrack >= 0 ? g_selectedTrack : 0);
                     }
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
-                    UpdateTimerSchedule(hWnd);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_LEFT: {
@@ -3147,7 +3282,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     if (pos < 0) pos = 0;
                     Player_SetPosition(pos);
                     if (Jam_IsActive()) Jam_BroadcastSeek(pos);
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_RIGHT: {
@@ -3156,7 +3291,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     if (dur > 0 && pos > dur) pos = dur;
                     Player_SetPosition(pos);
                     if (Jam_IsActive()) Jam_BroadcastSeek(pos);
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_UP: {
@@ -3165,7 +3300,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     if (Player_GetVolume() > 0) g_preMuteVol = Player_GetVolume();
                     g_cfg.volume = Player_GetVolume();
                     Config_Save(&g_cfg, L"config.json");
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_DOWN: {
@@ -3174,7 +3309,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     if (Player_GetVolume() > 0) g_preMuteVol = Player_GetVolume();
                     g_cfg.volume = Player_GetVolume();
                     Config_Save(&g_cfg, L"config.json");
-                    InvalidateRect(hWnd, &rcCapsule, FALSE);
+                    InvalidateRect(hWnd, NULL, FALSE);
                     return 0;
                 }
                 case VK_RETURN: {
@@ -3218,8 +3353,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
         case WM_GETMINMAXINFO: {
             MINMAXINFO *mmi = (MINMAXINFO*)lParam;
-            mmi->ptMinTrackSize.x = S(480);
-            mmi->ptMinTrackSize.y = S(480);
+            mmi->ptMinTrackSize.x = S(500);
+            mmi->ptMinTrackSize.y = S(520);
             return 0;
         }
 
@@ -3262,6 +3397,43 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             return 0;
         }
 
+        case WM_APPCOMMAND: {
+            int cmd = GET_APPCOMMAND_LPARAM(lParam);
+            if (cmd == APPCOMMAND_MEDIA_PLAY_PAUSE) {
+                if (Player_IsPlaying()) {
+                    Player_Pause();
+                    SyncLocalTrackToFriends();
+                    if (Jam_IsActive()) Jam_BroadcastPause(Player_GetPosition());
+                } else if (g_currentTrack >= 0) {
+                    Player_Play();
+                    SyncLocalTrackToFriends();
+                    BroadcastCurrentJamTrack(Player_GetPosition());
+                } else if (Playlist_Count() > 0) {
+                    PlayTrack(0);
+                }
+                InvalidateRect(hWnd, &rcDock, FALSE);
+                UpdateTimerSchedule(hWnd);
+                return TRUE;
+            }
+            if (cmd == APPCOMMAND_MEDIA_NEXTTRACK) {
+                int next = Playlist_FindNext(g_currentTrack, g_cfg.shuffle, g_cfg.repeat == 2 ? 1 : g_cfg.repeat);
+                if (next >= 0) { PlayTrack(next); ScrollTrackIntoView(next); }
+                return TRUE;
+            }
+            if (cmd == APPCOMMAND_MEDIA_PREVIOUSTRACK) {
+                int prev = Playlist_FindPrev(g_currentTrack);
+                if (prev >= 0) { PlayTrack(prev); ScrollTrackIntoView(prev); }
+                return TRUE;
+            }
+            if (cmd == APPCOMMAND_MEDIA_STOP) {
+                Player_Stop();
+                InvalidateRect(hWnd, &rcDock, FALSE);
+                UpdateTimerSchedule(hWnd);
+                return TRUE;
+            }
+            break;
+        }
+
         case WM_ERASEBKGND:
             return 1;
 
@@ -3285,13 +3457,21 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 g_filterIndices = NULL;
             }
 
+            if (g_hFontBrand)      DeleteObject(g_hFontBrand);
             if (g_hFontTitle)      DeleteObject(g_hFontTitle);
             if (g_hFontBold)       DeleteObject(g_hFontBold);
             if (g_hFontMain)       DeleteObject(g_hFontMain);
             if (g_hFontSmall)      DeleteObject(g_hFontSmall);
             if (g_hFontSmallBold)  DeleteObject(g_hFontSmallBold);
             if (g_hFontMicro)      DeleteObject(g_hFontMicro);
+            if (g_hFontIcons)      DeleteObject(g_hFontIcons);
+            if (g_hFontIconsSmall) DeleteObject(g_hFontIconsSmall);
+            if (g_hFontIconsLarge) DeleteObject(g_hFontIconsLarge);
             if (g_hBrInputBg)      DeleteObject(g_hBrInputBg);
+            if (g_pMainThumb) {
+                g_pMainThumb->lpVtbl->Release(g_pMainThumb);
+                g_pMainThumb = NULL;
+            }
             if (g_hAppIcon) {
                 DestroyIcon(g_hAppIcon);
                 g_hAppIcon = NULL;
