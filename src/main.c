@@ -389,11 +389,11 @@ static void FillVerticalGradientPx(int x, int y, int w, int h, COLORREF topCol, 
 
 static void DimRectPx(int x, int y, int w, int h, BYTE dimAlpha) {
     if (!g_backPixels || dimAlpha == 0 || w <= 0 || h <= 0) return;
-    GdiFlush();
     int x0 = (x < 0) ? 0 : x;
     int y0 = (y < 0) ? 0 : y;
     int x1 = (x + w > g_backW) ? g_backW : (x + w);
     int y1 = (y + h > g_backH) ? g_backH : (y + h);
+    if (x0 >= x1 || y0 >= y1) return;
     uint32_t keep = 256u - (uint32_t)dimAlpha;
     for (int py = y0; py < y1; py++) {
         uint32_t *row = g_backPixels + py * g_backW;
@@ -612,7 +612,8 @@ static void UpdateSidebarEditPosition(void) {
         return;
     }
     int sbW = GetSidebarW();
-    int offX = (int)((g_sidebarAnim - 1.0f) * (float)sbW);
+    float animNorm = (g_sidebarAnim < 0.0f) ? 0.0f : ((g_sidebarAnim > 1.0f) ? 1.0f : g_sidebarAnim);
+    int offX = (int)((animNorm - 1.0f) * (float)sbW);
     int inputTop = GetHeaderH() + S(204);
     MoveWindow(g_hFriendAddEdit, offX + S(22), inputTop + S(8), sbW - S(44), S(22), TRUE);
     if (!IsWindowVisible(g_hFriendAddEdit)) ShowWindow(g_hFriendAddEdit, SW_SHOW);
@@ -670,15 +671,21 @@ static void StartAnimLoop(HWND hWnd) {
 
 static BOOL StepSpring(float *pos, float *vel, float target, float omega, float damping, float dt, float eps) {
     float disp = *pos - target;
-    if (fabsf(disp) <= eps && fabsf(*vel) <= eps * 8.0f) {
+    if (fabsf(disp) <= eps && fabsf(*vel) <= eps * 4.0f) {
         *pos = target;
         *vel = 0.0f;
         return FALSE;
     }
-    float accel = -omega * omega * disp - 2.0f * damping * omega * (*vel);
-    *vel += accel * dt;
-    *pos += (*vel) * dt;
-    if (fabsf(*pos - target) <= eps && fabsf(*vel) <= eps * 8.0f) {
+    // Apple Akışkan Fizik: 4 alt adımlı (sub-stepping) yarı-kapalı Euler entegrasyonu.
+    // Windows timer dalgalanmalarından bağımsız %100 kararlı, sıfır titreme (zero jitter).
+    float subDt = dt * 0.25f;
+    for (int step = 0; step < 4; step++) {
+        disp = *pos - target;
+        float accel = -omega * omega * disp - 2.0f * damping * omega * (*vel);
+        *vel += accel * subDt;
+        *pos += (*vel) * subDt;
+    }
+    if (fabsf(*pos - target) <= eps && fabsf(*vel) <= eps * 4.0f) {
         *pos = target;
         *vel = 0.0f;
         return FALSE;
@@ -1001,6 +1008,7 @@ static void ToggleSidebar(BOOL open) {
     g_sidebarOpen = open;
     if (!g_isWindowActive || g_isMinimized) {
         g_sidebarAnim = open ? 1.0f : 0.0f;
+        g_sidebarVel = 0.0f;
     }
     if (!open && g_hFriendAddEdit) {
         ShowWindow(g_hFriendAddEdit, SW_HIDE);
@@ -1009,7 +1017,10 @@ static void ToggleSidebar(BOOL open) {
         EnsureSocialNetworkStarted();
         TriggerImmediateFriendsRefresh();
     }
-    if (g_hWnd) StartAnimLoop(g_hWnd);
+    if (g_hWnd) {
+        StartAnimLoop(g_hWnd);
+        InvalidateRect(g_hWnd, NULL, FALSE);
+    }
 }
 
 static void OpenFriendsDrawer(void) {
@@ -1774,24 +1785,29 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     }
 
     // =========================================================================
-    // 5. AKIŞKAN YAN ÇEKMECE & MODERN ARKADAŞLAR / JAM MERKEZİ
+    // 5. AKIŞKAN YAN ÇEKMECE & MODERN ARKADAŞLAR / JAM MERKEZİ (APPLE AKICI FİZİK)
     // =========================================================================
-    if (g_sidebarAnim > 0.005f) {
+    if (g_sidebarAnim > 0.002f) {
         int sbW  = GetSidebarW();
-        int offX = (int)((g_sidebarAnim - 1.0f) * (float)sbW);
+        float animNorm = (g_sidebarAnim < 0.0f) ? 0.0f : ((g_sidebarAnim > 1.0f) ? 1.0f : g_sidebarAnim);
+        int offX = (int)((animNorm - 1.0f) * (float)sbW);
+        int sideRight = offX + sbW;
 
-        // Arka planı orantılı karart
-        BYTE scrimAlpha = (BYTE)(g_sidebarAnim * 135.0f);
-        DimRectPx(0, headerH, w, h - headerH, scrimAlpha);
+        // Arka planı orantılı karart: Sadece çekmecenin sağında kalan açık alanı karart!
+        // Çekmecenin altında kalan pikseller zaten opaktır; gereksiz CPU yükünü ve gecikmeyi önler.
+        BYTE scrimAlpha = (BYTE)(animNorm * 135.0f);
+        if (sideRight < w && scrimAlpha > 0) {
+            DimRectPx(sideRight, headerH, w - sideRight, h - headerH, scrimAlpha);
+        }
 
-        int clipRight = offX + sbW + 1;
+        int clipRight = sideRight;
         if (clipRight > w) clipRight = w;
         int savedSide = SaveDC(hdc);
         IntersectClipRect(hdc, 0, headerH, clipRight, h);
         SetPixelClip(0, headerH, clipRight, h);
 
         FillVerticalGradientPx(offX, headerH, sbW, h - headerH, COLOR_SIDEBAR_SURF, RGB(11, 13, 19));
-        DrawHairlineV(offX + sbW - 1, headerH, h, COLOR_BORDER_LIGHT, 180);
+        DrawHairlineV(sideRight - 1, headerH, h, COLOR_BORDER_LIGHT, 180);
 
         if (g_sidebarView == SIDEBAR_VIEW_MENU) {
             static const struct { const wchar_t *icon; const wchar_t *label; const wchar_t *sub; BOOL accent; } items[] = {
@@ -1855,7 +1871,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             RECT rcFHead = { offX + S(46), headerH + S(10), offX + sbW - S(46), headerH + S(40) };
             SelectObject(hdc, g_hFontTitle);
             SetTextColor(hdc, COLOR_TEXT_WHITE);
-            DrawTextW(hdc, L"Arkadaşlar & Jam", -1, &rcFHead, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(hdc, L"Arkadaşlar & Jam", -1, &rcFHead, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
             // Kullanıcı Kimlik Kartı (Profil Avatarı + Etiket + Kopyala Hapı)
             RECT rcMyCard = { offX + S(12), headerH + S(46), offX + sbW - S(12), headerH + S(98) };
@@ -2465,9 +2481,30 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 
                 float jamTarget = (Jam_GetState() != JAM_STATE_NONE) ? 1.0f : 0.0f;
 
-                BOOL mScroll  = StepSpring(&g_scrollPosPx,   &g_scrollVelPx,   g_scrollTargetPx,           24.0f, 1.0f,  dt, 0.35f);
-                BOOL mSidebar = StepSpring(&g_sidebarAnim,   &g_sidebarVel,    g_sidebarOpen ? 1.0f : 0.0f, 26.0f, 0.94f, dt, 0.003f);
-                BOOL mJamBar  = StepSpring(&g_jamBannerAnim, &g_jamBannerVel,  jamTarget,                  24.0f, 0.94f, dt, 0.004f);
+                BOOL mScroll  = StepSpring(&g_scrollPosPx,   &g_scrollVelPx,   g_scrollTargetPx,           22.0f, 1.0f, dt, 0.25f);
+                BOOL mSidebar = StepSpring(&g_sidebarAnim,   &g_sidebarVel,    g_sidebarOpen ? 1.0f : 0.0f, 22.0f, 1.0f, dt, 0.002f);
+                BOOL mJamBar  = StepSpring(&g_jamBannerAnim, &g_jamBannerVel,  jamTarget,                  22.0f, 1.0f, dt, 0.002f);
+
+                // Apple Tasarımı: Çekmece sınır aşımını (overshoot & titreme) kesin olarak engelle
+                if (g_sidebarOpen && g_sidebarAnim >= 1.0f) {
+                    g_sidebarAnim = 1.0f;
+                    g_sidebarVel = 0.0f;
+                    mSidebar = FALSE;
+                } else if (!g_sidebarOpen && g_sidebarAnim <= 0.0f) {
+                    g_sidebarAnim = 0.0f;
+                    g_sidebarVel = 0.0f;
+                    mSidebar = FALSE;
+                }
+
+                if (jamTarget >= 0.99f && g_jamBannerAnim >= 1.0f) {
+                    g_jamBannerAnim = 1.0f;
+                    g_jamBannerVel = 0.0f;
+                    mJamBar = FALSE;
+                } else if (jamTarget <= 0.01f && g_jamBannerAnim <= 0.0f) {
+                    g_jamBannerAnim = 0.0f;
+                    g_jamBannerVel = 0.0f;
+                    mJamBar = FALSE;
+                }
 
                 UpdateSidebarEditPosition();
                 InvalidateRect(hWnd, NULL, FALSE);
@@ -2899,6 +2936,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             if (hit == ZONE_HAMBURGER) {
                 if (!g_sidebarOpen) g_sidebarView = SIDEBAR_VIEW_MENU;
                 ToggleSidebar(!g_sidebarOpen);
+                g_pressedZone = ZONE_NONE;
+                ReleaseCapture();
                 InvalidateRect(hWnd, NULL, FALSE);
                 return 0;
             }
