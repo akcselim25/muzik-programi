@@ -200,7 +200,7 @@ static DWORD WINAPI NetworkThreadProc(LPVOID lpParam) {
             fd_set readSet;
             FD_ZERO(&readSet);
             FD_SET(s, &readSet);
-            struct timeval tv = { 0, 500000 }; // 500ms
+            struct timeval tv = { 5, 0 }; // 5sn çekirdek beklemesi (gelen pakette <1ms uyanır, boşta %0.000 CPU)
 
             int sel = select(0, &readSet, NULL, NULL, &tv);
             if (sel == SOCKET_ERROR) break;
@@ -354,7 +354,7 @@ static void SanitizeTopic(const char *in, char *out, int maxLen) {
 }
 
 BOOL Network_Subscribe(const char *topic) {
-    if (!topic || !topic[0]) return FALSE;
+    if (!g_running || !topic || !topic[0]) return FALSE;
 
     char safeTopic[128] = {0};
     SanitizeTopic(topic, safeTopic, sizeof(safeTopic));
@@ -382,7 +382,7 @@ BOOL Network_Subscribe(const char *topic) {
 }
 
 BOOL Network_Unsubscribe(const char *topic) {
-    if (!topic || !topic[0]) return FALSE;
+    if (!g_running || !topic || !topic[0]) return FALSE;
 
     char safeTopic[128] = {0};
     SanitizeTopic(topic, safeTopic, sizeof(safeTopic));
@@ -402,7 +402,7 @@ BOOL Network_Unsubscribe(const char *topic) {
 }
 
 BOOL Network_Publish(const char *topic, const char *payload) {
-    if (!topic || !payload) return FALSE;
+    if (!g_running || !topic || !payload) return FALSE;
 
     char safeTopic[128] = {0};
     SanitizeTopic(topic, safeTopic, sizeof(safeTopic));
@@ -422,9 +422,11 @@ BOOL Network_IsConnected(void) {
 }
 
 void Network_Close(void) {
+    if (!g_running && !g_hThread) return;
     g_running = FALSE;
     EnterCriticalSection(&g_cs);
     if (g_socket != INVALID_SOCKET) {
+        shutdown(g_socket, SD_BOTH);
         closesocket(g_socket);
         g_socket = INVALID_SOCKET;
     }
