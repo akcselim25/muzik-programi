@@ -3650,6 +3650,16 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     (void)hInstance; (void)hPrevInstance; (void)pCmdLine;
 
+    // Windows Görev Çubuğu ve Pinned Shortcut Modern Uygulama Tanımlayıcısı (AppUserModelID)
+    typedef HRESULT(WINAPI *SetAppIDProc)(PCWSTR);
+    HMODULE hShell = LoadLibraryW(L"shell32.dll");
+    if (hShell) {
+        SetAppIDProc pSetAppID = (SetAppIDProc)GetProcAddress(hShell, "SetCurrentProcessExplicitAppUserModelID");
+        if (pSetAppID) {
+            pSetAppID(L"Aura.MusicPlayer.Modern.App");
+        }
+    }
+
     typedef BOOL(WINAPI *SetDpiCtxProc)(DPI_AWARENESS_CONTEXT);
     HMODULE hUser = GetModuleHandleW(L"user32.dll");
     if (hUser) {
