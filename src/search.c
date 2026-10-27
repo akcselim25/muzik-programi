@@ -9,16 +9,16 @@
 #include "search.h"
 #include "playlist.h"
 
-// Spotify Green & Apple Minimalist Dark Mode Renk Paleti
-#define SPOTIFY_GREEN       RGB(29, 185, 84)    // #1DB954
-#define SPOTIFY_GREEN_HOV   RGB(30, 215, 96)    // #1ED760
-#define SPOTIFY_GREEN_DARK  RGB(22, 156, 70)    // #169C46
+// Premium Obsidian & Sunset-Neon Renk Paleti
+#define COLOR_ACCENT_ORANGE RGB(255, 146, 92)   // #FF925C Turuncu Vurgu
+#define COLOR_ACCENT_PINK   RGB(240, 68, 184)   // #F044B8 Pembe Vurgu
+#define COLOR_ACCENT_PURPLE RGB(139, 53, 255)   // #8B35FF Mor Vurgu
 
-#define COLOR_SEARCH_BG     RGB(10, 12, 16)     // Saf Derin Obsidyen Tuval
-#define COLOR_SEARCH_CARD   RGB(18, 21, 28)     // Modern Yükseltilmiş Kart
-#define COLOR_SEARCH_BOX    RGB(24, 28, 37)     // Arama Kutusu Yüzeyi
-#define COLOR_SEARCH_LIST   RGB(15, 18, 24)     // Liste Arka Planı
-#define COLOR_SEARCH_BORDER RGB(38, 44, 58)     // İnce Ayırıcı Çizgi
+#define COLOR_SEARCH_BG     RGB(5, 5, 5)        // #050505 Ana Arka Plan
+#define COLOR_SEARCH_CARD   RGB(16, 16, 16)     // #101010 Kart ve Panel Arka Planı
+#define COLOR_SEARCH_BOX    RGB(24, 24, 24)     // #181818 İkincil Yüzey
+#define COLOR_SEARCH_LIST   RGB(16, 16, 16)     // #101010 Kart ve Panel Arka Planı
+#define COLOR_SEARCH_BORDER RGB(38, 38, 38)     // #262626 Kenarlıklar
 
 #define MAX_SEARCH_RESULTS  30
 
@@ -531,7 +531,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
         case WM_CTLCOLORDLG: {
             HDC hdc = (HDC)wParam;
             SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(160, 160, 168));
+            SetTextColor(hdc, RGB(161, 161, 170));
             return (LRESULT)hBrBg;
         }
 
@@ -564,8 +564,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     PatBlt(dis->hDC, dis->rcItem.left, dis->rcItem.top, dis->rcItem.right - dis->rcItem.left, dis->rcItem.bottom - dis->rcItem.top, PATCOPY);
                     SelectObject(dis->hDC, oldBr);
 
-                    COLORREF bg = isDisabled ? RGB(38, 38, 44) : (isPressed ? SPOTIFY_GREEN_DARK : SPOTIFY_GREEN);
-                    COLORREF txtCol = isDisabled ? RGB(115, 115, 125) : RGB(10, 10, 12);
+                    COLORREF bg = isDisabled ? RGB(32, 32, 36) : (isPressed ? COLOR_ACCENT_PURPLE : COLOR_ACCENT_ORANGE);
+                    COLORREF txtCol = isDisabled ? RGB(100, 100, 108) : RGB(5, 5, 5);
                     RECT rcBtn = dis->rcItem;
                     if (isPressed) InflateRect(&rcBtn, -1, -1);
                     DrawFastCard(dis->hDC, &rcBtn, bg, bg, 10);
@@ -576,8 +576,8 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     return TRUE;
                 }
                 else if (dis->CtlID == IDC_SEARCH_BTN) {
-                    COLORREF bg = isDisabled ? RGB(28, 28, 32) : (isPressed ? SPOTIFY_GREEN_DARK : SPOTIFY_GREEN);
-                    COLORREF txtCol = isDisabled ? RGB(100, 100, 108) : RGB(10, 10, 12);
+                    COLORREF bg = isDisabled ? RGB(26, 26, 30) : (isPressed ? COLOR_ACCENT_PURPLE : COLOR_ACCENT_ORANGE);
+                    COLORREF txtCol = isDisabled ? RGB(100, 100, 108) : RGB(5, 5, 5);
                     RECT rcBtn = dis->rcItem;
                     if (isPressed) InflateRect(&rcBtn, -1, -1);
                     DrawFastCard(dis->hDC, &rcBtn, bg, bg, 10);
@@ -588,11 +588,11 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     return TRUE;
                 }
                 else if (dis->CtlID == IDC_SEARCH_FOLDER_BTN) {
-                    COLORREF bg = isPressed ? RGB(44, 44, 52) : RGB(30, 30, 36);
+                    COLORREF bg = isPressed ? RGB(38, 38, 38) : RGB(24, 24, 24);
                     DrawFastCard(dis->hDC, &dis->rcItem, bg, COLOR_SEARCH_BORDER, 8);
                     SetBkMode(dis->hDC, TRANSPARENT);
                     SelectObject(dis->hDC, hFontSmall);
-                    SetTextColor(dis->hDC, RGB(220, 220, 228));
+                    SetTextColor(dis->hDC, RGB(240, 240, 245));
                     DrawTextW(dis->hDC, L"Klasör Seç", -1, &dis->rcItem, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                     return TRUE;
                 }
@@ -603,11 +603,11 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
                 FillRect(dis->hDC, &dis->rcItem, hBrList);
 
-                COLORREF bg = isSel ? RGB(22, 42, 29) : COLOR_SEARCH_LIST;
+                COLORREF bg = isSel ? RGB(28, 18, 30) : COLOR_SEARCH_LIST;
                 RECT rcRow = dis->rcItem;
                 InflateRect(&rcRow, -4, -2);
                 if (isSel) {
-                    DrawFastCard(dis->hDC, &rcRow, bg, RGB(28, 82, 46), 8);
+                    DrawFastCard(dis->hDC, &rcRow, bg, COLOR_ACCENT_PINK, 8);
                 }
 
                 if (g_results && idx < g_resultCount) {
@@ -617,7 +617,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
                     if (isSel) {
                         RECT rcPill = { rcRow.left + 3, rcRow.top + MulDiv(10, dpi, 96), rcRow.left + 6, rcRow.bottom - MulDiv(10, dpi, 96) };
-                        DrawFastCard(dis->hDC, &rcPill, SPOTIFY_GREEN, SPOTIFY_GREEN, 2);
+                        DrawFastCard(dis->hDC, &rcPill, COLOR_ACCENT_ORANGE, COLOR_ACCENT_ORANGE, 2);
                     }
 
                     int thumbW = MulDiv(78, dpi, 96);
@@ -626,7 +626,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     int thumbY = rcRow.top + (rowH - thumbH) / 2;
                     RECT rcThumb = { thumbX, thumbY, thumbX + thumbW, thumbY + thumbH };
 
-                    DrawFastCard(dis->hDC, &rcThumb, RGB(14, 14, 16), RGB(34, 34, 40), 6);
+                    DrawFastCard(dis->hDC, &rcThumb, RGB(24, 24, 24), COLOR_SEARCH_BORDER, 6);
 
                     if (si->pThumb) {
                         OLE_XSIZE_HIMETRIC cx;
@@ -640,7 +640,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     } else {
                         SetBkMode(dis->hDC, TRANSPARENT);
                         SelectObject(dis->hDC, hFontIcon);
-                        SetTextColor(dis->hDC, RGB(95, 95, 105));
+                        SetTextColor(dis->hDC, RGB(113, 113, 122));
                         DrawTextW(dis->hDC, L"\uE768", -1, &rcThumb, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                     }
 
@@ -651,7 +651,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                         int badgeW = MulDiv(38, dpi, 96);
                         int badgeH = MulDiv(15, dpi, 96);
                         RECT rcDurBadge = { rcThumb.right - badgeW - 3, rcThumb.bottom - badgeH - 3, rcThumb.right - 3, rcThumb.bottom - 3 };
-                        DrawFastCard(dis->hDC, &rcDurBadge, RGB(10, 10, 12), RGB(10, 10, 12), 4);
+                        DrawFastCard(dis->hDC, &rcDurBadge, RGB(16, 16, 16), COLOR_SEARCH_BORDER, 4);
                         SetBkMode(dis->hDC, TRANSPARENT);
                         SelectObject(dis->hDC, hFontSmall);
                         SetTextColor(dis->hDC, RGB(245, 245, 248));
@@ -670,7 +670,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     DrawTextW(dis->hDC, si->cleanTitle, -1, &rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                     SelectObject(dis->hDC, hFontSmall);
-                    SetTextColor(dis->hDC, isSel ? SPOTIFY_GREEN_HOV : RGB(145, 145, 154));
+                    SetTextColor(dis->hDC, isSel ? COLOR_ACCENT_PINK : RGB(161, 161, 170));
                     DrawTextW(dis->hDC, si->uploader, -1, &rcSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                 }
                 return TRUE;
@@ -739,7 +739,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             int thumbW  = cardW - (cardPad * 2);
             int thumbH  = (thumbW * 9) / 16;
             RECT rcThumb = { cardLeft + cardPad, cardTop + cardPad, cardLeft + cardPad + thumbW, cardTop + cardPad + thumbH };
-            DrawFastCard(hdc, &rcThumb, RGB(14, 14, 16), COLOR_SEARCH_BORDER, 8);
+            DrawFastCard(hdc, &rcThumb, RGB(24, 24, 24), COLOR_SEARCH_BORDER, 8);
 
             int sel = (int)SendMessageW(g_hListResults, LB_GETCURSEL, 0, 0);
             IPicture *curPic = (g_results && sel >= 0 && sel < g_resultCount) ? g_results[sel].pThumb : NULL;
@@ -755,7 +755,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             } else {
                 SetBkMode(hdc, TRANSPARENT);
                 SelectObject(hdc, hFontSmall);
-                SetTextColor(hdc, RGB(120, 120, 128));
+                SetTextColor(hdc, RGB(113, 113, 122));
                 const wchar_t *holderTxt = (sel >= 0) ? L"Kapak yükleniyor..." : L"Önizleme için şarkı arayın";
                 DrawTextW(hdc, holderTxt, -1, &rcThumb, DT_CENTER | DT_VCENTER | DT_WORDBREAK);
             }
@@ -774,14 +774,14 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 int artistH = MulDiv(22, dpi, 96);
                 RECT rcArtist = { rcThumb.left, artistY, rcThumb.right, artistY + artistH };
                 SelectObject(hdc, hFont);
-                SetTextColor(hdc, RGB(165, 165, 172));
+                SetTextColor(hdc, RGB(161, 161, 170));
                 DrawTextW(hdc, g_results[sel].uploader, -1, &rcArtist, DT_LEFT | DT_TOP | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                 int durY = artistY + artistH + MulDiv(4, dpi, 96);
                 int durH = MulDiv(20, dpi, 96);
                 RECT rcMeta = { rcThumb.left, durY, rcThumb.right, durY + durH };
                 SelectObject(hdc, hFontSmall);
-                SetTextColor(hdc, SPOTIFY_GREEN);
+                SetTextColor(hdc, COLOR_ACCENT_ORANGE);
                 wchar_t metaTxt[128];
                 int m = g_results[sel].duration / 60;
                 int s = g_results[sel].duration % 60;

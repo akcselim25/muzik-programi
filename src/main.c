@@ -27,34 +27,37 @@
 #endif
 
 // =============================================================================
-// MODERN OBSIDIAN GLASS & SPOTIFY EMERALD RENK SİSTEMİ
+// MODERN PREMİUM SİYAH VE GÜNBATIMI-NEON RENK SİSTEMİ
 // =============================================================================
-#define COLOR_BG_TOP        RGB(12, 14, 20)     // Üst Tuval Derin Obsidyen
-#define COLOR_BG_BOT        RGB(8, 9, 13)       // Alt Tuval Saf Koyu
-#define COLOR_BG_JAM_TOP    RGB(12, 28, 20)     // Canlı Jam Aktifken Üst Zümrüt Aura
-#define COLOR_HEADER_SURF   RGB(15, 18, 25)     // Üst Bar Yüzeyi
-#define COLOR_DOCK_SURF     RGB(19, 22, 30)     // Yüzen Alt Oynatıcı Kartı
-#define COLOR_SIDEBAR_SURF  RGB(15, 18, 25)     // Sol Çekmece Katmanı
-#define COLOR_CARD_SURF     RGB(23, 27, 37)     // Yükseltilmiş Kart Yüzeyi
-#define COLOR_CARD_HOVER    RGB(30, 35, 47)     // Kart Hover Yüzeyi
-#define COLOR_ROW_HOVER     RGB(22, 26, 36)     // Şarkı Satırı Hover
-#define COLOR_ROW_ACTIVE    RGB(17, 39, 27)     // Çalan Şarkı Satırı (Zümrüt Işıltılı)
-#define COLOR_ROW_SEL       RGB(20, 24, 34)     // Seçili Şarkı Satırı
-#define COLOR_CTRL_HOVER    RGB(34, 39, 52)     // İkon Düğme Hover
-#define COLOR_CTRL_PRESS    RGB(44, 50, 66)     // İkon Düğme Basılı
-#define COLOR_ACCENT        RGB(29, 185, 84)    // Spotify Yeşili (#1DB954)
-#define COLOR_ACCENT_HOV    RGB(30, 215, 96)    // Parlak Yeşil (#1ED760)
-#define COLOR_ACCENT_DARK   RGB(20, 142, 64)    // Koyu Basılı Yeşil
-#define COLOR_AMBER         RGB(245, 176, 65)   // Bekleyen Davet / İndirme Vurgusu
-#define COLOR_DANGER        RGB(235, 87, 87)    // Uyarı / Ayrıl Vurgusu
-#define COLOR_TEXT_WHITE    RGB(244, 246, 250)  // Birincil Parlak Metin
-#define COLOR_TEXT_MUTED    RGB(142, 150, 168)  // İkincil Sanatçı Metni
-#define COLOR_TEXT_DIM      RGB(92, 100, 118)   // Üçüncül Numara / Süre Metni
-#define COLOR_BAR_BG        RGB(44, 50, 64)     // İlerleme / Ses Çubuğu Arka Planı
-#define COLOR_BAR_HOVER     RGB(60, 68, 86)     // Çubuk Hover Arka Planı
-#define COLOR_BORDER        RGB(34, 40, 54)     // İnce Cam Kenarlık
-#define COLOR_BORDER_LIGHT  RGB(48, 56, 74)     // Vurgulu Kart Kenarlığı
-#define COLOR_INPUT_BG      RGB(21, 25, 34)     // Arama & Giriş Kutusu İç Yüzeyi
+#define COLOR_BG_TOP        RGB(5, 5, 5)        // #050505 Ana Arka Plan
+#define COLOR_BG_BOT        RGB(5, 5, 5)        // #050505 Ana Arka Plan (Minimal Düz Siyah)
+#define COLOR_BG_JAM_TOP    RGB(20, 10, 24)     // Canlı Jam Aktifken Üst Mor/Pembe Aura
+#define COLOR_HEADER_SURF   RGB(16, 16, 16)     // #101010 Kart ve Panel Arka Planı
+#define COLOR_DOCK_SURF     RGB(16, 16, 16)     // #101010 Yüzen Alt Oynatıcı Kartı
+#define COLOR_SIDEBAR_SURF  RGB(16, 16, 16)     // #101010 Sol Çekmece Katmanı
+#define COLOR_CARD_SURF     RGB(16, 16, 16)     // #101010 Kart ve Panel Arka Planı
+#define COLOR_CARD_HOVER    RGB(24, 24, 24)     // #181818 İkincil Yüzey (Hover)
+#define COLOR_ROW_HOVER     RGB(20, 20, 20)     // Şarkı Satırı Hover
+#define COLOR_ROW_ACTIVE    RGB(26, 18, 28)     // Çalan Şarkı Satırı (Zarif Mor/Pembe)
+#define COLOR_ROW_SEL       RGB(24, 24, 24)     // #181818 Seçili Şarkı Satırı
+#define COLOR_CTRL_HOVER    RGB(24, 24, 24)     // #181818 İkincil Yüzey (Düğme Hover)
+#define COLOR_CTRL_PRESS    RGB(38, 38, 38)     // #262626 Kenarlık/Basılı Tonu
+#define COLOR_ACCENT_ORANGE RGB(255, 146, 92)   // #FF925C Turuncu Vurgu
+#define COLOR_ACCENT_PINK   RGB(240, 68, 184)   // #F044B8 Pembe Vurgu
+#define COLOR_ACCENT_PURPLE RGB(139, 53, 255)   // #8B35FF Mor Vurgu
+#define COLOR_ACCENT        RGB(255, 146, 92)   // Turuncu Vurgu (#FF925C)
+#define COLOR_ACCENT_HOV    RGB(240, 68, 184)   // Pembe Vurgu (#F044B8)
+#define COLOR_ACCENT_DARK   RGB(139, 53, 255)   // Mor Vurgu (#8B35FF)
+#define COLOR_AMBER         RGB(255, 146, 92)   // #FF925C Bekleyen Davet / İndirme
+#define COLOR_DANGER        RGB(240, 68, 184)   // #F044B8 Uyarı / Ayrıl Vurgusu
+#define COLOR_TEXT_WHITE    RGB(255, 255, 255)  // #FFFFFF Ana Metin
+#define COLOR_TEXT_MUTED    RGB(161, 161, 170)  // #A1A1AA İkincil Metin
+#define COLOR_TEXT_DIM      RGB(113, 113, 122)  // #71717A Üçüncül Numara / Süre Metni
+#define COLOR_BAR_BG        RGB(24, 24, 24)     // #181818 İlerleme / Ses Çubuğu Arka Planı
+#define COLOR_BAR_HOVER     RGB(38, 38, 38)     // #262626 Çubuk Hover Arka Planı
+#define COLOR_BORDER        RGB(38, 38, 38)     // #262626 Kenarlıklar
+#define COLOR_BORDER_LIGHT  RGB(38, 38, 38)     // #262626 Kenarlıklar
+#define COLOR_INPUT_BG      RGB(24, 24, 24)     // #181818 İkincil Yüzey (Arama & Giriş Kutusu)
 
 #define IDT_UPDATE_TIMER        1001
 #define IDT_ANIM_TIMER          1002
@@ -495,6 +498,79 @@ static void DrawSmoothRoundRect(const RECT *rc, int radiusPx, COLORREF fillCol, 
             } else if (fA256 > 0) {
                 BlendPixelBGRA(&row[px], fr, fg, fb, (uint32_t)(outerCov * (float)fA256));
             }
+        }
+    }
+}
+
+// Yatay 3 Renkli Gradyan Yuvarlatılmış Dikdörtgen (Turuncu #FF925C -> Pembe #F044B8 -> Mor #8B35FF)
+static void DrawGradientRoundRectH(const RECT *rc, int radiusPx, COLORREF c0, COLORREF c1, COLORREF c2) {
+    if (!g_backPixels || !rc) return;
+    int w = rc->right - rc->left;
+    int h = rc->bottom - rc->top;
+    if (w <= 0 || h <= 0) return;
+    GdiFlush();
+
+    int x0 = (rc->left < g_pxClip.left) ? g_pxClip.left : rc->left;
+    int y0 = (rc->top  < g_pxClip.top)  ? g_pxClip.top  : rc->top;
+    int x1 = (rc->right  > g_pxClip.right)  ? g_pxClip.right  : rc->right;
+    int y1 = (rc->bottom > g_pxClip.bottom) ? g_pxClip.bottom : rc->bottom;
+    if (x0 >= x1 || y0 >= y1) return;
+
+    float hw = (float)w * 0.5f;
+    float hh = (float)h * 0.5f;
+    float cx = (float)rc->left + hw;
+    float cy = (float)rc->top  + hh;
+    float rad = (float)radiusPx;
+    if (rad > hw) rad = hw;
+    if (rad > hh) rad = hh;
+    if (rad < 0.0f) rad = 0.0f;
+
+    float bx = hw - rad;
+    float by = hh - rad;
+    float totalW = (w > 1) ? (float)(w - 1) : 1.0f;
+
+    float r0 = (float)GetRValue(c0), g0 = (float)GetGValue(c0), b0 = (float)GetBValue(c0);
+    float r1 = (float)GetRValue(c1), g1 = (float)GetGValue(c1), b1 = (float)GetBValue(c1);
+    float r2 = (float)GetRValue(c2), g2 = (float)GetGValue(c2), b2 = (float)GetBValue(c2);
+
+    for (int py = y0; py < y1; py++) {
+        float dy = fabsf(((float)py + 0.5f) - cy) - by;
+        uint32_t *row = g_backPixels + py * g_backW;
+
+        for (int px = x0; px < x1; px++) {
+            float dx = fabsf(((float)px + 0.5f) - cx) - bx;
+            float dist;
+            if (dx <= 0.0f && dy <= 0.0f) {
+                dist = (dx > dy) ? dx : dy;
+                dist -= rad;
+            } else {
+                float ox = (dx > 0.0f) ? dx : 0.0f;
+                float oy = (dy > 0.0f) ? dy : 0.0f;
+                dist = sqrtf(ox * ox + oy * oy) - rad;
+            }
+
+            float cov = 0.5f - dist;
+            if (cov <= 0.0f) continue;
+            if (cov > 1.0f) cov = 1.0f;
+
+            float t = (float)(px - rc->left) / totalW;
+            if (t < 0.0f) t = 0.0f;
+            if (t > 1.0f) t = 1.0f;
+
+            float fr, fg, fb;
+            if (t <= 0.5f) {
+                float u = t * 2.0f;
+                fr = r0 + (r1 - r0) * u;
+                fg = g0 + (g1 - g0) * u;
+                fb = b0 + (b1 - b0) * u;
+            } else {
+                float u = (t - 0.5f) * 2.0f;
+                fr = r1 + (r2 - r1) * u;
+                fg = g1 + (g2 - g1) * u;
+                fb = b1 + (b2 - b1) * u;
+            }
+
+            BlendPixelBGRA(&row[px], (uint32_t)fr, (uint32_t)fg, (uint32_t)fb, (uint32_t)(cov * 256.0f));
         }
     }
 }
@@ -1135,12 +1211,12 @@ static void SubmitFriendRequest(HWND hWnd) {
 // =============================================================================
 static COLORREF GetAvatarJewelColor(const wchar_t *text) {
     static const COLORREF palette[] = {
-        RGB(28, 52, 88),   // Derin Safir
-        RGB(58, 34, 84),   // Asil Mor
-        RGB(22, 66, 68),   // Okyanus Petrolü
-        RGB(76, 36, 54),   // Koyu Yakut
-        RGB(34, 62, 46),   // Zümrüt Gölgesi
-        RGB(68, 48, 28)    // Koyu Kehribar
+        RGB(38, 20, 52),   // Zarif Derin Mor
+        RGB(48, 18, 40),   // Koyu Pembe / Magenta
+        RGB(44, 26, 20),   // Sıcak Koyu Amber
+        RGB(26, 22, 40),   // Gece Menekşesi
+        RGB(22, 26, 36),   // Koyu Gece Mavisi
+        RGB(40, 22, 32)    // Koyu Bordo / Şarap
     };
     unsigned int hash = 2166136261u;
     if (text) {
@@ -1179,13 +1255,13 @@ static void DrawIconCircleBtn(HDC hdc, const RECT *rc, UiZone zone, const wchar_
 
     SetBkMode(hdc, TRANSPARENT);
     SelectObject(hdc, g_hFontIcons);
-    SetTextColor(hdc, activeColor != 0 ? activeColor : (isHot ? COLOR_TEXT_WHITE : RGB(188, 196, 212)));
+    SetTextColor(hdc, activeColor != 0 ? activeColor : (isHot ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED));
     RECT rcG = *rc;
     if (isPress) OffsetRect(&rcG, 0, 1);
     DrawTextW(hdc, glyph, -1, &rcG, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     if (showDot) {
-        DrawSmoothCircle(cx, (float)rc->bottom - (float)S(2), (float)S(2), COLOR_ACCENT_HOV, 255);
+        DrawSmoothCircle(cx, (float)rc->bottom - (float)S(2), (float)S(2), COLOR_ACCENT_ORANGE, 255);
     }
 }
 
@@ -1200,15 +1276,15 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     SetBkMode(hdc, TRANSPARENT);
     ResetPixelClip();
 
-    // 0. Derin Obsidyen / Zümrüt Aura Arka Plan Gradyanı
+    // 0. Ana Arka Plan (#050505 Minimal Düz Siyah)
     FillVerticalGradientPx(0, 0, w, h, (jamState == JAM_STATE_ACTIVE) ? COLOR_BG_JAM_TOP : COLOR_BG_TOP, COLOR_BG_BOT);
 
     // =========================================================================
     // 1. ÜST BÖLGE: MODERN CAM ÜST ÇUBUK (HEADER)
     // =========================================================================
     RECT rcHeader = { 0, 0, w, headerH };
-    DrawSmoothRoundRect(&rcHeader, 0, COLOR_HEADER_SURF, 220, 0, 0);
-    DrawHairlineH(0, w, headerH - 1, COLOR_BORDER, 190);
+    DrawSmoothRoundRect(&rcHeader, 0, COLOR_HEADER_SURF, 255, 0, 0);
+    DrawHairlineH(0, w, headerH - 1, COLOR_BORDER, 255);
 
     // Sol Menü Düğmesi
     rcHamburger = (RECT){ S(12), (headerH - S(36)) / 2, S(48), (headerH + S(36)) / 2 };
@@ -1216,15 +1292,15 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         BOOL hHot = (g_hotZone == ZONE_HAMBURGER);
         BOOL hPrs = (g_pressedZone == ZONE_HAMBURGER);
         if (hHot || hPrs || g_sidebarOpen) {
-            DrawSmoothRoundRect(&rcHamburger, S(10), hPrs ? COLOR_CTRL_PRESS : COLOR_CTRL_HOVER, 255, COLOR_BORDER_LIGHT, 120);
+            DrawSmoothRoundRect(&rcHamburger, S(10), hPrs ? COLOR_CTRL_PRESS : COLOR_CTRL_HOVER, 255, COLOR_BORDER, 140);
         }
         SetBkMode(hdc, TRANSPARENT);
         SelectObject(hdc, g_hFontIcons);
-        SetTextColor(hdc, g_sidebarOpen ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+        SetTextColor(hdc, g_sidebarOpen ? COLOR_ACCENT_ORANGE : COLOR_TEXT_WHITE);
         DrawTextW(hdc, L"\uE700", -1, &rcHamburger, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
         if (Friends_GetPendingCount() > 0 && !g_sidebarOpen) {
-            DrawSmoothCircle((float)(rcHamburger.right - S(6)), (float)(rcHamburger.top + S(6)), (float)S(4), COLOR_ACCENT_HOV, 255);
+            DrawSmoothCircle((float)(rcHamburger.right - S(6)), (float)(rcHamburger.top + S(6)), (float)S(4), COLOR_ACCENT_ORANGE, 255);
         }
     }
 
@@ -1244,12 +1320,12 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
 
     BOOL searchFocused = (GetFocus() == g_hSearchEdit);
     DrawSmoothRoundRect(&rcSearchBox, searchH / 2, COLOR_INPUT_BG, 255,
-                        searchFocused ? COLOR_ACCENT : COLOR_BORDER_LIGHT,
-                        searchFocused ? 230 : 140);
+                        searchFocused ? COLOR_ACCENT_ORANGE : COLOR_BORDER,
+                        searchFocused ? 240 : 180);
 
     RECT rcSearchIcon = { searchX + S(10), searchY, searchX + S(28), searchY + searchH };
     SelectObject(hdc, g_hFontIconsSmall);
-    SetTextColor(hdc, searchFocused ? COLOR_ACCENT_HOV : COLOR_TEXT_DIM);
+    SetTextColor(hdc, searchFocused ? COLOR_ACCENT_ORANGE : COLOR_TEXT_DIM);
     DrawTextW(hdc, L"\uE721", -1, &rcSearchIcon, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     if (g_searchQuery[0]) {
@@ -1271,9 +1347,9 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         BOOL qPrs = (g_pressedZone == ZONE_QUICK_DOWNLOAD);
         DrawSmoothRoundRect(&rcQuickDownload, searchH / 2,
                             qPrs ? COLOR_CTRL_PRESS : (qHot ? COLOR_CARD_HOVER : COLOR_CARD_SURF), 255,
-                            qHot ? COLOR_ACCENT : COLOR_BORDER_LIGHT, qHot ? 180 : 120);
+                            qHot ? COLOR_ACCENT_ORANGE : COLOR_BORDER, qHot ? 200 : 150);
         SelectObject(hdc, g_hFontSmallBold);
-        SetTextColor(hdc, qHot ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+        SetTextColor(hdc, qHot ? COLOR_ACCENT_ORANGE : COLOR_TEXT_WHITE);
         DrawTextW(hdc, L"+ İndir", -1, &rcQuickDownload, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     } else {
         rcQuickDownload = (RECT){0};
@@ -1289,22 +1365,22 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         BOOL fPrs = (g_pressedZone == ZONE_HEADER_FRIENDS);
         BOOL fActive = ((g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_FRIENDS) || jamState == JAM_STATE_ACTIVE);
 
-        COLORREF fFill = fActive ? RGB(18, 48, 31) : (fPrs ? COLOR_CTRL_PRESS : (fHot ? COLOR_CARD_HOVER : COLOR_CARD_SURF));
-        COLORREF fBord = fActive ? COLOR_ACCENT : (fHot ? COLOR_BORDER_LIGHT : COLOR_BORDER);
-        DrawSmoothRoundRect(&rcHeaderFriends, searchH / 2, fFill, 255, fBord, fActive ? 210 : 140);
+        COLORREF fFill = fActive ? RGB(28, 16, 32) : (fPrs ? COLOR_CTRL_PRESS : (fHot ? COLOR_CARD_HOVER : COLOR_CARD_SURF));
+        COLORREF fBord = fActive ? COLOR_ACCENT_PINK : (fHot ? COLOR_BORDER : COLOR_BORDER);
+        DrawSmoothRoundRect(&rcHeaderFriends, searchH / 2, fFill, 255, fBord, fActive ? 220 : 160);
 
         RECT rcFIcon = { frLeft + S(14), searchY, frLeft + S(32), searchY + searchH };
         SelectObject(hdc, g_hFontIconsSmall);
-        SetTextColor(hdc, fActive ? COLOR_ACCENT_HOV : COLOR_TEXT_MUTED);
+        SetTextColor(hdc, fActive ? COLOR_ACCENT_PINK : COLOR_TEXT_MUTED);
         DrawTextW(hdc, L"\uE716", -1, &rcFIcon, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
         RECT rcFTxt = { frLeft + S(34), searchY, frRight - S(10), searchY + searchH };
         SelectObject(hdc, g_hFontSmallBold);
-        SetTextColor(hdc, fActive ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+        SetTextColor(hdc, fActive ? COLOR_ACCENT_PINK : COLOR_TEXT_WHITE);
         DrawTextW(hdc, (jamState == JAM_STATE_ACTIVE) ? L"Jam Aktif" : L"Arkadaşlar", -1, &rcFTxt, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
         if (Friends_GetPendingCount() > 0) {
-            DrawSmoothCircle((float)(rcHeaderFriends.right - S(8)), (float)(rcHeaderFriends.top + S(7)), (float)S(4), COLOR_ACCENT_HOV, 255);
+            DrawSmoothCircle((float)(rcHeaderFriends.right - S(8)), (float)(rcHeaderFriends.top + S(7)), (float)S(4), COLOR_ACCENT_ORANGE, 255);
         }
     } else {
         rcHeaderFriends = (RECT){0};
@@ -1327,24 +1403,24 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         rcJamStage = (RECT){ S(12), headerH + S(6), w - S(12), headerH + S(50) };
         BOOL isInviting = (jamState == JAM_STATE_INVITING);
 
-        COLORREF stageBg   = isInviting ? RGB(36, 29, 16) : RGB(15, 42, 27);
-        COLORREF stageBord = isInviting ? COLOR_AMBER     : COLOR_ACCENT_HOV;
-        DrawSmoothRoundRect(&rcJamStage, S(12), stageBg, 245, stageBord, 200);
+        COLORREF stageBg   = isInviting ? RGB(32, 20, 16) : RGB(26, 14, 30);
+        COLORREF stageBord = isInviting ? COLOR_ACCENT_ORANGE : COLOR_ACCENT_PINK;
+        DrawSmoothRoundRect(&rcJamStage, S(12), stageBg, 255, stageBord, 200);
 
         // Sol Canlı Işıltı Noktası
         float dotX = (float)(rcJamStage.left + S(20));
         float dotY = (float)(rcJamStage.top + rcJamStage.bottom) * 0.5f;
-        COLORREF dotCol = isInviting ? COLOR_AMBER : COLOR_ACCENT_HOV;
+        COLORREF dotCol = isInviting ? COLOR_ACCENT_ORANGE : COLOR_ACCENT_PINK;
         DrawSmoothCircle(dotX, dotY, (float)S(8), dotCol, 55);
         DrawSmoothCircle(dotX, dotY, (float)S(4), dotCol, 255);
 
         // Sağ "Ayrıl / İptal" Düğmesi
         rcJamLeave = (RECT){ rcJamStage.right - S(74), rcJamStage.top + S(8), rcJamStage.right - S(10), rcJamStage.bottom - S(8) };
         BOOL lvHot = (g_hotZone == ZONE_JAM_LEAVE);
-        DrawSmoothRoundRect(&rcJamLeave, S(8), lvHot ? RGB(68, 28, 32) : RGB(28, 34, 42), 235,
-                            lvHot ? COLOR_DANGER : COLOR_BORDER_LIGHT, 160);
+        DrawSmoothRoundRect(&rcJamLeave, S(8), lvHot ? RGB(56, 18, 28) : RGB(24, 24, 24), 255,
+                            lvHot ? COLOR_DANGER : COLOR_BORDER, 160);
         SelectObject(hdc, g_hFontSmallBold);
-        SetTextColor(hdc, lvHot ? RGB(255, 150, 150) : COLOR_TEXT_WHITE);
+        SetTextColor(hdc, lvHot ? COLOR_ACCENT_PINK : COLOR_TEXT_WHITE);
         DrawTextW(hdc, isInviting ? L"İptal" : L"Ayrıl", -1, &rcJamLeave, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
         // Eksik şarkı varsa manuel "+ İndir" kısayolu
@@ -1354,9 +1430,9 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         if (!isInviting && missingTitle[0] && !Jam_IsDownloadingTrack()) {
             rcJamMissingBtn = (RECT){ rcJamLeave.left - S(82), rcJamStage.top + S(8), rcJamLeave.left - S(6), rcJamStage.bottom - S(8) };
             BOOL mHot = (g_hotZone == ZONE_JAM_MISSING_DL);
-            DrawSmoothRoundRect(&rcJamMissingBtn, S(8), mHot ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
+            DrawGradientRoundRectH(&rcJamMissingBtn, S(8), COLOR_ACCENT_ORANGE, COLOR_ACCENT_PINK, COLOR_ACCENT_PURPLE);
             SelectObject(hdc, g_hFontSmallBold);
-            SetTextColor(hdc, RGB(8, 12, 10));
+            SetTextColor(hdc, RGB(5, 5, 5));
             DrawTextW(hdc, L"İndir", -1, &rcJamMissingBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             textRightLimit = rcJamMissingBtn.left - S(8);
         }
@@ -1379,7 +1455,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         RECT rcJSub = { rcJamStage.left + S(36), rcJamStage.top + S(23), textRightLimit, rcJamStage.bottom - S(4) };
 
         SelectObject(hdc, g_hFontSmallBold);
-        SetTextColor(hdc, isInviting ? COLOR_AMBER : COLOR_ACCENT_HOV);
+        SetTextColor(hdc, isInviting ? COLOR_ACCENT_ORANGE : COLOR_ACCENT_PINK);
         DrawTextW(hdc, jamHeadline, -1, &rcJTop, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
         SelectObject(hdc, g_hFontSmall);
@@ -1416,7 +1492,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         cntStr[47] = L'\0';
         DrawTextW(hdc, cntStr, -1, &rcColCnt, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
 
-        DrawHairlineH(S(14), w - S(14), listTop - 1, COLOR_BORDER, 130);
+        DrawHairlineH(S(14), w - S(14), listTop - 1, COLOR_BORDER, 180);
     }
 
     int savedList = SaveDC(hdc);
@@ -1464,16 +1540,16 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             BOOL isHovered      = (actualIdx == g_hoverTrack && g_sidebarAnim < 0.08f);
 
             if (isPlayingTrack) {
-                DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_ACTIVE, 255, COLOR_ACCENT, 115);
+                DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_ACTIVE, 255, COLOR_ACCENT_PINK, 140);
             } else if (isHovered) {
-                DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_HOVER, 255, COLOR_BORDER_LIGHT, 80);
+                DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_HOVER, 255, COLOR_BORDER, 120);
             } else if (isSelected) {
                 DrawSmoothRoundRect(&rcRow, S(11), COLOR_ROW_SEL, 200, 0, 0);
             }
 
             if (g_isDraggingList && !g_isFiltered && displayIdx == g_dragTargetIndex) {
-                DrawHairlineH(rcRow.left + S(8), rcRow.right - S(8), rcRow.top, COLOR_ACCENT_HOV, 255);
-                DrawHairlineH(rcRow.left + S(8), rcRow.right - S(8), rcRow.top + 1, COLOR_ACCENT_HOV, 255);
+                DrawHairlineH(rcRow.left + S(8), rcRow.right - S(8), rcRow.top, COLOR_ACCENT_ORANGE, 255);
+                DrawHairlineH(rcRow.left + S(8), rcRow.right - S(8), rcRow.top + 1, COLOR_ACCENT_ORANGE, 255);
             }
 
             const PlaylistItem *item = Playlist_Get(actualIdx);
@@ -1499,9 +1575,9 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 RECT b1 = { eqCx - barW - gapB - barW / 2, eqBaseY - h1, eqCx - gapB - barW / 2, eqBaseY };
                 RECT b2 = { eqCx - barW / 2,               eqBaseY - h2, eqCx + barW - barW / 2, eqBaseY };
                 RECT b3 = { eqCx + barW - barW / 2 + gapB, eqBaseY - h3, eqCx + barW * 2 - barW / 2 + gapB, eqBaseY };
-                DrawSmoothRoundRect(&b1, 2, COLOR_ACCENT_HOV, 255, 0, 0);
-                DrawSmoothRoundRect(&b2, 2, COLOR_ACCENT_HOV, 255, 0, 0);
-                DrawSmoothRoundRect(&b3, 2, COLOR_ACCENT_HOV, 255, 0, 0);
+                DrawSmoothRoundRect(&b1, 2, COLOR_ACCENT_ORANGE, 255, 0, 0);
+                DrawSmoothRoundRect(&b2, 2, COLOR_ACCENT_PINK, 255, 0, 0);
+                DrawSmoothRoundRect(&b3, 2, COLOR_ACCENT_PURPLE, 255, 0, 0);
             } else if (isHovered) {
                 SetBkMode(hdc, TRANSPARENT);
                 SelectObject(hdc, g_hFontIconsSmall);
@@ -1521,22 +1597,22 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             int tileSz = S(38);
             int tileY  = (rcRow.top + rcRow.bottom - tileSz) / 2;
             RECT rcTile = { rcRow.left + S(38), tileY, rcRow.left + S(38) + tileSz, tileY + tileSz };
-            COLORREF tileCol = isPlayingTrack ? RGB(22, 72, 42) : GetAvatarJewelColor(artistStr);
-            DrawSmoothRoundRect(&rcTile, S(9), tileCol, 255, isPlayingTrack ? COLOR_ACCENT : COLOR_BORDER_LIGHT, isPlayingTrack ? 150 : 90);
+            COLORREF tileCol = isPlayingTrack ? RGB(38, 20, 36) : GetAvatarJewelColor(artistStr);
+            DrawSmoothRoundRect(&rcTile, S(9), tileCol, 255, isPlayingTrack ? COLOR_ACCENT_PINK : COLOR_BORDER, isPlayingTrack ? 160 : 90);
 
             wchar_t initBuf[2] = { GetInitialChar(artistStr[0] ? artistStr : songStr), L'\0' };
             SetBkMode(hdc, TRANSPARENT);
             SelectObject(hdc, g_hFontBold);
-            SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_HOV : RGB(220, 228, 242));
+            SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_ORANGE : RGB(235, 235, 240));
             DrawTextW(hdc, initBuf, -1, &rcTile, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
             // Sağ Durum Rozeti (Çalan satırda)
             int textRight = rcRow.right - S(12);
             if (isPlayingTrack && w >= S(460)) {
                 RECT rcPill = { rcRow.right - S(76), (rcRow.top + rcRow.bottom) / 2 - S(11), rcRow.right - S(10), (rcRow.top + rcRow.bottom) / 2 + S(11) };
-                DrawSmoothRoundRect(&rcPill, S(11), RGB(22, 62, 38), 255, COLOR_ACCENT, 140);
+                DrawSmoothRoundRect(&rcPill, S(11), RGB(32, 18, 30), 255, COLOR_ACCENT_PINK, 160);
                 SelectObject(hdc, g_hFontMicro);
-                SetTextColor(hdc, COLOR_ACCENT_HOV);
+                SetTextColor(hdc, COLOR_ACCENT_ORANGE);
                 DrawTextW(hdc, Player_IsPlaying() ? L"ÇALIYOR" : L"DURAKLAT", -1, &rcPill, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                 textRight = rcPill.left - S(10);
             }
@@ -1548,11 +1624,11 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             RECT rcArtist = { textLeft, midRowY + S(1),  textRight, midRowY + S(19) };
 
             SelectObject(hdc, g_hFontBold);
-            SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+            SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_ORANGE : COLOR_TEXT_WHITE);
             DrawTextW(hdc, songStr, -1, &rcSong, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
             SelectObject(hdc, g_hFontSmall);
-            SetTextColor(hdc, isHovered ? RGB(178, 186, 204) : COLOR_TEXT_MUTED);
+            SetTextColor(hdc, isHovered ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED);
             DrawTextW(hdc, artistStr, -1, &rcArtist, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         }
 
@@ -1580,7 +1656,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 int thumbTop = sbTop + (int)(ratio * (float)(trackH - thumbH));
 
                 rcScrollbarThumb = (RECT){ sbRight - sbW, thumbTop, sbRight, thumbTop + thumbH };
-                COLORREF sbCol = g_isDraggingScrollbar ? COLOR_ACCENT : (g_scrollbarHover ? RGB(130, 140, 160) : RGB(64, 72, 90));
+                COLORREF sbCol = g_isDraggingScrollbar ? COLOR_ACCENT_ORANGE : (g_scrollbarHover ? RGB(90, 90, 100) : RGB(46, 46, 52));
                 DrawSmoothRoundRect(&rcScrollbarThumb, sbW / 2, sbCol, 220, 0, 0);
             }
         } else {
@@ -1598,9 +1674,9 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     // =========================================================================
     rcDock = (RECT){ S(10), h - dockH + S(4), w - S(10), h - S(8) };
     BOOL jamGlow = (jamState == JAM_STATE_ACTIVE);
-    DrawSmoothRoundRect(&rcDock, S(16), COLOR_DOCK_SURF, 250,
-                        jamGlow ? COLOR_ACCENT : COLOR_BORDER_LIGHT,
-                        jamGlow ? 175 : 130);
+    DrawSmoothRoundRect(&rcDock, S(16), COLOR_DOCK_SURF, 255,
+                        jamGlow ? COLOR_ACCENT_PINK : COLOR_BORDER,
+                        jamGlow ? 180 : 160);
 
     int dockMidY     = (rcDock.top + rcDock.bottom) / 2;
     int ctrlRowY     = rcDock.top + S(31);
@@ -1619,7 +1695,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     rcRepeat  = (RECT){ rcNext.right + S(4),           ctrlRowY - iconBox / 2, rcNext.right + S(4) + iconBox, ctrlRowY + iconBox / 2 };
     (void)btnStep;
 
-    DrawIconCircleBtn(hdc, &rcShuffle, ZONE_SHUFFLE, L"\uE8B1", g_cfg.shuffle ? COLOR_ACCENT_HOV : 0, g_cfg.shuffle != 0);
+    DrawIconCircleBtn(hdc, &rcShuffle, ZONE_SHUFFLE, L"\uE8B1", g_cfg.shuffle ? COLOR_ACCENT_ORANGE : 0, g_cfg.shuffle != 0);
     DrawIconCircleBtn(hdc, &rcPrev,    ZONE_PREV,    L"\uE892", 0, FALSE);
 
     // Pürüzsüz Anti-Aliased Ana Oynat/Duraklat Dairesi
@@ -1627,13 +1703,15 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         BOOL pHot = (g_hotZone == ZONE_PLAY);
         BOOL pPrs = (g_pressedZone == ZONE_PLAY);
         float pRad = (float)(pPrs ? (playRad - 1) : (pHot ? (playRad + 1) : playRad));
-        COLORREF pBg = pPrs ? RGB(215, 222, 232) : (pHot ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
-        DrawSmoothCircle((float)centerX, (float)ctrlRowY, pRad + 2.0f, COLOR_ACCENT, pHot ? 50 : 0);
+        COLORREF pBg = pPrs ? RGB(225, 225, 225) : COLOR_TEXT_WHITE;
+        if (pHot) {
+            DrawSmoothCircle((float)centerX, (float)ctrlRowY, pRad + 3.0f, COLOR_ACCENT_ORANGE, 70);
+        }
         DrawSmoothCircle((float)centerX, (float)ctrlRowY, pRad, pBg, 255);
 
         SetBkMode(hdc, TRANSPARENT);
         SelectObject(hdc, g_hFontIconsLarge);
-        SetTextColor(hdc, RGB(10, 12, 16));
+        SetTextColor(hdc, RGB(5, 5, 5));
         RECT rcPG = rcPlay;
         if (!Player_IsPlaying()) OffsetRect(&rcPG, S(1), 0);
         DrawTextW(hdc, Player_IsPlaying() ? L"\uE769" : L"\uE768", -1, &rcPG, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -1641,11 +1719,11 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
 
     DrawIconCircleBtn(hdc, &rcNext, ZONE_NEXT, L"\uE893", 0, FALSE);
     const wchar_t *repGlyph = (g_cfg.repeat == 2) ? L"\uE8ED" : L"\uE8EE";
-    DrawIconCircleBtn(hdc, &rcRepeat, ZONE_REPEAT, repGlyph, (g_cfg.repeat > 0) ? COLOR_ACCENT_HOV : 0, g_cfg.repeat > 0);
+    DrawIconCircleBtn(hdc, &rcRepeat, ZONE_REPEAT, repGlyph, (g_cfg.repeat > 0) ? COLOR_ACCENT_ORANGE : 0, g_cfg.repeat > 0);
     if (g_cfg.repeat == 2) {
         RECT rcOne = { rcRepeat.right - S(12), rcRepeat.top + S(1), rcRepeat.right, rcRepeat.top + S(13) };
         SelectObject(hdc, g_hFontMicro);
-        SetTextColor(hdc, COLOR_ACCENT_HOV);
+        SetTextColor(hdc, COLOR_ACCENT_ORANGE);
         DrawTextW(hdc, L"1", -1, &rcOne, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
@@ -1674,7 +1752,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     int fillW = (int)((float)(rcSeekBar.right - rcSeekBar.left) * progRatio);
     if (fillW > 0) {
         RECT rcFill = { rcSeekBar.left, rcSeekBar.top, rcSeekBar.left + fillW, rcSeekBar.bottom };
-        DrawSmoothRoundRect(&rcFill, barH / 2, seekActive ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
+        DrawGradientRoundRectH(&rcFill, barH / 2, COLOR_ACCENT_ORANGE, COLOR_ACCENT_PINK, COLOR_ACCENT_PURPLE);
     }
     if (seekActive && duration > 0) {
         DrawSmoothCircle((float)(rcSeekBar.left + fillW), (float)seekRowY, (float)S(6), COLOR_TEXT_WHITE, 255);
@@ -1697,7 +1775,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     int artY    = dockMidY - artSize / 2;
     RECT rcArt  = { artX, artY, artX + artSize, artY + artSize };
 
-    DrawSmoothRoundRect(&rcArt, S(10), RGB(26, 30, 42), 255, COLOR_BORDER_LIGHT, 140);
+    DrawSmoothRoundRect(&rcArt, S(10), RGB(24, 24, 24), 255, COLOR_BORDER, 160);
     if (g_pMainThumb) {
         OLE_XSIZE_HIMETRIC hmW = 0;
         OLE_YSIZE_HIMETRIC hmH = 0;
@@ -1715,10 +1793,10 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             DeleteObject(hRgn);
         }
     } else {
-        DrawSmoothCircle((float)(artX + artSize / 2), (float)(artY + artSize / 2), (float)S(16), RGB(34, 40, 54), 255);
+        DrawSmoothCircle((float)(artX + artSize / 2), (float)(artY + artSize / 2), (float)S(16), RGB(32, 32, 32), 255);
         SetBkMode(hdc, TRANSPARENT);
         SelectObject(hdc, g_hFontIcons);
-        SetTextColor(hdc, g_currentTrack >= 0 ? COLOR_ACCENT_HOV : COLOR_TEXT_DIM);
+        SetTextColor(hdc, g_currentTrack >= 0 ? COLOR_ACCENT_ORANGE : COLOR_TEXT_DIM);
         DrawTextW(hdc, L"\uEC4F", -1, &rcArt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
@@ -1775,7 +1853,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         int vFillW = (int)((float)(rcVolBar.right - rcVolBar.left) * ((float)curVol / 100.0f));
         if (vFillW > 0) {
             RECT rcVFill = { rcVolBar.left, rcVolBar.top, rcVolBar.left + vFillW, rcVolBar.bottom };
-            DrawSmoothRoundRect(&rcVFill, vBarH / 2, volActive ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE, 255, 0, 0);
+            DrawGradientRoundRectH(&rcVFill, vBarH / 2, COLOR_ACCENT_ORANGE, COLOR_ACCENT_PINK, COLOR_ACCENT_PURPLE);
         }
         if (volActive) {
             DrawSmoothCircle((float)(rcVolBar.left + vFillW), (float)dockMidY, (float)S(5), COLOR_TEXT_WHITE, 255);
@@ -1806,8 +1884,8 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         IntersectClipRect(hdc, 0, headerH, clipRight, h);
         SetPixelClip(0, headerH, clipRight, h);
 
-        FillVerticalGradientPx(offX, headerH, sbW, h - headerH, COLOR_SIDEBAR_SURF, RGB(11, 13, 19));
-        DrawHairlineV(sideRight - 1, headerH, h, COLOR_BORDER_LIGHT, 180);
+        FillVerticalGradientPx(offX, headerH, sbW, h - headerH, COLOR_SIDEBAR_SURF, COLOR_SIDEBAR_SURF);
+        DrawHairlineV(sideRight - 1, headerH, h, COLOR_BORDER, 255);
 
         if (g_sidebarView == SIDEBAR_VIEW_MENU) {
             static const struct { const wchar_t *icon; const wchar_t *label; const wchar_t *sub; BOOL accent; } items[] = {
@@ -1826,22 +1904,22 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 BOOL isHov = (m == g_sidebarHoverItem);
 
                 if (isHov || items[m].accent) {
-                    COLORREF mFill = isHov ? COLOR_CARD_HOVER : RGB(18, 28, 24);
-                    COLORREF mBord = items[m].accent ? COLOR_ACCENT : COLOR_BORDER_LIGHT;
+                    COLORREF mFill = isHov ? COLOR_CARD_HOVER : RGB(26, 18, 28);
+                    COLORREF mBord = items[m].accent ? COLOR_ACCENT_PINK : COLOR_BORDER;
                     DrawSmoothRoundRect(&rcMenu, S(10), mFill, isHov ? 255 : 150, mBord, isHov ? 160 : 80);
                 }
 
                 RECT rcIc = { rcMenu.left + S(10), rcMenu.top, rcMenu.left + S(38), rcMenu.bottom };
                 SetBkMode(hdc, TRANSPARENT);
                 SelectObject(hdc, g_hFontIcons);
-                SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_HOV : (isHov ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED));
+                SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_ORANGE : (isHov ? COLOR_TEXT_WHITE : COLOR_TEXT_MUTED));
                 DrawTextW(hdc, items[m].icon, -1, &rcIc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                 RECT rcLbl = { rcMenu.left + S(42), rcMenu.top + S(6),  rcMenu.right - S(36), rcMenu.top + S(25) };
                 RECT rcSub = { rcMenu.left + S(42), rcMenu.top + S(24), rcMenu.right - S(36), rcMenu.bottom - S(5) };
 
                 SelectObject(hdc, g_hFontBold);
-                SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_HOV : COLOR_TEXT_WHITE);
+                SetTextColor(hdc, items[m].accent ? COLOR_ACCENT_ORANGE : COLOR_TEXT_WHITE);
                 DrawTextW(hdc, items[m].label, -1, &rcLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
                 SelectObject(hdc, g_hFontMicro);
@@ -1853,9 +1931,9 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                     _snwprintf(bTxt, 15, L"%d", Friends_GetPendingCount());
                     bTxt[15] = L'\0';
                     RECT rcBadge = { rcMenu.right - S(30), rcMenu.top + S(13), rcMenu.right - S(10), rcMenu.bottom - S(13) };
-                    DrawSmoothRoundRect(&rcBadge, S(10), COLOR_ACCENT, 255, 0, 0);
+                    DrawSmoothRoundRect(&rcBadge, S(10), COLOR_ACCENT_ORANGE, 255, 0, 0);
                     SelectObject(hdc, g_hFontMicro);
-                    SetTextColor(hdc, RGB(8, 12, 10));
+                    SetTextColor(hdc, RGB(5, 5, 5));
                     DrawTextW(hdc, bTxt, -1, &rcBadge, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                 }
             }
@@ -1875,7 +1953,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
 
             // Kullanıcı Kimlik Kartı (Profil Avatarı + Etiket + Kopyala Hapı)
             RECT rcMyCard = { offX + S(12), headerH + S(46), offX + sbW - S(12), headerH + S(98) };
-            DrawSmoothRoundRect(&rcMyCard, S(12), COLOR_CARD_SURF, 255, COLOR_BORDER_LIGHT, 130);
+            DrawSmoothRoundRect(&rcMyCard, S(12), COLOR_CARD_SURF, 255, COLOR_BORDER, 160);
 
             wchar_t myName[64] = {0}, myTag[32] = {0};
             Friends_GetMyName(myName, 64);
@@ -1883,23 +1961,23 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
 
             float myAvX = (float)(rcMyCard.left + S(26));
             float myAvY = (float)(rcMyCard.top + rcMyCard.bottom) * 0.5f;
-            DrawSmoothCircle(myAvX, myAvY, (float)S(16), RGB(22, 74, 44), 255);
+            DrawSmoothCircle(myAvX, myAvY, (float)S(16), RGB(42, 20, 46), 255);
             DrawSmoothCircle(myAvX + (float)S(11), myAvY + (float)S(11), SF(5.0f), COLOR_CARD_SURF, 255);
-            DrawSmoothCircle(myAvX + (float)S(11), myAvY + (float)S(11), SF(3.5f), COLOR_ACCENT_HOV, 255);
+            DrawSmoothCircle(myAvX + (float)S(11), myAvY + (float)S(11), SF(3.5f), COLOR_ACCENT_PINK, 255);
 
             RECT rcMyInit = { (int)(myAvX - S(16)), (int)(myAvY - S(16)), (int)(myAvX + S(16)), (int)(myAvY + S(16)) };
             wchar_t myInit[2] = { GetInitialChar(myName[0] ? myName : myTag), L'\0' };
             SelectObject(hdc, g_hFontBold);
-            SetTextColor(hdc, COLOR_ACCENT_HOV);
+            SetTextColor(hdc, COLOR_ACCENT_ORANGE);
             DrawTextW(hdc, myInit, -1, &rcMyInit, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
             BOOL recentlyCopied = (g_copiedTagTick != 0 && (GetTickCount() - g_copiedTagTick) < 2000);
             rcCopyTag = (RECT){ rcMyCard.right - S(76), rcMyCard.top + S(12), rcMyCard.right - S(10), rcMyCard.bottom - S(12) };
             DrawSmoothRoundRect(&rcCopyTag, S(8),
-                                recentlyCopied ? COLOR_ACCENT : ((g_hotZone == ZONE_COPY_TAG) ? COLOR_CARD_HOVER : RGB(30, 36, 48)),
-                                255, COLOR_BORDER_LIGHT, 140);
+                                recentlyCopied ? COLOR_ACCENT_ORANGE : ((g_hotZone == ZONE_COPY_TAG) ? COLOR_CARD_HOVER : RGB(24, 24, 24)),
+                                255, COLOR_BORDER, 160);
             SelectObject(hdc, g_hFontMicro);
-            SetTextColor(hdc, recentlyCopied ? RGB(8, 12, 10) : COLOR_TEXT_WHITE);
+            SetTextColor(hdc, recentlyCopied ? RGB(5, 5, 5) : COLOR_TEXT_WHITE);
             DrawTextW(hdc, recentlyCopied ? L"✓ Kopyalandı" : L"Kopyala", -1, &rcCopyTag, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
             RECT rcMyLbl = { rcMyCard.left + S(50), rcMyCard.top + S(8),  rcCopyTag.left - S(6), rcMyCard.top + S(26) };
@@ -1913,7 +1991,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
 
             // Segmented Pill Sekmeler (Arkadaşlar | İstekler | Ekle)
             RECT rcTabTray = { offX + S(12), headerH + S(106), offX + sbW - S(12), headerH + S(140) };
-            DrawSmoothRoundRect(&rcTabTray, S(10), RGB(19, 22, 30), 255, COLOR_BORDER, 140);
+            DrawSmoothRoundRect(&rcTabTray, S(10), RGB(16, 16, 16), 255, COLOR_BORDER, 180);
 
             int trayW = (rcTabTray.right - rcTabTray.left - S(8)) / 3;
             rcFriendsTab0 = (RECT){ rcTabTray.left + S(4),              rcTabTray.top + S(3), rcTabTray.left + S(4) + trayW,     rcTabTray.bottom - S(3) };
@@ -1935,10 +2013,10 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             for (int t = 0; t < 3; t++) {
                 BOOL sel = ((int)g_friendsTab == t);
                 if (sel) {
-                    DrawSmoothRoundRect(tabRects[t], S(7), COLOR_CARD_HOVER, 255, COLOR_ACCENT, 150);
+                    DrawSmoothRoundRect(tabRects[t], S(7), COLOR_CARD_HOVER, 255, COLOR_ACCENT_PINK, 150);
                 }
                 SelectObject(hdc, sel ? g_hFontSmallBold : g_hFontSmall);
-                SetTextColor(hdc, sel ? COLOR_ACCENT_HOV : COLOR_TEXT_MUTED);
+                SetTextColor(hdc, sel ? COLOR_ACCENT_ORANGE : COLOR_TEXT_MUTED);
                 DrawTextW(hdc, tabLabels[t], -1, (RECT*)tabRects[t], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
 
@@ -1971,8 +2049,8 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                         BOOL inJamWithFriend = (jamState != JAM_STATE_NONE && _wcsicmp(jamPartner, fi->tag) == 0);
                         RECT rcFC = { offX + S(12), cardY, offX + sbW - S(12), cardY + S(54) };
                         DrawSmoothRoundRect(&rcFC, S(11),
-                                            inJamWithFriend ? RGB(17, 42, 28) : COLOR_CARD_SURF, 255,
-                                            inJamWithFriend ? COLOR_ACCENT : COLOR_BORDER, 150);
+                                            inJamWithFriend ? RGB(28, 16, 32) : COLOR_CARD_SURF, 255,
+                                            inJamWithFriend ? COLOR_ACCENT_PINK : COLOR_BORDER, 150);
 
                         // Avatar + Çevrimiçi Noktası
                         float avX = (float)(rcFC.left + S(24));
@@ -1985,10 +2063,10 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                         SetTextColor(hdc, COLOR_TEXT_WHITE);
                         DrawTextW(hdc, fInit, -1, &rcAvTxt, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-                        // Durum Rozeti (Yeşil = Çevrimiçi, Gri = Çevrimdışı)
+                        // Durum Rozeti (Turuncu = Çevrimiçi, Koyu Gri = Çevrimdışı)
                         DrawSmoothCircle(avX + (float)S(11), avY + (float)S(11), SF(5.2f), COLOR_CARD_SURF, 255);
                         DrawSmoothCircle(avX + (float)S(11), avY + (float)S(11), SF(3.8f),
-                                         fi->isOnline ? COLOR_ACCENT_HOV : RGB(95, 102, 118), 255);
+                                         fi->isOnline ? COLOR_ACCENT_ORANGE : RGB(70, 70, 75), 255);
 
                         // Sağ: Jam Düğmesi + Sil Düğmesi
                         rcFriendRemoveBtns[i] = (RECT){ rcFC.right - S(28), cardY + S(15), rcFC.right - S(6), cardY + S(39) };
@@ -1997,10 +2075,10 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                         DrawTextW(hdc, L"\uE711", -1, &rcFriendRemoveBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                         rcFriendActionBtns[i] = (RECT){ rcFC.right - S(78), cardY + S(13), rcFC.right - S(30), cardY + S(41) };
-                        COLORREF actBg = inJamWithFriend ? RGB(68, 28, 32) : (fi->isOnline ? COLOR_ACCENT : RGB(32, 37, 48));
+                        COLORREF actBg = inJamWithFriend ? RGB(56, 18, 28) : (fi->isOnline ? COLOR_ACCENT_ORANGE : RGB(24, 24, 24));
                         DrawSmoothRoundRect(&rcFriendActionBtns[i], S(8), actBg, 255, 0, 0);
                         SelectObject(hdc, g_hFontMicro);
-                        SetTextColor(hdc, inJamWithFriend ? RGB(255, 165, 165) : (fi->isOnline ? RGB(8, 12, 10) : COLOR_TEXT_DIM));
+                        SetTextColor(hdc, inJamWithFriend ? RGB(255, 165, 165) : (fi->isOnline ? RGB(5, 5, 5) : COLOR_TEXT_DIM));
                         DrawTextW(hdc, inJamWithFriend ? L"Ayrıl" : L"Jam", -1, &rcFriendActionBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                         // İsim + Ne Dinliyor / Çevrimiçi Bilgilendirmesi
@@ -2022,7 +2100,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                         }
 
                         SelectObject(hdc, g_hFontMicro);
-                        SetTextColor(hdc, !fi->isOnline ? COLOR_TEXT_DIM : (fi->isPlaying ? COLOR_ACCENT_HOV : COLOR_TEXT_MUTED));
+                        SetTextColor(hdc, !fi->isOnline ? COLOR_TEXT_DIM : (fi->isPlaying ? COLOR_ACCENT_PINK : COLOR_TEXT_MUTED));
                         DrawTextW(hdc, subLine, -1, &rcFS, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
                     }
                 }
@@ -2049,7 +2127,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                         if (!rq) continue;
 
                         RECT rcCard = { offX + S(12), cardY, offX + sbW - S(12), cardY + S(52) };
-                        DrawSmoothRoundRect(&rcCard, S(11), COLOR_CARD_SURF, 255, COLOR_BORDER_LIGHT, 130);
+                        DrawSmoothRoundRect(&rcCard, S(11), COLOR_CARD_SURF, 255, COLOR_BORDER, 140);
 
                         RECT rcName = { rcCard.left + S(12), cardY + S(7),  rcCard.right - S(74), cardY + S(26) };
                         RECT rcTag  = { rcCard.left + S(12), cardY + S(25), rcCard.right - S(74), cardY + S(44) };
@@ -2063,13 +2141,13 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                         DrawTextW(hdc, rq->tag, -1, &rcTag, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
                         rcReqAcceptBtns[i] = (RECT){ rcCard.right - S(68), cardY + S(11), rcCard.right - S(38), cardY + S(41) };
-                        DrawSmoothRoundRect(&rcReqAcceptBtns[i], S(8), COLOR_ACCENT, 255, 0, 0);
+                        DrawSmoothRoundRect(&rcReqAcceptBtns[i], S(8), COLOR_ACCENT_ORANGE, 255, 0, 0);
                         SelectObject(hdc, g_hFontIconsSmall);
-                        SetTextColor(hdc, RGB(8, 12, 10));
+                        SetTextColor(hdc, RGB(5, 5, 5));
                         DrawTextW(hdc, L"\uE73E", -1, &rcReqAcceptBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                         rcReqRejectBtns[i] = (RECT){ rcCard.right - S(34), cardY + S(11), rcCard.right - S(6), cardY + S(41) };
-                        DrawSmoothRoundRect(&rcReqRejectBtns[i], S(8), COLOR_CTRL_HOVER, 255, COLOR_BORDER_LIGHT, 120);
+                        DrawSmoothRoundRect(&rcReqRejectBtns[i], S(8), COLOR_CTRL_HOVER, 255, COLOR_BORDER, 140);
                         SelectObject(hdc, g_hFontIconsSmall);
                         SetTextColor(hdc, COLOR_TEXT_MUTED);
                         DrawTextW(hdc, L"\uE711", -1, &rcReqRejectBtns[i], DT_CENTER | DT_VCENTER | DT_SINGLELINE);
@@ -2091,20 +2169,20 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
                 RECT rcInputBox = { offX + S(12), headerH + S(204), offX + sbW - S(12), headerH + S(242) };
                 BOOL addFocused = (GetFocus() == g_hFriendAddEdit);
                 DrawSmoothRoundRect(&rcInputBox, S(10), COLOR_INPUT_BG, 255,
-                                    addFocused ? COLOR_ACCENT : COLOR_BORDER_LIGHT, addFocused ? 220 : 150);
+                                    addFocused ? COLOR_ACCENT_ORANGE : COLOR_BORDER, addFocused ? 220 : 150);
 
                 rcFriendSendBtn = (RECT){ offX + S(12), headerH + S(252), offX + sbW - S(12), headerH + S(290) };
-                COLORREF btnCol = (g_pressedZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_DARK :
-                                  ((g_hotZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_HOV : COLOR_ACCENT);
+                COLORREF btnCol = (g_pressedZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_PURPLE :
+                                  ((g_hotZone == ZONE_FRIEND_SEND) ? COLOR_ACCENT_PINK : COLOR_ACCENT_ORANGE);
                 DrawSmoothRoundRect(&rcFriendSendBtn, S(10), btnCol, 255, 0, 0);
                 SelectObject(hdc, g_hFontBold);
-                SetTextColor(hdc, RGB(8, 12, 10));
+                SetTextColor(hdc, RGB(5, 5, 5));
                 DrawTextW(hdc, L"Arkadaşlık İsteği Gönder", -1, &rcFriendSendBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
                 if (g_friendAddMsg[0]) {
                     RECT rcMsg = { offX + S(14), headerH + S(300), offX + sbW - S(14), headerH + S(356) };
                     SelectObject(hdc, g_hFontSmall);
-                    SetTextColor(hdc, wcsstr(g_friendAddMsg, L"gönderildi") ? COLOR_ACCENT_HOV : COLOR_DANGER);
+                    SetTextColor(hdc, wcsstr(g_friendAddMsg, L"gönderildi") ? COLOR_ACCENT_ORANGE : COLOR_DANGER);
                     DrawTextW(hdc, g_friendAddMsg, -1, &rcMsg, DT_LEFT | DT_WORDBREAK);
                 }
             }
@@ -2126,22 +2204,22 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         if (bannerW > w - S(24)) bannerW = w - S(24);
         int topY = headerH + S(10);
         rcToastBox = (RECT){ (w - bannerW) / 2, topY, (w + bannerW) / 2, topY + S(54) };
-        DrawSmoothRoundRect(&rcToastBox, S(14), RGB(16, 40, 27), 250, COLOR_ACCENT_HOV, 230);
+        DrawSmoothRoundRect(&rcToastBox, S(14), RGB(26, 14, 30), 250, COLOR_ACCENT_PINK, 230);
 
-        DrawSmoothCircle((float)(rcToastBox.left + S(20)), (float)(topY + S(27)), (float)S(5), COLOR_ACCENT_HOV, 255);
+        DrawSmoothCircle((float)(rcToastBox.left + S(20)), (float)(topY + S(27)), (float)S(5), COLOR_ACCENT_ORANGE, 255);
 
         wchar_t toastTitle[128];
         _snwprintf(toastTitle, 127, L"%s seni Canlı Jam'e davet etti!", invName[0] ? invName : invTag);
         toastTitle[127] = L'\0';
 
         rcToastAccept = (RECT){ rcToastBox.right - S(104), rcToastBox.top + S(11), rcToastBox.right - S(42), rcToastBox.bottom - S(11) };
-        DrawSmoothRoundRect(&rcToastAccept, S(9), (g_hotZone == ZONE_TOAST_ACCEPT) ? COLOR_ACCENT_HOV : COLOR_ACCENT, 255, 0, 0);
+        DrawGradientRoundRectH(&rcToastAccept, S(9), COLOR_ACCENT_ORANGE, COLOR_ACCENT_PINK, COLOR_ACCENT_PURPLE);
         SelectObject(hdc, g_hFontSmallBold);
-        SetTextColor(hdc, RGB(8, 12, 10));
+        SetTextColor(hdc, RGB(5, 5, 5));
         DrawTextW(hdc, L"Katıl", -1, &rcToastAccept, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
         rcToastReject = (RECT){ rcToastBox.right - S(36), rcToastBox.top + S(11), rcToastBox.right - S(8), rcToastBox.bottom - S(11) };
-        DrawSmoothRoundRect(&rcToastReject, S(9), COLOR_CTRL_HOVER, 255, COLOR_BORDER_LIGHT, 140);
+        DrawSmoothRoundRect(&rcToastReject, S(9), COLOR_CTRL_HOVER, 255, COLOR_BORDER, 140);
         SelectObject(hdc, g_hFontIconsSmall);
         SetTextColor(hdc, COLOR_TEXT_MUTED);
         DrawTextW(hdc, L"\uE711", -1, &rcToastReject, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
