@@ -1486,7 +1486,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     // Sütun Mikro Başlığı ("#   PARÇA VE SANATÇI               TOPLAM")
     if (listBottom > listTop) {
         RECT rcColNum  = { S(18), sectionTop + S(2), S(48), listTop };
-        RECT rcColName = { S(56), sectionTop + S(2), w - S(120), listTop };
+        RECT rcColName = { S(68), sectionTop + S(2), w - S(120), listTop };
         RECT rcColCnt  = { w - S(120), sectionTop + S(2), w - S(20), listTop };
 
         SelectObject(hdc, g_hFontMicro);
@@ -1567,56 +1567,83 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             Playlist_SplitArtistSong(item->title, artistStr, 128, songStr, 160);
             if (!artistStr[0]) wcscpy(artistStr, L"Yerel Parça");
 
-            // Sol Numara / Oynat / Canlı Ekolayzır Sütunu
-            RECT rcNum = { rcRow.left + S(4), rcRow.top, rcRow.left + S(34), rcRow.bottom };
-            if (isPlayingTrack) {
-                int eqBaseY = (rcRow.top + rcRow.bottom) / 2 + S(7);
-                int eqCx    = (rcNum.left + rcNum.right) / 2;
-                int barW    = S(3);
-                if (barW < 2) barW = 2;
-                int gapB    = S(2);
-                BOOL animEq = Player_IsPlaying();
-                int h1 = animEq ? (S(5) + (int)((tickNow / 90)  % (unsigned)S(10))) : S(6);
-                int h2 = animEq ? (S(7) + (int)(((tickNow + 170) / 75) % (unsigned)S(9)))  : S(12);
-                int h3 = animEq ? (S(4) + (int)(((tickNow + 310) / 105) % (unsigned)S(11))) : S(8);
-                RECT b1 = { eqCx - barW - gapB - barW / 2, eqBaseY - h1, eqCx - gapB - barW / 2, eqBaseY };
-                RECT b2 = { eqCx - barW / 2,               eqBaseY - h2, eqCx + barW - barW / 2, eqBaseY };
-                RECT b3 = { eqCx + barW - barW / 2 + gapB, eqBaseY - h3, eqCx + barW * 2 - barW / 2 + gapB, eqBaseY };
-                DrawSmoothRoundRect(&b1, 2, COLOR_ACCENT_ORANGE, 255, 0, 0);
-                DrawSmoothRoundRect(&b2, 2, COLOR_ACCENT_PINK, 255, 0, 0);
-                DrawSmoothRoundRect(&b3, 2, COLOR_ACCENT_PURPLE, 255, 0, 0);
-            } else if (isHovered) {
+            // Sol Numara / Oynat Sütunu
+            RECT rcNum = { rcRow.left + S(6), rcRow.top, rcRow.left + S(32), rcRow.bottom };
+            if (isHovered) {
                 SetBkMode(hdc, TRANSPARENT);
                 SelectObject(hdc, g_hFontIconsSmall);
-                SetTextColor(hdc, COLOR_TEXT_WHITE);
-                DrawTextW(hdc, L"\uE768", -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                if (isPlayingTrack && Player_IsPlaying()) {
+                    SetTextColor(hdc, COLOR_ACCENT_PINK);
+                    DrawTextW(hdc, L"\uE769", -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                } else {
+                    SetTextColor(hdc, COLOR_TEXT_WHITE);
+                    DrawTextW(hdc, L"\uE768", -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                }
             } else {
                 wchar_t numBuf[16];
                 _snwprintf(numBuf, 15, L"%d", displayIdx + 1);
                 numBuf[15] = L'\0';
                 SetBkMode(hdc, TRANSPARENT);
-                SelectObject(hdc, g_hFontSmall);
-                SetTextColor(hdc, COLOR_TEXT_DIM);
+                SelectObject(hdc, isPlayingTrack ? g_hFontBold : g_hFontSmall);
+                SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_ORANGE : COLOR_TEXT_DIM);
                 DrawTextW(hdc, numBuf, -1, &rcNum, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
 
-            // 38x38 Yuvarlatılmış Sanatçı Monogram Kutucuğu
-            int tileSz = S(38);
-            int tileY  = (rcRow.top + rcRow.bottom - tileSz) / 2;
-            RECT rcTile = { rcRow.left + S(38), tileY, rcRow.left + S(38) + tileSz, tileY + tileSz };
-            COLORREF tileCol = isPlayingTrack ? RGB(38, 20, 36) : GetAvatarJewelColor(artistStr);
-            DrawSmoothRoundRect(&rcTile, S(9), tileCol, 255, isPlayingTrack ? COLOR_ACCENT_PINK : COLOR_BORDER, isPlayingTrack ? 160 : 90);
+            // İnteraktif Durum Noktası (Çalan şarkıda dinamik neon haleli, fareyle parlayan, beklemede minimal)
+            int midRowY  = (rcRow.top + rcRow.bottom) / 2;
+            float dotCx  = (float)(rcRow.left + S(42));
+            float dotCy  = (float)midRowY;
 
-            wchar_t initBuf[2] = { GetInitialChar(artistStr[0] ? artistStr : songStr), L'\0' };
-            SetBkMode(hdc, TRANSPARENT);
-            SelectObject(hdc, g_hFontBold);
-            SetTextColor(hdc, isPlayingTrack ? COLOR_ACCENT_ORANGE : RGB(235, 235, 240));
-            DrawTextW(hdc, initBuf, -1, &rcTile, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            if (isPlayingTrack) {
+                // Canlı Sunset Neon renk akışı: Turuncu (#FF925C) -> Pembe (#F044B8) -> Mor (#8B35FF)
+                float phase = fmodf((float)tickNow * 0.002f, 3.0f);
+                COLORREF liveDotCol;
+                if (phase < 1.0f) {
+                    float t = phase;
+                    liveDotCol = RGB(
+                        (BYTE)(255 * (1.0f - t) + 240 * t),
+                        (BYTE)(146 * (1.0f - t) +  68 * t),
+                        (BYTE)( 92 * (1.0f - t) + 184 * t));
+                } else if (phase < 2.0f) {
+                    float t = phase - 1.0f;
+                    liveDotCol = RGB(
+                        (BYTE)(240 * (1.0f - t) + 139 * t),
+                        (BYTE)( 68 * (1.0f - t) +  53 * t),
+                        (BYTE)(184 * (1.0f - t) + 255 * t));
+                } else {
+                    float t = phase - 2.0f;
+                    liveDotCol = RGB(
+                        (BYTE)(139 * (1.0f - t) + 255 * t),
+                        (BYTE)( 53 * (1.0f - t) + 146 * t),
+                        (BYTE)(255 * (1.0f - t) +  92 * t));
+                }
+
+                if (Player_IsPlaying()) {
+                    float pulse = 0.5f + 0.5f * sinf((float)tickNow * 0.007f);
+                    float haloR = SF(6.5f) + pulse * SF(2.5f);
+                    BYTE haloA = (BYTE)(70 + 45 * pulse);
+                    DrawSmoothCircle(dotCx, dotCy, haloR, liveDotCol, haloA);
+                    DrawSmoothCircle(dotCx, dotCy, SF(4.0f), liveDotCol, 255);
+                    DrawSmoothCircle(dotCx, dotCy, SF(1.8f), RGB(255, 255, 255), 240);
+                } else {
+                    // Duraklatıldıysa sakin neon hale
+                    DrawSmoothCircle(dotCx, dotCy, SF(5.5f), COLOR_ACCENT_PINK, 65);
+                    DrawSmoothCircle(dotCx, dotCy, SF(3.5f), COLOR_ACCENT_ORANGE, 255);
+                    DrawSmoothCircle(dotCx, dotCy, SF(1.5f), RGB(255, 255, 255), 200);
+                }
+            } else if (isHovered) {
+                // Fare üzerindeyken parlak beyaz ve neon turuncu etkileşim halesi
+                DrawSmoothCircle(dotCx, dotCy, SF(5.5f), COLOR_ACCENT_ORANGE, 80);
+                DrawSmoothCircle(dotCx, dotCy, SF(3.5f), COLOR_TEXT_WHITE, 245);
+            } else {
+                // Normal beklemedeki şarkı: Zarif minimal koyu çelik nokta
+                DrawSmoothCircle(dotCx, dotCy, SF(2.5f), RGB(60, 60, 70), 180);
+            }
 
             // Sağ Durum Rozeti (Çalan satırda)
             int textRight = rcRow.right - S(12);
             if (isPlayingTrack && w >= S(460)) {
-                RECT rcPill = { rcRow.right - S(76), (rcRow.top + rcRow.bottom) / 2 - S(11), rcRow.right - S(10), (rcRow.top + rcRow.bottom) / 2 + S(11) };
+                RECT rcPill = { rcRow.right - S(76), midRowY - S(11), rcRow.right - S(10), midRowY + S(11) };
                 DrawSmoothRoundRect(&rcPill, S(11), RGB(32, 18, 30), 255, COLOR_ACCENT_PINK, 160);
                 SelectObject(hdc, g_hFontMicro);
                 SetTextColor(hdc, COLOR_ACCENT_ORANGE);
@@ -1625,8 +1652,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
             }
 
             // İki Satırlı Modern Tipografi: Üstte Şarkı (Kalın), Altta Sanatçı (Yumuşak Gri)
-            int textLeft = rcTile.right + S(12);
-            int midRowY  = (rcRow.top + rcRow.bottom) / 2;
+            int textLeft = rcRow.left + S(56);
             RECT rcSong   = { textLeft, midRowY - S(19), textRight, midRowY + S(1) };
             RECT rcArtist = { textLeft, midRowY + S(1),  textRight, midRowY + S(19) };
 
@@ -3510,6 +3536,12 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             }
 
             EndPaint(hWnd, &ps);
+
+            static BOOL s_firstPaintTrimDone = FALSE;
+            if (!s_firstPaintTrimDone) {
+                s_firstPaintTrimDone = TRUE;
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+            }
             return 0;
         }
 
