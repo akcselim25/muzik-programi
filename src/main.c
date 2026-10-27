@@ -683,14 +683,13 @@ static void ClampScrollTargets(HWND hWnd) {
 
 static void UpdateSidebarEditPosition(void) {
     if (!g_hFriendAddEdit) return;
-    BOOL shouldShow = (g_sidebarAnim > 0.05f && g_sidebarView == SIDEBAR_VIEW_FRIENDS && g_friendsTab == FRIENDS_TAB_ADD);
+    BOOL shouldShow = (g_sidebarAnim >= 0.95f && g_sidebarView == SIDEBAR_VIEW_FRIENDS && g_friendsTab == FRIENDS_TAB_ADD);
     if (!shouldShow) {
         if (IsWindowVisible(g_hFriendAddEdit)) ShowWindow(g_hFriendAddEdit, SW_HIDE);
         return;
     }
     int sbW = GetSidebarW();
-    float animNorm = (g_sidebarAnim < 0.0f) ? 0.0f : ((g_sidebarAnim > 1.0f) ? 1.0f : g_sidebarAnim);
-    int offX = (int)((animNorm - 1.0f) * (float)sbW);
+    int offX = 0;
     int inputTop = GetHeaderH() + S(204);
     MoveWindow(g_hFriendAddEdit, offX + S(22), inputTop + S(8), sbW - S(44), S(22), TRUE);
     if (!IsWindowVisible(g_hFriendAddEdit)) ShowWindow(g_hFriendAddEdit, SW_SHOW);
@@ -1316,7 +1315,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
     SetBkMode(hdc, TRANSPARENT);
     SelectObject(hdc, g_hFontBrand);
     SetTextColor(hdc, COLOR_TEXT_WHITE);
-    DrawTextW(hdc, L"\u039B U R A", -1, &rcBrand, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(hdc, L"\u039B U R N S", -1, &rcBrand, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
     // Sağ Arama Kutusu Hapı
     int searchW = (w >= S(560)) ? S(190) : S(148);
@@ -1904,12 +1903,7 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         int offX = (int)((animNorm - 1.0f) * (float)sbW);
         int sideRight = offX + sbW;
 
-        // Arka planı orantılı karart: Sadece çekmecenin sağında kalan açık alanı karart!
-        // Çekmecenin altında kalan pikseller zaten opaktır; gereksiz CPU yükünü ve gecikmeyi önler.
-        BYTE scrimAlpha = (BYTE)(animNorm * 135.0f);
-        if (sideRight < w && scrimAlpha > 0) {
-            DimRectPx(sideRight, headerH, w - sideRight, h - headerH, scrimAlpha);
-        }
+        // Karartma kaldirildi - Aninda yag gibi akici 60 FPS
 
         int clipRight = sideRight;
         if (clipRight > w) clipRight = w;
@@ -2593,7 +2587,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 float jamTarget = (Jam_GetState() != JAM_STATE_NONE) ? 1.0f : 0.0f;
 
                 BOOL mScroll  = StepSpring(&g_scrollPosPx,   &g_scrollVelPx,   g_scrollTargetPx,           22.0f, 1.0f, dt, 0.25f);
-                BOOL mSidebar = StepSpring(&g_sidebarAnim,   &g_sidebarVel,    g_sidebarOpen ? 1.0f : 0.0f, 22.0f, 1.0f, dt, 0.002f);
+                BOOL mSidebar = StepSpring(&g_sidebarAnim,   &g_sidebarVel,    g_sidebarOpen ? 1.0f : 0.0f, 48.0f, 1.0f, dt, 0.005f);
                 BOOL mJamBar  = StepSpring(&g_jamBannerAnim, &g_jamBannerVel,  jamTarget,                  22.0f, 1.0f, dt, 0.002f);
 
                 // Apple Tasarımı: Çekmece sınır aşımını (overshoot & titreme) kesin olarak engelle
@@ -2803,13 +2797,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     wchar_t prompt[2048];
                     if (info->changelog[0]) {
                         _snwprintf(prompt, 2047,
-                                   L"\u039BURA için yeni bir güncelleme mevcut!\n\n"
+                                   L"\u039BURNS için yeni bir güncelleme mevcut!\n\n"
                                    L"Mevcut Sürüm: v%s\nYeni Sürüm: v%s\n\nYenilikler:\n%s\n\n"
                                    L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
                                    APP_VERSION_STR, info->newVersion, info->changelog);
                     } else {
                         _snwprintf(prompt, 2047,
-                                   L"\u039BURA için yeni bir güncelleme mevcut!\n\n"
+                                   L"\u039BURNS için yeni bir güncelleme mevcut!\n\n"
                                    L"Mevcut Sürüm: v%s\nYeni Sürüm: v%s\n\n"
                                    L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
                                    APP_VERSION_STR, info->newVersion);
@@ -3656,7 +3650,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     if (hShell) {
         SetAppIDProc pSetAppID = (SetAppIDProc)GetProcAddress(hShell, "SetCurrentProcessExplicitAppUserModelID");
         if (pSetAppID) {
-            pSetAppID(L"Aura.MusicPlayer.Modern.App");
+            pSetAppID(L"Aurns.MusicPlayer.Modern.App");
         }
     }
 
@@ -3690,7 +3684,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     wc.hIconSm = hSmallIcon ? hSmallIcon : wc.hIcon;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = NULL;
-    wc.lpszClassName = L"SeloPlayerNativeClass";
+    wc.lpszClassName = L"AurnsNativeClass";
 
     RegisterClassExW(&wc);
 
@@ -3707,8 +3701,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     HWND hWnd = CreateWindowExW(
         WS_EX_ACCEPTFILES,
-        L"SeloPlayerNativeClass",
-        L"\u039BURA",
+        L"AurnsNativeClass",
+        L"\u039BURNS",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
         CW_USEDEFAULT, CW_USEDEFAULT, winW, winH,
         NULL, NULL, hInst, NULL
