@@ -267,11 +267,12 @@ static void InitDpiFonts(int dpi) {
     int sIcon      = -MulDiv(12, dpi, 72);
     int sIconLarge = -MulDiv(15, dpi, 72);
 
-    const wchar_t *uiFont   = FontExists(L"Segoe UI Variable Text") ? L"Segoe UI Variable Text" : L"Segoe UI";
-    const wchar_t *dispFont = FontExists(L"Segoe UI Variable Display") ? L"Segoe UI Variable Display" : uiFont;
-    const wchar_t *iconFont = FontExists(L"Segoe Fluent Icons") ? L"Segoe Fluent Icons" : L"Segoe MDL2 Assets";
+    const wchar_t *uiFont    = FontExists(L"Segoe UI Variable Text") ? L"Segoe UI Variable Text" : L"Segoe UI";
+    const wchar_t *dispFont  = FontExists(L"Segoe UI Variable Display") ? L"Segoe UI Variable Display" : uiFont;
+    const wchar_t *brandFont = FontExists(L"Bahnschrift") ? L"Bahnschrift" : dispFont;
+    const wchar_t *iconFont  = FontExists(L"Segoe Fluent Icons") ? L"Segoe Fluent Icons" : L"Segoe MDL2 Assets";
 
-    g_hFontBrand      = CreateFontW(sBrand,     0, 0, 0, FW_BOLD,     FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, dispFont);
+    g_hFontBrand      = CreateFontW(sBrand,     0, 0, 0, FW_BOLD,     FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, brandFont);
     g_hFontTitle      = CreateFontW(sTitle,     0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, dispFont);
     g_hFontBold       = CreateFontW(sMain,      0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
     g_hFontMain       = CreateFontW(sMain,      0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, uiFont);
@@ -1304,12 +1305,18 @@ static void RenderUI(HDC hdc, const RECT *clientRc) {
         }
     }
 
-    // Marka İsmi ("Selo")
-    RECT rcBrand = { S(56), 0, S(126), headerH };
+    // Logo İkonu ve Marka İsmi ("Λ U R A")
+    int logoSz = S(26);
+    int logoX  = S(56);
+    int logoY  = (headerH - logoSz) / 2;
+    if (g_hAppIcon) {
+        DrawIconEx(hdc, logoX, logoY, g_hAppIcon, logoSz, logoSz, 0, NULL, DI_NORMAL);
+    }
+    RECT rcBrand = { logoX + logoSz + S(9), 0, logoX + logoSz + S(140), headerH };
     SetBkMode(hdc, TRANSPARENT);
     SelectObject(hdc, g_hFontBrand);
     SetTextColor(hdc, COLOR_TEXT_WHITE);
-    DrawTextW(hdc, L"Selo", -1, &rcBrand, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+    DrawTextW(hdc, L"\u039B U R A", -1, &rcBrand, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
     // Sağ Arama Kutusu Hapı
     int searchW = (w >= S(560)) ? S(190) : S(148);
@@ -2763,13 +2770,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     wchar_t prompt[2048];
                     if (info->changelog[0]) {
                         _snwprintf(prompt, 2047,
-                                   L"SeloPlayer için yeni bir güncelleme mevcut!\n\n"
+                                   L"\u039BURA için yeni bir güncelleme mevcut!\n\n"
                                    L"Mevcut Sürüm: v%s\nYeni Sürüm: v%s\n\nYenilikler:\n%s\n\n"
                                    L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
                                    APP_VERSION_STR, info->newVersion, info->changelog);
                     } else {
                         _snwprintf(prompt, 2047,
-                                   L"SeloPlayer için yeni bir güncelleme mevcut!\n\n"
+                                   L"\u039BURA için yeni bir güncelleme mevcut!\n\n"
                                    L"Mevcut Sürüm: v%s\nYeni Sürüm: v%s\n\n"
                                    L"Şimdi otomatik olarak indirip güncellemek istiyor musunuz?",
                                    APP_VERSION_STR, info->newVersion);
@@ -3652,7 +3659,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     HWND hWnd = CreateWindowExW(
         WS_EX_ACCEPTFILES,
         L"SeloPlayerNativeClass",
-        L"Selo Player",
+        L"\u039BURA",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
         CW_USEDEFAULT, CW_USEDEFAULT, winW, winH,
         NULL, NULL, hInst, NULL
