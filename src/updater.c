@@ -239,7 +239,7 @@ void Updater_CheckAsync(HWND hWnd, BOOL isManual) {
     cp->hWnd = hWnd;
     cp->isManual = isManual;
 
-    HANDLE hThread = CreateThread(NULL, 0, CheckUpdateThread, cp, 0, NULL);
+    HANDLE hThread = CreateThread(NULL, 64 * 1024, CheckUpdateThread, cp, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
     if (hThread) {
         CloseHandle(hThread);
     } else {

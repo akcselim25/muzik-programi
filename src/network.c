@@ -309,7 +309,7 @@ BOOL Network_Init(HWND hWnd, const char *clientTag) {
     g_socket = INVALID_SOCKET;
     g_topicCount = 0;
 
-    g_hThread = CreateThread(NULL, 0, NetworkThreadProc, NULL, 0, NULL);
+    g_hThread = CreateThread(NULL, 64 * 1024, NetworkThreadProc, NULL, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
     return (g_hThread != NULL);
 }
 

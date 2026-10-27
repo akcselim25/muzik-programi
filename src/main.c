@@ -2632,6 +2632,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                         InvalidateRect(hWnd, &rcDock, FALSE);
                     }
                 }
+
+                // Periyodik RAM Tiraslama: Bellek kullanimini her zaman dip seviyede tut
+                static DWORD s_lastTrimTick = 0;
+                if (now - s_lastTrimTick >= 20000 && !g_isDraggingSeek && !g_isDraggingVol && !g_isDraggingList) {
+                    s_lastTrimTick = now;
+                    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+                }
             }
             return 0;
         }
@@ -3676,6 +3683,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     int show = (nCmdShow == 0 || nCmdShow == SW_HIDE) ? SW_SHOWNORMAL : nCmdShow;
     ShowWindow(hWnd, show);
     UpdateWindow(hWnd);
+
+    // RAM Tiraslama: Baslangictaki DLL sayfalarini aninda serbest birak (0.5 - 2 MB dip seviye)
+    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
 
     MSG msg;
     while (GetMessageW(&msg, NULL, 0, 0)) {

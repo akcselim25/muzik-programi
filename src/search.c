@@ -824,7 +824,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 InvalidateRect(hWnd, NULL, FALSE);
 
                 wchar_t *qCopy = _wcsdup(query);
-                HANDLE hT = CreateThread(NULL, 0, SearchThread, qCopy, 0, NULL);
+                HANDLE hT = CreateThread(NULL, 64 * 1024, SearchThread, qCopy, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
                 if (hT) CloseHandle(hT);
             }
             else if (wmId == IDC_SEARCH_LIST) {
@@ -857,7 +857,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 wcsncpy(dp->folder, g_downloadFolder, MAX_PATH - 1);
                 dp->folder[MAX_PATH - 1] = L'\0';
 
-                HANDLE hT = CreateThread(NULL, 0, DownloadThread, dp, 0, NULL);
+                HANDLE hT = CreateThread(NULL, 64 * 1024, DownloadThread, dp, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
                 if (hT) CloseHandle(hT);
             }
             break;
@@ -889,7 +889,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     task->searchGen = curGen;
                     wcsncpy(task->id, g_results[i].id, 63);
                     task->id[63] = L'\0';
-                    HANDLE hT = CreateThread(NULL, 0, SingleThumbThread, task, 0, NULL);
+                    HANDLE hT = CreateThread(NULL, 64 * 1024, SingleThumbThread, task, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
                     if (hT) CloseHandle(hT);
                 }
             }
