@@ -1,17 +1,25 @@
 #include "updater.h"
 #include <winhttp.h>
+#include <shellapi.h>
 #include <shlwapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define GITHUB_VERSION_URL L"https://raw.githubusercontent.com/akcselim25/muzik-programi/main/version.txt"
-#define DEFAULT_EXE_URL    L"https://raw.githubusercontent.com/akcselim25/muzik-programi/main/SeloPlayer.exe"
+#define DEFAULT_EXE_URL    L"https://raw.githubusercontent.com/akcselim25/muzik-programi/main/Aurns.exe"
 
 typedef struct {
     HWND hWnd;
     BOOL isManual;
 } CheckParam;
+
+typedef struct {
+    HWND hWnd;
+    wchar_t downloadUrl[1024];
+} UpdateDownloadParam;
+
+static volatile LONG g_updateDownloading = 0;
 
 static int CompareVersions(const wchar_t *v1, const wchar_t *v2) {
     int maj1 = 0, min1 = 0, pat1 = 0;
@@ -40,11 +48,11 @@ static HINTERNET OpenHttpRequest(const wchar_t *url, HINTERNET *pSession, HINTER
 
     if (!WinHttpCrackUrl(url, 0, 0, &uc)) return NULL;
 
-    HINTERNET hSession = WinHttpOpen(L"SeloPlayer/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+    HINTERNET hSession = WinHttpOpen(L"Aurns/1.1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!hSession) return NULL;
 
-    WinHttpSetTimeouts(hSession, 4000, 4000, 5000, 8000);
+    WinHttpSetTimeouts(hSession, 4000, 4000, 5000, 10000);
 
     HINTERNET hConnect = WinHttpConnect(hSession, host, uc.nPort, 0);
     if (!hConnect) {
@@ -107,10 +115,15 @@ static BOOL HttpDownloadTextUtf8(const wchar_t *url, char *outBuf, DWORD maxByte
     return (total > 0);
 }
 
-static BOOL HttpDownloadToFile(const wchar_t *url, const wchar_t *destPath) {
+static BOOL HttpDownloadToFileWithProgress(const wchar_t *url, const wchar_t *destPath, HWND hNotifyWnd) {
     HINTERNET hSession = NULL, hConnect = NULL;
     HINTERNET hRequest = OpenHttpRequest(url, &hSession, &hConnect);
     if (!hRequest) return FALSE;
+
+    DWORD contentLen = 0;
+    DWORD clSize = sizeof(contentLen);
+    WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH | WINHTTP_QUERY_FLAG_NUMBER,
+                        WINHTTP_HEADER_NAME_BY_INDEX, &contentLen, &clSize, WINHTTP_NO_HEADER_INDEX);
 
     HANDLE hFile = CreateFileW(destPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
@@ -120,9 +133,16 @@ static BOOL HttpDownloadToFile(const wchar_t *url, const wchar_t *destPath) {
         return FALSE;
     }
 
+    if (IsWindow(hNotifyWnd)) {
+        PostMessageW(hNotifyWnd, WM_APP_UPDATE_PROGRESS, 2, 0);
+    }
+
     BYTE chunk[16384];
     DWORD avail = 0;
+    DWORD totalDownloaded = 0;
+    int lastPct = 2;
     BOOL ok = TRUE;
+
     while (WinHttpQueryDataAvailable(hRequest, &avail) && avail > 0) {
         while (avail > 0) {
             DWORD toRead = (avail > sizeof(chunk)) ? sizeof(chunk) : avail;
@@ -137,6 +157,19 @@ static BOOL HttpDownloadToFile(const wchar_t *url, const wchar_t *destPath) {
                 break;
             }
             avail -= got;
+            totalDownloaded += got;
+
+            int pct;
+            if (contentLen > 0) {
+                pct = (int)(((unsigned long long)totalDownloaded * 99ULL) / (unsigned long long)contentLen);
+            } else {
+                pct = (int)((totalDownloaded * 95U) / 320000U);
+            }
+            if (pct > 99) pct = 99;
+            if (pct > lastPct && IsWindow(hNotifyWnd)) {
+                lastPct = pct;
+                PostMessageW(hNotifyWnd, WM_APP_UPDATE_PROGRESS, (WPARAM)pct, 0);
+            }
         }
         if (!ok) break;
     }
@@ -145,6 +178,10 @@ static BOOL HttpDownloadToFile(const wchar_t *url, const wchar_t *destPath) {
     WinHttpCloseHandle(hRequest);
     WinHttpCloseHandle(hConnect);
     WinHttpCloseHandle(hSession);
+
+    if (ok && IsWindow(hNotifyWnd)) {
+        PostMessageW(hNotifyWnd, WM_APP_UPDATE_PROGRESS, 100, 0);
+    }
     return ok;
 }
 
@@ -165,7 +202,6 @@ static DWORD WINAPI CheckUpdateThread(LPVOID param) {
     char utf8Buf[4096];
     if (HttpDownloadTextUtf8(urlWithTimestamp, utf8Buf, sizeof(utf8Buf))) {
         const char *src = utf8Buf;
-        // UTF-8 BOM varsa atla
         if ((unsigned char)src[0] == 0xEF && (unsigned char)src[1] == 0xBB && (unsigned char)src[2] == 0xBF) {
             src += 3;
         }
@@ -217,20 +253,89 @@ static DWORD WINAPI CheckUpdateThread(LPVOID param) {
     return 0;
 }
 
-void Updater_Init(void) {
+static DWORD WINAPI UpdateDownloadThread(LPVOID param) {
+    UpdateDownloadParam *up = (UpdateDownloadParam*)param;
+    HWND hWnd = up->hWnd;
+    wchar_t downloadUrl[1024];
+    wcsncpy(downloadUrl, up->downloadUrl, 1023);
+    downloadUrl[1023] = L'\0';
+    free(up);
+
     wchar_t szCurrentExe[MAX_PATH];
     GetModuleFileNameW(NULL, szCurrentExe, MAX_PATH);
-    PathRemoveFileSpecW(szCurrentExe);
 
-    wchar_t szOldExe[MAX_PATH];
-    _snwprintf(szOldExe, MAX_PATH - 1, L"%s\\SeloPlayer_old.tmp", szCurrentExe);
-    szOldExe[MAX_PATH - 1] = L'\0';
-    DeleteFileW(szOldExe);
+    wchar_t szDir[MAX_PATH];
+    wcscpy(szDir, szCurrentExe);
+    PathRemoveFileSpecW(szDir);
 
     wchar_t szNewExe[MAX_PATH];
-    _snwprintf(szNewExe, MAX_PATH - 1, L"%s\\SeloPlayer_new.tmp", szCurrentExe);
+    _snwprintf(szNewExe, MAX_PATH - 1, L"%s\\Aurns_new.tmp", szDir);
     szNewExe[MAX_PATH - 1] = L'\0';
+
+    wchar_t szOldExe[MAX_PATH];
+    _snwprintf(szOldExe, MAX_PATH - 1, L"%s\\Aurns_old.tmp", szDir);
+    szOldExe[MAX_PATH - 1] = L'\0';
+
     DeleteFileW(szNewExe);
+
+    wchar_t urlWithTs[1200];
+    _snwprintf(urlWithTs, 1199, L"%s?t=%lu", downloadUrl, (unsigned long)GetTickCount());
+    urlWithTs[1199] = L'\0';
+
+    if (!HttpDownloadToFileWithProgress(urlWithTs, szNewExe, hWnd)) {
+        DeleteFileW(szNewExe);
+        InterlockedExchange(&g_updateDownloading, 0);
+        if (IsWindow(hWnd)) PostMessageW(hWnd, WM_APP_UPDATE_DONE, 0, 1);
+        return 0;
+    }
+
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (!GetFileAttributesExW(szNewExe, GetFileExInfoStandard, &fad) || fad.nFileSizeLow < 50000) {
+        DeleteFileW(szNewExe);
+        InterlockedExchange(&g_updateDownloading, 0);
+        if (IsWindow(hWnd)) PostMessageW(hWnd, WM_APP_UPDATE_DONE, 0, 2);
+        return 0;
+    }
+
+    DeleteFileW(szOldExe);
+    if (!MoveFileExW(szCurrentExe, szOldExe, MOVEFILE_REPLACE_EXISTING)) {
+        DeleteFileW(szNewExe);
+        InterlockedExchange(&g_updateDownloading, 0);
+        if (IsWindow(hWnd)) PostMessageW(hWnd, WM_APP_UPDATE_DONE, 0, 3);
+        return 0;
+    }
+
+    if (!MoveFileExW(szNewExe, szCurrentExe, MOVEFILE_REPLACE_EXISTING)) {
+        MoveFileExW(szOldExe, szCurrentExe, MOVEFILE_REPLACE_EXISTING);
+        InterlockedExchange(&g_updateDownloading, 0);
+        if (IsWindow(hWnd)) PostMessageW(hWnd, WM_APP_UPDATE_DONE, 0, 4);
+        return 0;
+    }
+
+    InterlockedExchange(&g_updateDownloading, 0);
+    if (IsWindow(hWnd)) {
+        PostMessageW(hWnd, WM_APP_UPDATE_DONE, 1, 0);
+    }
+    ShellExecuteW(NULL, L"open", szCurrentExe, NULL, szDir, SW_SHOWNORMAL);
+    ExitProcess(0);
+    return 0;
+}
+
+void Updater_Init(void) {
+    wchar_t szDir[MAX_PATH];
+    GetModuleFileNameW(NULL, szDir, MAX_PATH);
+    PathRemoveFileSpecW(szDir);
+
+    static const wchar_t *temps[] = {
+        L"Aurns_old.tmp", L"Aurns_new.tmp",
+        L"SeloPlayer_old.tmp", L"SeloPlayer_new.tmp"
+    };
+    for (int i = 0; i < 4; i++) {
+        wchar_t path[MAX_PATH];
+        _snwprintf(path, MAX_PATH - 1, L"%s\\%s", szDir, temps[i]);
+        path[MAX_PATH - 1] = L'\0';
+        DeleteFileW(path);
+    }
 }
 
 void Updater_CheckAsync(HWND hWnd, BOOL isManual) {
@@ -247,59 +352,24 @@ void Updater_CheckAsync(HWND hWnd, BOOL isManual) {
     }
 }
 
-BOOL Updater_PerformUpdate(HWND hWnd, const wchar_t *downloadUrl) {
+BOOL Updater_StartUpdateAsync(HWND hWnd, const wchar_t *downloadUrl) {
     if (!downloadUrl || !downloadUrl[0]) return FALSE;
+    if (InterlockedCompareExchange(&g_updateDownloading, 1, 0) != 0) return FALSE;
 
-    wchar_t szCurrentExe[MAX_PATH];
-    GetModuleFileNameW(NULL, szCurrentExe, MAX_PATH);
-
-    wchar_t szDir[MAX_PATH];
-    wcscpy(szDir, szCurrentExe);
-    PathRemoveFileSpecW(szDir);
-
-    wchar_t szNewExe[MAX_PATH];
-    _snwprintf(szNewExe, MAX_PATH - 1, L"%s\\SeloPlayer_new.tmp", szDir);
-    szNewExe[MAX_PATH - 1] = L'\0';
-
-    wchar_t szOldExe[MAX_PATH];
-    _snwprintf(szOldExe, MAX_PATH - 1, L"%s\\SeloPlayer_old.tmp", szDir);
-    szOldExe[MAX_PATH - 1] = L'\0';
-
-    DeleteFileW(szNewExe);
-
-    wchar_t urlWithTs[1200];
-    _snwprintf(urlWithTs, 1199, L"%s?t=%lu", downloadUrl, (unsigned long)GetTickCount());
-    urlWithTs[1199] = L'\0';
-
-    if (!HttpDownloadToFile(urlWithTs, szNewExe)) {
-        MessageBoxW(hWnd, L"Güncelleme dosyası indirilemedi!\nLütfen internet bağlantınızı kontrol edin.", L"Güncelleme Hatası", MB_OK | MB_ICONERROR);
-        DeleteFileW(szNewExe);
+    UpdateDownloadParam *up = (UpdateDownloadParam*)calloc(1, sizeof(UpdateDownloadParam));
+    if (!up) {
+        InterlockedExchange(&g_updateDownloading, 0);
         return FALSE;
     }
+    up->hWnd = hWnd;
+    wcsncpy(up->downloadUrl, downloadUrl, 1023);
 
-    WIN32_FILE_ATTRIBUTE_DATA fad;
-    if (!GetFileAttributesExW(szNewExe, GetFileExInfoStandard, &fad) || fad.nFileSizeLow < 50000) {
-        MessageBoxW(hWnd, L"İndirilen güncelleme dosyası eksik veya geçersiz!", L"Güncelleme Hatası", MB_OK | MB_ICONERROR);
-        DeleteFileW(szNewExe);
-        return FALSE;
+    HANDLE hThread = CreateThread(NULL, 64 * 1024, UpdateDownloadThread, up, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
+    if (hThread) {
+        CloseHandle(hThread);
+        return TRUE;
     }
-
-    DeleteFileW(szOldExe);
-    if (!MoveFileExW(szCurrentExe, szOldExe, MOVEFILE_REPLACE_EXISTING)) {
-        MessageBoxW(hWnd, L"Mevcut program dosyası taşınamadı. Yönetici izinlerini kontrol edin.", L"Güncelleme Hatası", MB_OK | MB_ICONERROR);
-        DeleteFileW(szNewExe);
-        return FALSE;
-    }
-
-    if (!MoveFileExW(szNewExe, szCurrentExe, MOVEFILE_REPLACE_EXISTING)) {
-        MoveFileExW(szOldExe, szCurrentExe, MOVEFILE_REPLACE_EXISTING);
-        MessageBoxW(hWnd, L"Yeni sürüm dosyası yerine yerleştirilemedi!", L"Güncelleme Hatası", MB_OK | MB_ICONERROR);
-        return FALSE;
-    }
-
-    HINSTANCE hInst = ShellExecuteW(NULL, L"open", szCurrentExe, NULL, szDir, SW_SHOWNORMAL);
-    if ((INT_PTR)hInst > 32) {
-        ExitProcess(0);
-    }
-    return TRUE;
+    free(up);
+    InterlockedExchange(&g_updateDownloading, 0);
+    return FALSE;
 }

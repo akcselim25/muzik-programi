@@ -1,7 +1,6 @@
-1.0.9
-https://raw.githubusercontent.com/akcselim25/muzik-programi/main/SeloPlayer.exe
-- v1.0.8 Obsidyen Cam Arayuzu Geri Getirildi: Sevilen monogram harf kutucuklari, ust bar Arkadaslar ve +Indir butonlari, cift katmanli zengin oynatici dock'u birebir korundu.
-- Sifir-FPS-Drop Oyun Modu: Oyundayken veya arka plandayken tum animasyon ve zamanlayici donguleri durdurulur (%0.000 CPU, sifir GPU takilmasi).
-- Sadece Oynatici Alani Guncelleme: Muzik calarken her saniye tum liste degil, sadece alt oynatici cubugu (rcDock) cizilir; islemci ve pil tuketimi minimuma indirildi.
-- Donanim Medya Tuslari: Klavye ve kulakliktaki Play/Pause, Next, Prev tuslari oyundayken de arka planda kesintisiz calisir.
-- Toplam boyut yalnizca 277 KB.
+1.1.0
+https://raw.githubusercontent.com/akcselim25/muzik-programi/main/Aurns.exe
+- Akilli Oynatma Listesi Paylasimi: Arkadasinizin paylastigi oynatma listesini ice aktardiginizda bilgisayarinizda olmayan sarkilar otomatik olarak arka planda indirilir ve aninda listeye eklenir.
+- Evrensel Canli Indirme Yuzdesi ve Durum Cubugu: Tekli sarki indirme, paylasilan liste indirme, Canli Jam otomatik indirme ve uygulama guncellemelerinde gercek zamanli yuzde (%) ve ilerleme cubugu gosterilir.
+- Apple Akiskan Arayuz ve Ultra Hizli Baslangic: Sifir takilma ile aninda acilan pencere, kesintiye ugratilabilir yay fizigi ve maksimum hafiflikte optimize edilmis pikselsel cizim motoru.
+- Tum eski kodlar ve gereksiz ikili dosyalar temizlendi; yalnizca saf Aurns.exe mimarisi.

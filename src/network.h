@@ -20,9 +20,7 @@ typedef struct {
 
 BOOL Network_Init(HWND hWnd, const char *clientTag);
 BOOL Network_Subscribe(const char *topic);
-BOOL Network_Unsubscribe(const char *topic);
 BOOL Network_Publish(const char *topic, const char *payload);
-BOOL Network_IsConnected(void);
 void Network_Close(void);
 
 void Network_TagToTopicKeyW(const wchar_t *tag, char *out, int maxLen);

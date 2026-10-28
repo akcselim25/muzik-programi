@@ -282,23 +282,8 @@ void Friends_GetMyName(wchar_t *buf, int maxLen) {
     }
 }
 
-void Friends_SetMyName(const wchar_t *newName) {
-    if (!newName || !newName[0]) return;
-    wcsncpy(g_myName, newName, 63);
-    g_myName[63] = L'\0';
-    Friends_Save();
-}
-
 int Friends_GetFriendCount(void) {
     return g_friendCount;
-}
-
-int Friends_GetOnlineCount(void) {
-    int n = 0;
-    for (int i = 0; i < g_friendCount; i++) {
-        if (g_friends[i].isOnline) n++;
-    }
-    return n;
 }
 
 const FriendItem* Friends_GetFriend(int index) {

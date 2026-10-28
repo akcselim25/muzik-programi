@@ -12,7 +12,6 @@ void Player_Play(void);
 void Player_Pause(void);
 void Player_Stop(void);
 int  Player_IsPlaying(void);
-int  Player_IsPaused(void);
 int  Player_GetDuration(void);
 int  Player_GetPosition(void);
 void Player_SetPosition(int seconds);

@@ -229,10 +229,6 @@ int Player_IsPlaying(void) {
     return g_isPlaying && !g_isPaused;
 }
 
-int Player_IsPaused(void) {
-    return g_isPaused;
-}
-
 int Player_GetDuration(void) {
     if (!g_pPlayer || !g_mediaReady) return 0;
     if (g_durationCache > 0) return g_durationCache;

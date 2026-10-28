@@ -75,29 +75,51 @@ static void NormalizeUnicodeTurkishW(wchar_t *str) {
     str[w] = L'\0';
 }
 
-static wchar_t TurkishToUpperChar(wchar_t ch) {
+static inline wchar_t TurkishToUpperChar(wchar_t ch) {
     if (ch == L'i') return 0x0130; // İ
     if (ch == 0x0131) return L'I'; // ı -> I
+    if (ch >= L'a' && ch <= L'z') return (wchar_t)(ch - L'a' + L'A');
+    if (ch < 128) return ch;
+    switch (ch) {
+        case 0x015F: return 0x015E; // ş -> Ş
+        case 0x011F: return 0x011E; // ğ -> Ğ
+        case 0x00FC: return 0x00DC; // ü -> Ü
+        case 0x00F6: return 0x00D6; // ö -> Ö
+        case 0x00E7: return 0x00C7; // ç -> Ç
+        default: break;
+    }
     wchar_t out = ch;
-    if (LCMapStringW(0x041F /* tr-TR */, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &ch, 1, &out, 1) > 0) {
+    if (LCMapStringW(0x041F, LCMAP_UPPERCASE | LCMAP_LINGUISTIC_CASING, &ch, 1, &out, 1) > 0) {
         return out;
     }
     CharUpperBuffW(&out, 1);
     return out;
 }
 
-static wchar_t TurkishToLowerChar(wchar_t ch) {
-    if (ch == 0x0130) return L'i'; // İ -> i
-    if (ch == L'I') return 0x0131; // I -> ı
+static inline wchar_t TurkishToLowerChar(wchar_t ch) {
+    if (ch == 0x0130) return L'i';    // İ -> i
+    if (ch == L'I') return 0x0131;    // I -> ı
+    if (ch >= L'A' && ch <= L'Z') return (wchar_t)(ch - L'A' + L'a');
+    if (ch < 128) return ch;
+    switch (ch) {
+        case 0x015E: return 0x015F; // Ş -> ş
+        case 0x011E: return 0x011F; // Ğ -> ğ
+        case 0x00DC: return 0x00FC; // Ü -> ü
+        case 0x00D6: return 0x00F6; // Ö -> ö
+        case 0x00C7: return 0x00E7; // Ç -> ç
+        default: break;
+    }
     wchar_t out = ch;
-    if (LCMapStringW(0x041F /* tr-TR */, LCMAP_LOWERCASE | LCMAP_LINGUISTIC_CASING, &ch, 1, &out, 1) > 0) {
+    if (LCMapStringW(0x041F, LCMAP_LOWERCASE | LCMAP_LINGUISTIC_CASING, &ch, 1, &out, 1) > 0) {
         return out;
     }
     CharLowerBuffW(&out, 1);
     return out;
 }
 
-static BOOL IsLetterW(wchar_t ch) {
+static inline BOOL IsLetterW(wchar_t ch) {
+    if ((ch >= L'A' && ch <= L'Z') || (ch >= L'a' && ch <= L'z')) return TRUE;
+    if (ch < 128) return FALSE;
     WORD ctype = 0;
     if (GetStringTypeW(CT_CTYPE1, &ch, 1, &ctype)) {
         return (ctype & C1_ALPHA) != 0;
@@ -105,7 +127,10 @@ static BOOL IsLetterW(wchar_t ch) {
     return iswalpha(ch) != 0;
 }
 
-static BOOL IsUpperLetterW(wchar_t ch) {
+static inline BOOL IsUpperLetterW(wchar_t ch) {
+    if (ch >= L'A' && ch <= L'Z') return TRUE;
+    if (ch < 128) return FALSE;
+    if (ch == 0x0130 || ch == 0x015E || ch == 0x011E || ch == 0x00DC || ch == 0x00D6 || ch == 0x00C7) return TRUE;
     WORD ctype = 0;
     if (GetStringTypeW(CT_CTYPE1, &ch, 1, &ctype)) {
         return (ctype & C1_UPPER) != 0;
@@ -113,7 +138,10 @@ static BOOL IsUpperLetterW(wchar_t ch) {
     return iswupper(ch) != 0;
 }
 
-static BOOL IsLowerLetterW(wchar_t ch) {
+static inline BOOL IsLowerLetterW(wchar_t ch) {
+    if (ch >= L'a' && ch <= L'z') return TRUE;
+    if (ch < 128) return FALSE;
+    if (ch == 0x0131 || ch == 0x015F || ch == 0x011F || ch == 0x00FC || ch == 0x00F6 || ch == 0x00E7) return TRUE;
     WORD ctype = 0;
     if (GetStringTypeW(CT_CTYPE1, &ch, 1, &ctype)) {
         return (ctype & C1_LOWER) != 0;
@@ -583,7 +611,34 @@ int Playlist_ScanFolder(const wchar_t *folderPath) {
     return added;
 }
 
-int Playlist_ImportM3U(const wchar_t *filePath) {
+static void ExtractYtIdFromUrlW(const wchar_t *url, wchar_t *outId) {
+    outId[0] = L'\0';
+    if (!url) return;
+    const wchar_t *p = wcsstr(url, L"v=");
+    if (p) p += 2;
+    else {
+        p = wcsstr(url, L"youtu.be/");
+        if (p) p += 9;
+    }
+    if (!p) return;
+    for (int i = 0; i < 11; i++) {
+        wchar_t c = p[i];
+        if (!((c >= L'A' && c <= L'Z') || (c >= L'a' && c <= L'z') ||
+              (c >= L'0' && c <= L'9') || c == L'_' || c == L'-')) {
+            return;
+        }
+    }
+    wchar_t nextCh = p[11];
+    if (nextCh == L'\0' || nextCh == L'&' || nextCh == L'?' || nextCh == L'/' || nextCh == L' ') {
+        wcsncpy(outId, p, 11);
+        outId[11] = L'\0';
+    }
+}
+
+int Playlist_ImportSmart(const wchar_t *filePath, MissingPlaylistTrack *outMissing, int maxMissing, int *outMissingCount) {
+    if (outMissingCount) *outMissingCount = 0;
+    if (!filePath || !filePath[0]) return 0;
+
     FILE *f = _wfopen(filePath, L"rt, ccs=UTF-8");
     if (!f) {
         f = _wfopen(filePath, L"r");
@@ -596,38 +651,118 @@ int Playlist_ImportM3U(const wchar_t *filePath) {
     PathRemoveFileSpecW(dir);
 
     wchar_t line[1024];
+    wchar_t pendingTitle[256] = {0};
+    wchar_t pendingYtId[16] = {0};
     int added = 0;
+
     while (fgetws(line, 1024, f)) {
-        int len = (int)wcslen(line);
-        while (len > 0 && (line[len - 1] == L'\r' || line[len - 1] == L'\n' || line[len - 1] == L' ')) {
-            line[--len] = L'\0';
-        }
-        if (len == 0 || line[0] == L'#') continue;
+        wchar_t *s = line;
+        if (s[0] == 0xFEFF) s++; // UTF-8 BOM atla
 
-        wchar_t fullPath[MAX_PATH];
-        if (PathIsRelativeW(line)) {
-            PathCombineW(fullPath, dir, line);
-        } else {
-            wcsncpy(fullPath, line, MAX_PATH - 1);
-            fullPath[MAX_PATH - 1] = L'\0';
+        int len = (int)wcslen(s);
+        while (len > 0 && (s[len - 1] == L'\r' || s[len - 1] == L'\n' || s[len - 1] == L' ' || s[len - 1] == L'\t')) {
+            s[--len] = L'\0';
+        }
+        while (*s == L' ' || *s == L'\t') { s++; len--; }
+        if (len <= 0) continue;
+
+        if (s[0] == L'#') {
+            if (_wcsnicmp(s, L"#EXTAURNS:YTID=", 15) == 0) {
+                const wchar_t *idStr = s + 15;
+                if (wcslen(idStr) == 11) {
+                    wcsncpy(pendingYtId, idStr, 11);
+                    pendingYtId[11] = L'\0';
+                }
+            } else if (_wcsnicmp(s, L"#EXTINF:", 8) == 0) {
+                const wchar_t *comma = wcschr(s + 8, L',');
+                if (comma && comma[1]) {
+                    wcsncpy(pendingTitle, comma + 1, 255);
+                    pendingTitle[255] = L'\0';
+                    StrTrimW(pendingTitle, L" \t");
+                }
+            }
+            continue;
         }
 
-        if (GetFileAttributesW(fullPath) != INVALID_FILE_ATTRIBUTES) {
-            if (Playlist_Add(fullPath) >= 0) {
-                added++;
+        BOOL isUrl = (_wcsnicmp(s, L"http://", 7) == 0 || _wcsnicmp(s, L"https://", 8) == 0);
+        BOOL resolvedLocally = FALSE;
+
+        if (!isUrl) {
+            wchar_t fullPath[MAX_PATH];
+            if (PathIsRelativeW(s)) {
+                PathCombineW(fullPath, dir, s);
+            } else {
+                wcsncpy(fullPath, s, MAX_PATH - 1);
+                fullPath[MAX_PATH - 1] = L'\0';
+            }
+
+            DWORD attr = GetFileAttributesW(fullPath);
+            if (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+                if (Playlist_Add(fullPath) >= 0) {
+                    added++;
+                }
+                resolvedLocally = TRUE;
             }
         }
+
+        if (!resolvedLocally) {
+            if (!pendingYtId[0]) {
+                if (isUrl) ExtractYtIdFromUrlW(s, pendingYtId);
+                else Playlist_ExtractYouTubeId(s, pendingYtId, 16);
+            }
+            if (!pendingTitle[0] && !isUrl) {
+                Playlist_CleanTitle(s, pendingTitle, 256);
+            }
+            if (!pendingTitle[0] && pendingYtId[0]) {
+                _snwprintf(pendingTitle, 255, L"YouTube Parçası (%s)", pendingYtId);
+                pendingTitle[255] = L'\0';
+            }
+
+            // Yerel kitaplikta bu sarki farkli bir dosya yoluyla zaten yuklu mu?
+            int existingIdx = Playlist_FindBestMatch(pendingTitle, pendingYtId);
+            if (existingIdx >= 0) {
+                added++;
+            } else if ((pendingTitle[0] || pendingYtId[0]) && outMissing && outMissingCount && *outMissingCount < maxMissing) {
+                BOOL dup = FALSE;
+                for (int k = 0; k < *outMissingCount; k++) {
+                    if (pendingYtId[0] && outMissing[k].ytId[0] && wcscmp(outMissing[k].ytId, pendingYtId) == 0) {
+                        dup = TRUE;
+                        break;
+                    }
+                    if (pendingTitle[0] && _wcsicmp(outMissing[k].title, pendingTitle) == 0) {
+                        dup = TRUE;
+                        break;
+                    }
+                }
+                if (!dup) {
+                    int idx = (*outMissingCount)++;
+                    wcsncpy(outMissing[idx].title, pendingTitle, 255);
+                    outMissing[idx].title[255] = L'\0';
+                    wcsncpy(outMissing[idx].ytId, pendingYtId, 15);
+                    outMissing[idx].ytId[15] = L'\0';
+                }
+            }
+        }
+
+        pendingTitle[0] = L'\0';
+        pendingYtId[0]  = L'\0';
     }
+
     fclose(f);
     return added;
 }
 
-int Playlist_ExportM3U(const wchar_t *filePath) {
+int Playlist_ExportSmart(const wchar_t *filePath) {
     FILE *f = _wfopen(filePath, L"wt, ccs=UTF-8");
     if (!f) return 0;
 
     fwprintf(f, L"#EXTM3U\n");
     for (int i = 0; i < g_count; i++) {
+        wchar_t ytId[16] = {0};
+        Playlist_ExtractYouTubeId(g_items[i].filePath, ytId, 16);
+        if (ytId[0]) {
+            fwprintf(f, L"#EXTAURNS:YTID=%s\n", ytId);
+        }
         fwprintf(f, L"#EXTINF:-1,%s\n", g_items[i].title);
         fwprintf(f, L"%s\n", g_items[i].filePath);
     }

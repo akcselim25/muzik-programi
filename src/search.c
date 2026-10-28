@@ -4,6 +4,7 @@
 #include <shlobj.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <olectl.h>
 #include <dwmapi.h>
 #include "search.h"
@@ -44,10 +45,12 @@ static HWND g_hBtnDownload = NULL;
 static HWND g_hLblStatus = NULL;
 
 static wchar_t g_downloadFolder[MAX_PATH] = {0};
+static wchar_t g_activeDlTitle[256] = {0};
 static SearchItem *g_results = NULL; // Yalnızca pencere açıkken bellekte tutulur (0 KB boşta RAM!)
 static int g_resultCount = 0;
 static volatile BOOL g_isSearching = FALSE;
 static volatile BOOL g_isDownloading = FALSE;
+static volatile int  g_downloadPct = -1;
 static volatile LONG g_searchGen = 0;
 
 #define IDC_SEARCH_EDIT         2001
@@ -61,6 +64,7 @@ static volatile LONG g_searchGen = 0;
 #define WM_APP_SEARCH_DONE       (WM_APP + 201)
 #define WM_APP_DOWN_DONE         (WM_APP + 202)
 #define WM_APP_THUMB_READY       (WM_APP + 203)
+#define WM_APP_DOWN_PROGRESS     (WM_APP + 204)
 
 static int CALLBACK EnumFontCheckProcS(const LOGFONTW *lpelfe, const TEXTMETRICW *lpntme, DWORD FontType, LPARAM lParam) {
     (void)lpelfe; (void)lpntme; (void)FontType;
@@ -68,17 +72,135 @@ static int CALLBACK EnumFontCheckProcS(const LOGFONTW *lpelfe, const TEXTMETRICW
     return 0;
 }
 
-static BOOL SearchFontExists(const wchar_t *faceName) {
-    BOOL found = FALSE;
-    LOGFONTW lf = {0};
-    lf.lfCharSet = DEFAULT_CHARSET;
-    wcsncpy(lf.lfFaceName, faceName, LF_FACESIZE - 1);
-    HDC hdc = GetDC(NULL);
-    if (hdc) {
-        EnumFontFamiliesExW(hdc, &lf, (FONTENUMPROCW)EnumFontCheckProcS, (LPARAM)&found, 0);
-        ReleaseDC(NULL, hdc);
+static void GetCachedSearchFonts(const wchar_t **outTextFont, const wchar_t **outIconFont) {
+    static BOOL s_probed = FALSE;
+    static BOOL s_hasVarText = FALSE;
+    static BOOL s_hasFluent = FALSE;
+    if (!s_probed) {
+        s_probed = TRUE;
+        HDC hdc = GetDC(NULL);
+        if (hdc) {
+            LOGFONTW lf = {0};
+            lf.lfCharSet = DEFAULT_CHARSET;
+            wcscpy(lf.lfFaceName, L"Segoe UI Variable Text");
+            EnumFontFamiliesExW(hdc, &lf, (FONTENUMPROCW)EnumFontCheckProcS, (LPARAM)&s_hasVarText, 0);
+            wcscpy(lf.lfFaceName, L"Segoe Fluent Icons");
+            EnumFontFamiliesExW(hdc, &lf, (FONTENUMPROCW)EnumFontCheckProcS, (LPARAM)&s_hasFluent, 0);
+            ReleaseDC(NULL, hdc);
+        }
     }
-    return found;
+    *outTextFont = s_hasVarText ? L"Segoe UI Variable Text" : L"Segoe UI";
+    *outIconFont = s_hasFluent  ? L"Segoe Fluent Icons"     : L"Segoe MDL2 Assets";
+}
+
+void Search_GetActiveDownloadTitle(wchar_t *outTitle, int maxLen) {
+    if (!outTitle || maxLen <= 0) return;
+    wcsncpy(outTitle, g_activeDlTitle, maxLen - 1);
+    outTitle[maxLen - 1] = L'\0';
+}
+
+static int ParseYtDlpPercentLine(const char *line) {
+    if (!line) return -1;
+    const char *dlTag = strstr(line, "[download]");
+    if (!dlTag) return -1;
+    const char *pctSign = strchr(dlTag + 10, '%');
+    if (!pctSign) return -1;
+
+    const char *p = pctSign - 1;
+    while (p > dlTag && ((*p >= '0' && *p <= '9') || *p == '.')) {
+        p--;
+    }
+    p++;
+    if (p >= pctSign) return -1;
+
+    double val = atof(p);
+    if (val < 0.0 || val > 100.0) return -1;
+    return (int)(val + 0.5);
+}
+
+BOOL Search_RunYtDlpDownload(const wchar_t *targetSpec,
+                             const wchar_t *destFolder,
+                             volatile LONG *pCancelFlag,
+                             YtDlpProgressFn onProgress,
+                             void *userData) {
+    if (!targetSpec || !targetSpec[0] || !destFolder || !destFolder[0]) return FALSE;
+
+    wchar_t cmdLine[2048];
+    _snwprintf(cmdLine, 2047,
+               L"yt-dlp.exe --progress --newline --no-warnings -f \"ba[ext=m4a]/ba\" --write-thumbnail --no-playlist -o \"%s\\%%(title)s [%%(id)s].%%(ext)s\" \"%s\"",
+               destFolder, targetSpec);
+    cmdLine[2047] = L'\0';
+
+    HANDLE hRead = NULL, hWrite = NULL;
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
+    if (!CreatePipe(&hRead, &hWrite, &sa, 0)) {
+        return FALSE;
+    }
+    SetHandleInformation(hRead, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOW si;
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+    si.wShowWindow = SW_HIDE;
+    si.hStdOutput = hWrite;
+    si.hStdError  = hWrite;
+
+    PROCESS_INFORMATION pi = {0};
+    if (!CreateProcessW(NULL, cmdLine, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+        CloseHandle(hRead);
+        CloseHandle(hWrite);
+        return FALSE;
+    }
+    CloseHandle(hWrite);
+
+    if (onProgress) onProgress(3, userData);
+
+    char buffer[1024];
+    char lineBuf[512];
+    int linePos = 0;
+    int bestPct = 3;
+    DWORD bytesRead = 0;
+
+    while (ReadFile(hRead, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) {
+        if (pCancelFlag && *pCancelFlag != 0) {
+            TerminateProcess(pi.hProcess, 1);
+            break;
+        }
+        for (DWORD i = 0; i < bytesRead; i++) {
+            char ch = buffer[i];
+            if (ch == '\n' || ch == '\r') {
+                if (linePos > 0) {
+                    lineBuf[linePos] = '\0';
+                    int pct = ParseYtDlpPercentLine(lineBuf);
+                    if (pct >= 0) {
+                        if (pct > 99) pct = 99;
+                        if (pct > bestPct) {
+                            bestPct = pct;
+                            if (onProgress) onProgress(bestPct, userData);
+                        }
+                    }
+                    linePos = 0;
+                }
+            } else if (linePos < (int)sizeof(lineBuf) - 1) {
+                lineBuf[linePos++] = ch;
+            }
+        }
+    }
+
+    CloseHandle(hRead);
+    WaitForSingleObject(pi.hProcess, 15000);
+    DWORD exitCode = 1;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    if (pCancelFlag && *pCancelFlag != 0) return FALSE;
+    BOOL success = (exitCode == 0);
+    if (success && onProgress) {
+        onProgress(100, userData);
+    }
+    return success;
 }
 
 static void FreeSearchResults(void) {
@@ -106,12 +228,14 @@ static DWORD WINAPI SearchThread(LPVOID param) {
     SECURITY_ATTRIBUTES sa = { sizeof(sa), NULL, TRUE };
     if (!CreatePipe(&hRead, &hWrite, &sa, 0)) {
         g_isSearching = FALSE;
-        PostMessageW(g_hDlg, WM_APP_SEARCH_DONE, 0, 0);
+        if (IsWindow(g_hDlg)) PostMessageW(g_hDlg, WM_APP_SEARCH_DONE, 0, 0);
         return 0;
     }
     SetHandleInformation(hRead, HANDLE_FLAG_INHERIT, 0);
 
-    STARTUPINFOW si = { sizeof(si) };
+    STARTUPINFOW si;
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
     si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
     si.wShowWindow = SW_HIDE;
     si.hStdOutput = hWrite;
@@ -230,32 +354,30 @@ typedef struct {
     wchar_t folder[MAX_PATH];
 } DownloadParam;
 
+static void OnDialogDownloadProgress(int pct, void *userData) {
+    (void)userData;
+    g_downloadPct = pct;
+    if (IsWindow(g_hDlg)) {
+        PostMessageW(g_hDlg, WM_APP_DOWN_PROGRESS, (WPARAM)pct, 0);
+    }
+    if (IsWindow(g_hParent)) {
+        PostMessageW(g_hParent, WM_APP_SINGLE_DL_PROGRESS, (WPARAM)pct, 0);
+    }
+}
+
 static DWORD WINAPI DownloadThread(LPVOID param) {
     DownloadParam *dp = (DownloadParam*)param;
-
-    wchar_t cmdLine[2048];
-    _snwprintf(cmdLine, 2047, L"yt-dlp.exe --no-warnings -f \"ba[ext=m4a]/ba\" --write-thumbnail --no-playlist -o \"%s\\%%(title)s.%%(ext)s\" \"%s\"", dp->folder, dp->url);
-    cmdLine[2047] = L'\0';
+    BOOL success = Search_RunYtDlpDownload(dp->url, dp->folder, NULL, OnDialogDownloadProgress, NULL);
     free(dp);
 
-    STARTUPINFOW si = { sizeof(si) };
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
-
-    PROCESS_INFORMATION pi = {0};
-    BOOL success = FALSE;
-    if (CreateProcessW(NULL, cmdLine, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
-        WaitForSingleObject(pi.hProcess, INFINITE);
-        DWORD exitCode = 0;
-        GetExitCodeProcess(pi.hProcess, &exitCode);
-        success = (exitCode == 0);
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-    }
-
     g_isDownloading = FALSE;
+    if (!success && IsWindow(g_hParent)) {
+        PostMessageW(g_hParent, WM_APP_SINGLE_DL_PROGRESS, (WPARAM)-1, 0);
+    }
     if (IsWindow(g_hDlg)) {
         PostMessageW(g_hDlg, WM_APP_DOWN_DONE, (WPARAM)success, 0);
+    } else if (success && IsWindow(g_hParent)) {
+        PostMessageW(g_hParent, WM_APP_FILE_DOWNLOADED, 0, 0);
     }
     return 0;
 }
@@ -290,6 +412,41 @@ static void DrawFastCard(HDC hdc, const RECT *rc, COLORREF bg, COLORREF border, 
     SelectObject(hdc, oldPen);
 }
 
+static void DrawNeonProgressBarGdi(HDC hdc, const RECT *rcTrack, int pct) {
+    int tw = rcTrack->right - rcTrack->left;
+    int th = rcTrack->bottom - rcTrack->top;
+    if (tw <= 0 || th <= 0) return;
+
+    DrawFastCard(hdc, rcTrack, RGB(24, 24, 24), COLOR_SEARCH_BORDER, th);
+    if (pct <= 0) return;
+    if (pct > 100) pct = 100;
+
+    int fillW = (tw * pct) / 100;
+    if (fillW < th && pct > 0) fillW = th;
+    if (fillW > tw) fillW = tw;
+
+    int saved = SaveDC(hdc);
+    HRGN hRgn = CreateRoundRectRgn(rcTrack->left, rcTrack->top, rcTrack->left + fillW + 1, rcTrack->bottom + 1, th, th);
+    SelectClipRgn(hdc, hRgn);
+
+    int halfW = tw / 2;
+    if (halfW < 1) halfW = 1;
+    TRIVERTEX v1[2] = {
+        { rcTrack->left,         rcTrack->top,    0xFF00, 0x9200, 0x5C00, 0xFF00 },
+        { rcTrack->left + halfW, rcTrack->bottom, 0xF000, 0x4400, 0xB800, 0xFF00 }
+    };
+    TRIVERTEX v2[2] = {
+        { rcTrack->left + halfW, rcTrack->top,    0xF000, 0x4400, 0xB800, 0xFF00 },
+        { rcTrack->right,        rcTrack->bottom, 0x8B00, 0x3500, 0xFF00, 0xFF00 }
+    };
+    GRADIENT_RECT gRect = { 0, 1 };
+    GdiGradientFill(hdc, v1, 2, &gRect, 1, GRADIENT_FILL_RECT_H);
+    GdiGradientFill(hdc, v2, 2, &gRect, 1, GRADIENT_FILL_RECT_H);
+
+    RestoreDC(hdc, saved);
+    DeleteObject(hRgn);
+}
+
 const wchar_t* Search_GetDownloadFolder(void) {
     return g_downloadFolder;
 }
@@ -297,7 +454,7 @@ const wchar_t* Search_GetDownloadFolder(void) {
 static int GetSearchWindowDpi(HWND hWnd) {
     typedef UINT(WINAPI *GetDpiForWindowProc)(HWND);
     GetDpiForWindowProc pGetDpi = (GetDpiForWindowProc)GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow");
-    int dpi = pGetDpi ? pGetDpi(hWnd) : 0;
+    int dpi = pGetDpi ? (int)pGetDpi(hWnd) : 0;
     if (dpi <= 0) {
         HDC hdc = GetDC(hWnd);
         if (hdc) {
@@ -450,6 +607,10 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
     static HFONT hFontBold = NULL;
     static HFONT hFontSmall = NULL;
     static HFONT hFontIcon = NULL;
+    static HDC s_memDC = NULL;
+    static HBITMAP s_memBmp = NULL;
+    static HBITMAP s_oldBmp = NULL;
+    static int s_memW = 0, s_memH = 0;
 
     switch (msg) {
         case WM_CREATE: {
@@ -460,10 +621,13 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 g_results = (SearchItem*)calloc(MAX_SEARCH_RESULTS, sizeof(SearchItem));
             }
             g_resultCount = 0;
+            if (!g_isDownloading) g_downloadPct = -1;
 
             BOOL useDark = TRUE;
             DwmSetWindowAttribute(hWnd, 20, &useDark, sizeof(useDark));
             DwmSetWindowAttribute(hWnd, 19, &useDark, sizeof(useDark));
+            DWORD cornerPref = 2; // DWMWCP_ROUND
+            DwmSetWindowAttribute(hWnd, 33, &cornerPref, sizeof(cornerPref));
 
             hBrBg   = CreateSolidBrush(COLOR_SEARCH_BG);
             hBrBox  = CreateSolidBrush(COLOR_SEARCH_BOX);
@@ -474,8 +638,9 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             int sSmall = -MulDiv(9,  dpi, 72);
             int sIcon  = -MulDiv(11, dpi, 72);
 
-            const wchar_t *fontFamily = SearchFontExists(L"Segoe UI Variable Text") ? L"Segoe UI Variable Text" : L"Segoe UI";
-            const wchar_t *iconFamily = SearchFontExists(L"Segoe Fluent Icons") ? L"Segoe Fluent Icons" : L"Segoe MDL2 Assets";
+            const wchar_t *fontFamily = NULL;
+            const wchar_t *iconFamily = NULL;
+            GetCachedSearchFonts(&fontFamily, &iconFamily);
 
             hFont      = CreateFontW(sMain,  0, 0, 0, FW_NORMAL,   FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
             hFontBold  = CreateFontW(sBold,  0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, fontFamily);
@@ -565,14 +730,23 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                     SelectObject(dis->hDC, oldBr);
 
                     COLORREF bg = isDisabled ? RGB(32, 32, 36) : (isPressed ? COLOR_ACCENT_PURPLE : COLOR_ACCENT_ORANGE);
-                    COLORREF txtCol = isDisabled ? RGB(100, 100, 108) : RGB(5, 5, 5);
+                    COLORREF txtCol = isDisabled ? RGB(145, 145, 155) : RGB(5, 5, 5);
                     RECT rcBtn = dis->rcItem;
                     if (isPressed) InflateRect(&rcBtn, -1, -1);
                     DrawFastCard(dis->hDC, &rcBtn, bg, bg, 10);
                     SetBkMode(dis->hDC, TRANSPARENT);
                     SelectObject(dis->hDC, hFontBold);
                     SetTextColor(dis->hDC, txtCol);
-                    DrawTextW(dis->hDC, g_isDownloading ? L"İndiriliyor..." : L"İndir ve Listeye Ekle", -1, &rcBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+                    wchar_t btnTxt[64];
+                    if (g_isDownloading) {
+                        int p = g_downloadPct < 0 ? 0 : g_downloadPct;
+                        _snwprintf(btnTxt, 63, L"İndiriliyor • %%%d", p);
+                        btnTxt[63] = L'\0';
+                    } else {
+                        wcscpy(btnTxt, L"İndir ve Listeye Ekle");
+                    }
+                    DrawTextW(dis->hDC, btnTxt, -1, &rcBtn, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
                     return TRUE;
                 }
                 else if (dis->CtlID == IDC_SEARCH_BTN) {
@@ -691,11 +865,20 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 return 0;
             }
 
-            // Çift tamponlu pürüzsüz çizim (Titreme sıfır)
-            HDC hdc = CreateCompatibleDC(screenDC);
-            HBITMAP memBmp = CreateCompatibleBitmap(screenDC, clientW, clientH);
-            HBITMAP oldBmp = (HBITMAP)SelectObject(hdc, memBmp);
+            if (!s_memDC || !s_memBmp || s_memW != clientW || s_memH != clientH) {
+                if (s_memDC) {
+                    if (s_oldBmp) SelectObject(s_memDC, s_oldBmp);
+                    if (s_memBmp) DeleteObject(s_memBmp);
+                    DeleteDC(s_memDC);
+                }
+                s_memDC  = CreateCompatibleDC(screenDC);
+                s_memBmp = CreateCompatibleBitmap(screenDC, clientW, clientH);
+                s_oldBmp = (HBITMAP)SelectObject(s_memDC, s_memBmp);
+                s_memW   = clientW;
+                s_memH   = clientH;
+            }
 
+            HDC hdc = s_memDC;
             FillRect(hdc, &rcClient, hBrBg);
 
             int dpi = GetSearchWindowDpi(hWnd);
@@ -790,11 +973,37 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 DrawTextW(hdc, metaTxt, -1, &rcMeta, DT_LEFT | DT_TOP | DT_SINGLELINE);
             }
 
-            BitBlt(screenDC, 0, 0, clientW, clientH, hdc, 0, 0, SRCCOPY);
-            SelectObject(hdc, oldBmp);
-            DeleteObject(memBmp);
-            DeleteDC(hdc);
+            // Canlı İndirme Yüzdesi ve Sunset-Neon İlerleme Çubuğu
+            if (g_isDownloading || g_downloadPct >= 0) {
+                int btnDownH = MulDiv(44, dpi, 96);
+                int btnDownY = cardBottom - cardPad - btnDownH;
+                int progBoxH = MulDiv(46, dpi, 96);
+                int progBoxY = btnDownY - MulDiv(10, dpi, 96) - progBoxH;
 
+                RECT rcProgBox = { rcThumb.left, progBoxY, rcThumb.right, progBoxY + progBoxH };
+                DrawFastCard(hdc, &rcProgBox, RGB(22, 16, 26), g_isDownloading ? COLOR_ACCENT_PINK : COLOR_SEARCH_BORDER, 10);
+
+                int shownPct = g_downloadPct < 0 ? 0 : g_downloadPct;
+                RECT rcPLbl = { rcProgBox.left + MulDiv(10, dpi, 96), rcProgBox.top + MulDiv(6, dpi, 96), rcProgBox.right - MulDiv(54, dpi, 96), rcProgBox.top + MulDiv(24, dpi, 96) };
+                RECT rcPPct = { rcProgBox.right - MulDiv(54, dpi, 96), rcProgBox.top + MulDiv(6, dpi, 96), rcProgBox.right - MulDiv(10, dpi, 96), rcProgBox.top + MulDiv(24, dpi, 96) };
+
+                SetBkMode(hdc, TRANSPARENT);
+                SelectObject(hdc, hFontSmall);
+                SetTextColor(hdc, RGB(235, 235, 240));
+                DrawTextW(hdc, g_isDownloading ? L"İndirme durumu" : L"✓ İndirme tamamlandı", -1, &rcPLbl, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+                wchar_t pctTxt[16];
+                _snwprintf(pctTxt, 15, L"%%%d", shownPct);
+                pctTxt[15] = L'\0';
+                SelectObject(hdc, hFontBold);
+                SetTextColor(hdc, COLOR_ACCENT_ORANGE);
+                DrawTextW(hdc, pctTxt, -1, &rcPPct, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+
+                RECT rcPTrack = { rcProgBox.left + MulDiv(10, dpi, 96), rcProgBox.bottom - MulDiv(14, dpi, 96), rcProgBox.right - MulDiv(10, dpi, 96), rcProgBox.bottom - MulDiv(7, dpi, 96) };
+                DrawNeonProgressBarGdi(hdc, &rcPTrack, shownPct);
+            }
+
+            BitBlt(screenDC, 0, 0, clientW, clientH, hdc, 0, 0, SRCCOPY);
             EndPaint(hWnd, &ps);
             return 0;
         }
@@ -817,6 +1026,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 InterlockedIncrement(&g_searchGen);
 
                 g_isSearching = TRUE;
+                g_downloadPct = -1;
                 EnableWindow(g_hBtnSearch, FALSE);
                 EnableWindow(g_hBtnDownload, FALSE);
                 SendMessageW(g_hListResults, LB_RESETCONTENT, 0, 0);
@@ -831,6 +1041,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 if (wmEvent == LBN_SELCHANGE) {
                     int sel = (int)SendMessageW(g_hListResults, LB_GETCURSEL, 0, 0);
                     BOOL hasSel = (sel >= 0 && sel < g_resultCount);
+                    if (!g_isDownloading) g_downloadPct = -1;
                     EnableWindow(g_hBtnDownload, hasSel && !g_isDownloading);
                     InvalidateRect(hWnd, NULL, FALSE);
                 } else if (wmEvent == LBN_DBLCLK) {
@@ -842,14 +1053,23 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 if (!g_results || sel < 0 || sel >= g_resultCount || g_isDownloading) break;
 
                 g_isDownloading = TRUE;
+                g_downloadPct = 0;
+                wcsncpy(g_activeDlTitle, g_results[sel].cleanTitle, 255);
+                g_activeDlTitle[255] = L'\0';
+
                 EnableWindow(g_hBtnDownload, FALSE);
                 EnableWindow(g_hBtnSearch, FALSE);
                 InvalidateRect(g_hBtnDownload, NULL, FALSE);
+                InvalidateRect(hWnd, NULL, FALSE);
 
                 wchar_t statusTxt[256];
-                _snwprintf(statusTxt, 255, L"İndiriliyor: %s...", g_results[sel].cleanTitle);
+                _snwprintf(statusTxt, 255, L"İndiriliyor (%%0): %s", g_results[sel].cleanTitle);
                 statusTxt[255] = L'\0';
                 SetWindowTextW(g_hLblStatus, statusTxt);
+
+                if (IsWindow(g_hParent)) {
+                    PostMessageW(g_hParent, WM_APP_SINGLE_DL_PROGRESS, 0, 0);
+                }
 
                 DownloadParam *dp = (DownloadParam*)malloc(sizeof(DownloadParam));
                 wcsncpy(dp->url, g_results[sel].url, 511);
@@ -860,6 +1080,17 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 HANDLE hT = CreateThread(NULL, 64 * 1024, DownloadThread, dp, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
                 if (hT) CloseHandle(hT);
             }
+            break;
+        }
+
+        case WM_APP_DOWN_PROGRESS: {
+            int pct = (int)wParam;
+            wchar_t statusTxt[300];
+            _snwprintf(statusTxt, 299, L"İndiriliyor (%%%d): %s", pct, g_activeDlTitle);
+            statusTxt[299] = L'\0';
+            SetWindowTextW(g_hLblStatus, statusTxt);
+            InvalidateRect(g_hBtnDownload, NULL, FALSE);
+            InvalidateRect(hWnd, NULL, FALSE);
             break;
         }
 
@@ -880,7 +1111,7 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
                 SetWindowTextW(g_hLblStatus, stat);
 
                 SendMessageW(g_hListResults, LB_SETCURSEL, 0, 0);
-                EnableWindow(g_hBtnDownload, TRUE);
+                EnableWindow(g_hBtnDownload, !g_isDownloading);
 
                 LONG curGen = g_searchGen;
                 for (int i = 0; i < g_resultCount; i++) {
@@ -917,13 +1148,16 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 
             BOOL success = (BOOL)wParam;
             if (success) {
-                SetWindowTextW(g_hLblStatus, L"Tamamlandı! Şarkı listenin en üstüne eklendi.");
+                g_downloadPct = 100;
+                SetWindowTextW(g_hLblStatus, L"✓ Tamamlandı (%100)! Şarkı listenin en üstüne eklendi.");
                 if (IsWindow(g_hParent)) {
                     PostMessageW(g_hParent, WM_APP_FILE_DOWNLOADED, 0, 0);
                 }
             } else {
+                g_downloadPct = -1;
                 SetWindowTextW(g_hLblStatus, L"İndirme başarısız oldu. Tekrar deneyin.");
             }
+            InvalidateRect(hWnd, NULL, FALSE);
             break;
         }
 
@@ -934,6 +1168,13 @@ static LRESULT CALLBACK SearchWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
             if (g_results) {
                 free(g_results);
                 g_results = NULL;
+            }
+            if (s_memDC) {
+                if (s_oldBmp) SelectObject(s_memDC, s_oldBmp);
+                if (s_memBmp) DeleteObject(s_memBmp);
+                DeleteDC(s_memDC);
+                s_memDC = NULL; s_memBmp = NULL; s_oldBmp = NULL;
+                s_memW = 0; s_memH = 0;
             }
             if (hBrBg)   { DeleteObject(hBrBg);   hBrBg = NULL; }
             if (hBrBox)  { DeleteObject(hBrBox);  hBrBox = NULL; }
@@ -974,7 +1215,8 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
         s_hMainIcon = LoadIconW(hInst, MAKEINTRESOURCEW(1));
         s_hSmallIcon = (HICON)LoadImageW(hInst, MAKEINTRESOURCEW(1), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
 
-        WNDCLASSEXW wc = { sizeof(wc) };
+        WNDCLASSEXW wc;
+        memset(&wc, 0, sizeof(wc));
         wc.cbSize = sizeof(WNDCLASSEXW);
         wc.style = CS_HREDRAW | CS_VREDRAW;
         wc.lpfnWndProc = SearchWndProc;
@@ -983,7 +1225,7 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
         wc.hIconSm = s_hSmallIcon ? s_hSmallIcon : wc.hIcon;
         wc.hCursor = LoadCursor(NULL, IDC_ARROW);
         wc.hbrBackground = NULL;
-        wc.lpszClassName = L"SeloPlayerSearch";
+        wc.lpszClassName = L"AurnsSearchWindow";
         RegisterClassExW(&wc);
         s_classRegistered = TRUE;
     }
@@ -999,8 +1241,8 @@ void Search_ShowDialog(HWND hParentWnd, const wchar_t *downloadFolder) {
 
     g_hDlg = CreateWindowExW(
         0,
-        L"SeloPlayerSearch",
-        L"Müzik Ara ve İndir",
+        L"AurnsSearchWindow",
+        L"\u039BURNS \u2022 M\u00FCzik Ara ve \u0130ndir",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE,
         x, y, dlgW, dlgH,
         hParentWnd, NULL, hInst, NULL

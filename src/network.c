@@ -159,7 +159,7 @@ static SOCKET ConnectToHost(const char *host, const char *port) {
 static DWORD WINAPI NetworkThreadProc(LPVOID lpParam) {
     (void)lpParam;
     char clientCid[128];
-    snprintf(clientCid, sizeof(clientCid), "selo_%s_%lu", g_clientTag, (unsigned long)GetTickCount());
+    snprintf(clientCid, sizeof(clientCid), "aurns_%s_%lu", g_clientTag, (unsigned long)GetTickCount());
     for (int i = 0; clientCid[i]; i++) {
         if (clientCid[i] == '#' || clientCid[i] == '+') clientCid[i] = '_';
     }
@@ -381,26 +381,6 @@ BOOL Network_Subscribe(const char *topic) {
     return ok;
 }
 
-BOOL Network_Unsubscribe(const char *topic) {
-    if (!g_running || !topic || !topic[0]) return FALSE;
-
-    char safeTopic[128] = {0};
-    SanitizeTopic(topic, safeTopic, sizeof(safeTopic));
-
-    EnterCriticalSection(&g_cs);
-    for (int i = 0; i < g_topicCount; i++) {
-        if (strcmp(g_topics[i], safeTopic) == 0) {
-            for (int j = i; j < g_topicCount - 1; j++) {
-                strcpy(g_topics[j], g_topics[j + 1]);
-            }
-            g_topicCount--;
-            break;
-        }
-    }
-    LeaveCriticalSection(&g_cs);
-    return TRUE;
-}
-
 BOOL Network_Publish(const char *topic, const char *payload) {
     if (!g_running || !topic || !payload) return FALSE;
 
@@ -415,10 +395,6 @@ BOOL Network_Publish(const char *topic, const char *payload) {
     LeaveCriticalSection(&g_cs);
 
     return ok;
-}
-
-BOOL Network_IsConnected(void) {
-    return g_connected;
 }
 
 void Network_Close(void) {

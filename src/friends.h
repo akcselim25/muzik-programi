@@ -26,10 +26,8 @@ void Friends_Save(void);
 
 void Friends_GetMyTag(wchar_t *buf, int maxLen);
 void Friends_GetMyName(wchar_t *buf, int maxLen);
-void Friends_SetMyName(const wchar_t *newName);
 
 int  Friends_GetFriendCount(void);
-int  Friends_GetOnlineCount(void);
 const FriendItem* Friends_GetFriend(int index);
 
 int  Friends_GetPendingCount(void);

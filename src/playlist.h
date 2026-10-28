@@ -8,6 +8,11 @@ typedef struct {
     wchar_t title[MAX_PATH];
 } PlaylistItem;
 
+typedef struct {
+    wchar_t title[256];
+    wchar_t ytId[16];
+} MissingPlaylistTrack;
+
 void Playlist_Init(void);
 void Playlist_Free(void);
 int  Playlist_Count(void);
@@ -19,8 +24,8 @@ void Playlist_Clear(void);
 int  Playlist_FindNext(int currentIndex, int shuffle, int repeat);
 int  Playlist_FindPrev(int currentIndex);
 int  Playlist_ScanFolder(const wchar_t *folderPath);
-int  Playlist_ImportM3U(const wchar_t *filePath);
-int  Playlist_ExportM3U(const wchar_t *filePath);
+int  Playlist_ImportSmart(const wchar_t *filePath, MissingPlaylistTrack *outMissing, int maxMissing, int *outMissingCount);
+int  Playlist_ExportSmart(const wchar_t *filePath);
 int  Playlist_FindByPrefix(wchar_t prefixChar, int startIndex);
 void Playlist_CleanTitle(const wchar_t *path, wchar_t *outTitle, int maxLen);
 
