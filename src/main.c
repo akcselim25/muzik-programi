@@ -3009,7 +3009,8 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             InvalidateRect(hWnd, NULL, FALSE);
 
             Updater_Init();
-            // Açılışta sessiz arka plan güncelleme sorgusu yerine menüden "Güncellemeleri Denetle" ile manuel çağrılır (sıfır ağ ve TLS/RAM yükü)
+            // Açılışta en hızlı şekilde sürüm kontrolü yap; güncelleme yoksa iş parçacığı hemen kapanır ve bellek anında boşaltılır
+            Updater_CheckAsync(hWnd, FALSE);
 
             // Açılış sonrası boşta bellek temizliği
             SetTimer(hWnd, IDT_IDLE_TRIM, 1200, NULL);

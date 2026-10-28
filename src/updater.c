@@ -48,11 +48,11 @@ static HINTERNET OpenHttpRequest(const wchar_t *url, HINTERNET *pSession, HINTER
 
     if (!WinHttpCrackUrl(url, 0, 0, &uc)) return NULL;
 
-    HINTERNET hSession = WinHttpOpen(L"Aurns/1.1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+    HINTERNET hSession = WinHttpOpen(L"Aurns/1.1", WINHTTP_ACCESS_TYPE_NO_PROXY,
                                      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!hSession) return NULL;
 
-    WinHttpSetTimeouts(hSession, 4000, 4000, 5000, 10000);
+    WinHttpSetTimeouts(hSession, 2000, 2000, 2000, 3000);
 
     HINTERNET hConnect = WinHttpConnect(hSession, host, uc.nPort, 0);
     if (!hConnect) {
@@ -243,6 +243,13 @@ static DWORD WINAPI CheckUpdateThread(LPVOID param) {
                 info->hasUpdate = TRUE;
             }
         }
+    }
+
+    // Güncelleme yoksa ve otomatik açılış kontrolüyse: sessizce sonlandır, belleği boşalt ve hemen kapan!
+    if (!info->hasUpdate && !info->isManual) {
+        free(info);
+        SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+        return 0;
     }
 
     if (IsWindow(hWnd)) {
