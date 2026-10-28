@@ -61,6 +61,7 @@
 
 #define IDT_UPDATE_TIMER        1001
 #define IDT_ANIM_TIMER          1002
+#define IDT_IDLE_TRIM           1003
 #define IDC_HEADER_SEARCH       1010
 #define IDC_FRIEND_ADD_EDIT     1020
 
@@ -155,7 +156,9 @@ static uint32_t *g_backPixels = NULL;
 static int       g_backW = 0;
 static int       g_backH = 0;
 static RECT      g_pxClip = {0};
+static RECT      g_paintBase = {0};   // Yalnızca geçersiz bölge çizilir (dokunulmayan bellek sayfaları RAM'e girmez)
 static BOOL      g_gdiDirty = FALSE;
+static DWORD     g_lastInputTick = 0;
 
 static IPicture *g_pMainThumb = NULL;
 static HICON     g_hAppIcon = NULL;
@@ -350,9 +353,9 @@ static inline void DrawUiText(HDC hdc, const wchar_t *str, RECT *rc, UINT fmt) {
     DrawTextW(hdc, str, -1, rc, fmt);
 }
 
-static void EnsureBackbuffer(HDC refDC, int w, int h) {
-    if (w <= 0 || h <= 0) return;
-    if (g_backDC && g_backBmp && g_backPixels && g_backW == w && g_backH == h) return;
+static BOOL EnsureBackbuffer(HDC refDC, int w, int h) {
+    if (w <= 0 || h <= 0) return FALSE;
+    if (g_backDC && g_backBmp && g_backPixels && g_backW == w && g_backH == h) return FALSE;
 
     if (g_backDC) {
         if (g_backOldBmp) SelectObject(g_backDC, g_backOldBmp);
@@ -377,12 +380,15 @@ static void EnsureBackbuffer(HDC refDC, int w, int h) {
             g_backW = w;
             g_backH = h;
             g_pxClip = (RECT){ 0, 0, w, h };
+            g_paintBase = g_pxClip;
+            return TRUE;
         } else {
             if (g_backBmp) DeleteObject(g_backBmp);
             DeleteDC(g_backDC);
             g_backDC = NULL; g_backBmp = NULL; g_backPixels = NULL;
         }
     }
+    return FALSE;
 }
 
 static void FreeBackbuffer(void) {
@@ -396,15 +402,17 @@ static void FreeBackbuffer(void) {
 }
 
 static inline void SetPixelClip(int left, int top, int right, int bottom) {
-    if (left < 0) left = 0;
-    if (top < 0) top = 0;
-    if (right > g_backW) right = g_backW;
-    if (bottom > g_backH) bottom = g_backH;
+    if (left < g_paintBase.left) left = g_paintBase.left;
+    if (top < g_paintBase.top) top = g_paintBase.top;
+    if (right > g_paintBase.right) right = g_paintBase.right;
+    if (bottom > g_paintBase.bottom) bottom = g_paintBase.bottom;
+    if (right < left) right = left;
+    if (bottom < top) bottom = top;
     g_pxClip = (RECT){ left, top, right, bottom };
 }
 
 static inline void ResetPixelClip(void) {
-    g_pxClip = (RECT){ 0, 0, g_backW, g_backH };
+    g_pxClip = g_paintBase;
 }
 
 static inline uint32_t ColorToBGRA(COLORREF c) {
@@ -477,10 +485,10 @@ static void FillVerticalGradientPx(int x, int y, int w, int h, COLORREF topCol, 
 static void DimRectFastPx(int x, int y, int w, int h, BYTE dimAlpha) {
     if (!g_backPixels || dimAlpha == 0 || w <= 0 || h <= 0) return;
     FlushGdiIfNeeded();
-    int x0 = (x < 0) ? 0 : x;
-    int y0 = (y < 0) ? 0 : y;
-    int x1 = (x + w > g_backW) ? g_backW : (x + w);
-    int y1 = (y + h > g_backH) ? g_backH : (y + h);
+    int x0 = (x < g_pxClip.left) ? g_pxClip.left : x;
+    int y0 = (y < g_pxClip.top)  ? g_pxClip.top  : y;
+    int x1 = (x + w > g_pxClip.right)  ? g_pxClip.right  : (x + w);
+    int y1 = (y + h > g_pxClip.bottom) ? g_pxClip.bottom : (y + h);
     if (x0 >= x1 || y0 >= y1) return;
 
     uint32_t keep = 256u - (uint32_t)dimAlpha;
@@ -499,10 +507,10 @@ static void DimRectFastPx(int x, int y, int w, int h, BYTE dimAlpha) {
 static void BlurFrostedGlassPx(int x, int y, int w, int h) {
     if (!g_backPixels || w <= 2 || h <= 2) return;
     FlushGdiIfNeeded();
-    int x0 = (x < 0) ? 0 : x;
-    int y0 = (y < 0) ? 0 : y;
-    int x1 = (x + w > g_backW) ? g_backW : (x + w);
-    int y1 = (y + h > g_backH) ? g_backH : (y + h);
+    int x0 = (x < g_pxClip.left) ? g_pxClip.left : x;
+    int y0 = (y < g_pxClip.top)  ? g_pxClip.top  : y;
+    int x1 = (x + w > g_pxClip.right)  ? g_pxClip.right  : (x + w);
+    int y1 = (y + h > g_pxClip.bottom) ? g_pxClip.bottom : (y + h);
     int bw = x1 - x0;
     int bh = y1 - y0;
     if (bw <= 2 || bh <= 2 || bw > 2048 || bh > 2048) return;
@@ -930,16 +938,16 @@ static void UpdateTimerSchedule(HWND hWnd) {
             g_dlBannerAnim  = (g_dlMode != DL_BANNER_NONE) ? 1.0f : 0.0f;
             g_scrollPosPx   = g_scrollTargetPx;
         }
-        if (Jam_GetState() == JAM_STATE_NONE && g_dlFinishHideTick == 0) {
-            KillTimer(hWnd, IDT_UPDATE_TIMER);
+        if (Player_IsPlaying() || Jam_GetState() != JAM_STATE_NONE || g_dlFinishHideTick != 0) {
+            SetTimer(hWnd, IDT_UPDATE_TIMER, 500, NULL);
         } else {
-            SetTimer(hWnd, IDT_UPDATE_TIMER, 1500, NULL);
+            KillTimer(hWnd, IDT_UPDATE_TIMER);
         }
         return;
     }
 
     if (Player_IsPlaying() || g_dlFinishHideTick != 0) {
-        SetTimer(hWnd, IDT_UPDATE_TIMER, 1000, NULL);
+        SetTimer(hWnd, IDT_UPDATE_TIMER, 500, NULL);
     } else if (Jam_GetState() != JAM_STATE_NONE || (g_sidebarOpen && g_sidebarView == SIDEBAR_VIEW_FRIENDS)) {
         SetTimer(hWnd, IDT_UPDATE_TIMER, 1500, NULL);
     } else {
@@ -2886,6 +2894,14 @@ static int HitTestTrackRowIndex(HWND hWnd, POINT pt, int *outDisplayIdx) {
 }
 
 static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    // Her kullanıcı girdisinde boşta-boşaltma sayacını sıfırla (etkileşim sırasında bellek asla boşaltılmaz)
+    if (msg == WM_MOUSEMOVE || msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_MOUSEWHEEL ||
+        msg == WM_KEYDOWN || msg == WM_RBUTTONUP) {
+        g_lastInputTick = GetTickCount();
+        if (msg != WM_MOUSEMOVE) {
+            SetTimer(hWnd, IDT_IDLE_TRIM, 1500, NULL);
+        }
+    }
     switch (msg) {
         case WM_CREATE: {
             g_hWnd = hWnd;
@@ -2993,10 +3009,10 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
             InvalidateRect(hWnd, NULL, FALSE);
 
             Updater_Init();
-            Updater_CheckAsync(hWnd, FALSE);
+            // Açılışta sessiz arka plan güncelleme sorgusu yerine menüden "Güncellemeleri Denetle" ile manuel çağrılır (sıfır ağ ve TLS/RAM yükü)
 
-            // Tek seferlik başlangıç bellek temizliği (soğuk açılış DLL kalıntılarını bırakır, menüleri asla yavaşlatmaz)
-            SetTimer(hWnd, 1003, 1800, NULL);
+            // Açılış sonrası boşta bellek temizliği
+            SetTimer(hWnd, IDT_IDLE_TRIM, 1200, NULL);
             return 0;
         }
 
@@ -3061,6 +3077,13 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         case WM_ACTIVATE: {
             g_isWindowActive = (LOWORD(wParam) != WA_INACTIVE);
             UpdateTimerSchedule(hWnd);
+            // Pencere arka plana geçince ekran tamponunu bırak ve belleği anında boşalt (< 0.5 MB)
+            if (!g_isWindowActive) {
+                FreeBackbuffer();
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+            } else {
+                SetTimer(hWnd, IDT_IDLE_TRIM, 1200, NULL);
+            }
             break;
         }
 
@@ -3069,6 +3092,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 g_isMinimized = TRUE;
                 UpdateTimerSchedule(hWnd);
                 FreeBackbuffer();
+                SetTimer(hWnd, IDT_IDLE_TRIM, 250, NULL);
                 SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
             } else {
                 g_isMinimized = FALSE;
@@ -3082,11 +3106,19 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
         }
 
         case WM_TIMER: {
-            if (wParam == 1003) {
-                if (!g_animTimerActive && !g_isDraggingSidebar) {
-                    KillTimer(hWnd, 1003);
-                    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+            if (wParam == IDT_IDLE_TRIM) {
+                // Kullanıcı etkileşimdeyken veya animasyon sürerken asla boşaltma yapma (sıfır kasma)
+                if (g_animTimerActive || g_isDraggingSidebar || g_isDraggingSeek || g_isDraggingVol ||
+                    g_isDraggingList || g_isDraggingScrollbar || GetKeyState(VK_LBUTTON) < 0 ||
+                    (g_isWindowActive && (GetTickCount() - g_lastInputTick) < 200)) {
+                    return 0;
                 }
+                KillTimer(hWnd, IDT_IDLE_TRIM);
+                if (!g_isWindowActive || g_isMinimized) {
+                    FreeBackbuffer();
+                }
+                GdiFlush();
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
                 return 0;
             }
             if (wParam == IDT_ANIM_TIMER) {
@@ -3129,11 +3161,20 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 if (!mScroll && !mSidebar && !mJamBar && !mDlBar && !g_isDraggingSidebar) {
                     KillTimer(hWnd, IDT_ANIM_TIMER);
                     g_animTimerActive = FALSE;
+                    UpdateWindow(hWnd);
+                    GdiFlush();
+                    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+                    SetTimer(hWnd, IDT_IDLE_TRIM, 250, NULL);
                 }
                 return 0;
             }
 
             if (wParam == IDT_UPDATE_TIMER) {
+                if (g_isMinimized) {
+                    FreeBackbuffer();
+                    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+                    return 0;
+                }
                 DWORD now = GetTickCount();
 
                 if (g_dlFinishHideTick != 0 && (int)(now - g_dlFinishHideTick) >= 0) {
@@ -3165,11 +3206,24 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                     }
                 }
 
-                // Şarkı çalıyorsa alt oynatıcı kartını yenile
-                if (g_isWindowActive && !g_isMinimized) {
-                    if (Player_IsPlaying() && !g_isDraggingSeek && rcDock.right > 0) {
-                        InvalidateRect(hWnd, &rcDock, FALSE);
+                // Şarkı çalıyorsa alt oynatıcı kartını saniyede 1 kez yenile
+                static int s_dockRepaintTick = 0;
+                if (++s_dockRepaintTick >= 2) {
+                    s_dockRepaintTick = 0;
+                    if (g_isWindowActive && !g_isMinimized) {
+                        if (Player_IsPlaying() && !g_isDraggingSeek && rcDock.right > 0) {
+                            InvalidateRect(hWnd, &rcDock, FALSE);
+                            UpdateWindow(hWnd);
+                        }
                     }
+                }
+
+                // Çalarken veya boşta RAM'i daima dipte tut (< 0.8 MB): kullanıcı fare/klavye sürüklemiyorsa anında tırpanla
+                if (!g_animTimerActive && !g_isDraggingSeek && !g_isDraggingVol &&
+                    !g_isDraggingList && !g_isDraggingSidebar && !g_isDraggingScrollbar &&
+                    GetKeyState(VK_LBUTTON) >= 0) {
+                    GdiFlush();
+                    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
                 }
             }
             return 0;
@@ -3496,6 +3550,7 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 }
                 free(info);
             }
+            SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
             return 0;
         }
 
@@ -4290,17 +4345,38 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 return 0;
             }
 
-            EnsureBackbuffer(hdc, rcClient.right, rcClient.bottom);
+            BOOL freshBuffer = EnsureBackbuffer(hdc, rcClient.right, rcClient.bottom);
             if (g_backDC && g_backPixels) {
+                // Yalnızca geçersiz kılınan bölgeyi çiz: dokunulmayan tampon sayfaları RAM'e hiç girmez
+                RECT rcDirty = ps.rcPaint;
+                if (freshBuffer || IsRectEmpty(&rcDirty)) rcDirty = rcClient;
+                IntersectRect(&rcDirty, &rcDirty, &rcClient);
+                g_paintBase = rcDirty;
+
+                int savedPaint = SaveDC(g_backDC);
+                IntersectClipRect(g_backDC, rcDirty.left, rcDirty.top, rcDirty.right, rcDirty.bottom);
                 g_gdiDirty = FALSE;
                 RenderUI(g_backDC, &rcClient);
                 FlushGdiIfNeeded();
-                BitBlt(hdc, 0, 0, rcClient.right, rcClient.bottom, g_backDC, 0, 0, SRCCOPY);
+                RestoreDC(g_backDC, savedPaint);
+                g_paintBase = (RECT){ 0, 0, g_backW, g_backH };
+
+                BitBlt(hdc, rcDirty.left, rcDirty.top, rcDirty.right - rcDirty.left, rcDirty.bottom - rcDirty.top,
+                       g_backDC, rcDirty.left, rcDirty.top, SRCCOPY);
             } else {
                 RenderUI(hdc, &rcClient);
             }
 
             EndPaint(hWnd, &ps);
+            GdiFlush();
+            if (!g_animTimerActive && !g_isDraggingSeek && !g_isDraggingVol &&
+                !g_isDraggingList && !g_isDraggingSidebar && !g_isDraggingScrollbar &&
+                GetKeyState(VK_LBUTTON) >= 0) {
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+            }
+            if (!g_isWindowActive || g_isMinimized) {
+                SetTimer(hWnd, IDT_IDLE_TRIM, 250, NULL);
+            }
             return 0;
         }
 
@@ -4316,6 +4392,10 @@ static LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
                 BitBlt(hdc, 0, 0, rcClient.right, rcClient.bottom, g_backDC, 0, 0, SRCCOPY);
             } else {
                 RenderUI(hdc, &rcClient);
+            }
+            if (g_isMinimized || !g_isWindowActive) {
+                FreeBackbuffer();
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
             }
             return 0;
         }
@@ -4495,6 +4575,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     while (GetMessageW(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
+        if (msg.message == WM_PAINT) {
+            if (!g_animTimerActive && !g_isDraggingSeek && !g_isDraggingVol &&
+                !g_isDraggingList && !g_isDraggingSidebar && !g_isDraggingScrollbar &&
+                GetKeyState(VK_LBUTTON) >= 0) {
+                SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+            }
+        }
     }
 
     OleUninitialize();

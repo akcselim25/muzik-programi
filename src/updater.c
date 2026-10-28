@@ -250,6 +250,7 @@ static DWORD WINAPI CheckUpdateThread(LPVOID param) {
     } else {
         free(info);
     }
+    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
     return 0;
 }
 
