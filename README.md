@@ -17,7 +17,11 @@
 
   <p align="center">
     <a href="https://github.com/selimakclk/aurns/releases/latest/download/Aurns.exe">
-      <img src="https://img.shields.io/badge/Hemen_İndir-Aurns.exe_(v1.1.0)-FF4B2B?style=for-the-badge&logo=directus&logoColor=white" height="38" alt="Aurns.exe İndir" />
+      <img src="https://img.shields.io/badge/Windows_İndir-Aurns.exe_(v1.1.0)-FF4B2B?style=for-the-badge&logo=windows&logoColor=white" height="38" alt="Aurns.exe İndir" />
+    </a>
+    &nbsp;&nbsp;
+    <a href="https://github.com/selimakclk/aurns/releases/latest/download/Aurns.apk">
+      <img src="https://img.shields.io/badge/Android_İndir-Aurns.apk_(v1.1.0)-3DDC84?style=for-the-badge&logo=android&logoColor=white" height="38" alt="Aurns.apk İndir" />
     </a>
   </p>
 
