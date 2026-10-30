@@ -1,7 +1,10 @@
 package com.aurns.player
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -20,6 +23,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,7 +38,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,8 +56,10 @@ import com.aurns.player.downloader.AudioDownloadManager
 import com.aurns.player.downloader.DownloadProgress
 import com.aurns.player.downloader.InnertubeResolver
 import com.aurns.player.downloader.SearchResult
-import com.aurns.player.jam.JamClient
-import com.aurns.player.jam.JamSyncState
+import com.aurns.player.friends.FriendItem
+import com.aurns.player.friends.FriendRequest
+import com.aurns.player.friends.FriendsManager
+import com.aurns.player.friends.JamRoomState
 import com.aurns.player.service.PlaybackService
 import com.aurns.player.ui.theme.*
 import com.google.common.util.concurrent.ListenableFuture
@@ -62,7 +70,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private lateinit var downloadManager: AudioDownloadManager
-    private val jamClient = JamClient()
+    private lateinit var friendsManager: FriendsManager
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
 
@@ -73,7 +81,7 @@ class MainActivity : ComponentActivity() {
     private var isShuffle by mutableStateOf(false)
     private var isRepeat by mutableStateOf(false)
 
-    // Sadece Dock'un yeniden çizilmesi için akışlar (Ana ekranın gereksiz recomposition'ını engeller)
+    // Sadece Dock'un yeniden çizilmesi için akışlar (60 FPS koruması)
     private val currentPositionFlow = MutableStateFlow(0)
     private val durationFlow = MutableStateFlow(0)
 
@@ -88,10 +96,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         downloadManager = AudioDownloadManager(this)
+        friendsManager = FriendsManager(this)
 
         downloadManager.onDownloadFinishedListener = {
             loadLocalTracks()
             Toast.makeText(this, "Şarkı arşive eklendi!", Toast.LENGTH_SHORT).show()
+        }
+
+        // Arkadaş Jam üzerinden şarkı senkronize ettiğinde
+        friendsManager.onRemoteJamPlayRequest = { title, posSec ->
+            val idx = tracks.indexOfFirst { it.title.contains(title, ignoreCase = true) }
+            if (idx != -1) {
+                playTrack(idx)
+                if (posSec > 0) seekTo(posSec)
+            } else {
+                Toast.makeText(this, "Arkadaşın '$title' çalıyor (Yerel arşivde aranıyor)", Toast.LENGTH_LONG).show()
+            }
         }
 
         checkAndRequestPermissions()
@@ -108,7 +128,7 @@ class MainActivity : ComponentActivity() {
                     currentPositionFlow = currentPositionFlow,
                     durationFlow = durationFlow,
                     downloadManager = downloadManager,
-                    jamClient = jamClient,
+                    friendsManager = friendsManager,
                     onPlayTrack = { index -> playTrack(index) },
                     onTogglePlay = { togglePlayPause() },
                     onSeek = { sec -> seekTo(sec) },
@@ -158,6 +178,8 @@ class MainActivity : ComponentActivity() {
             mediaController?.addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
+                    val title = if (currentTrackIndex in tracks.indices) tracks[currentTrackIndex].title else ""
+                    friendsManager.updateLocalPlaybackState(playing, title)
                 }
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_ENDED) {
@@ -195,27 +217,28 @@ class MainActivity : ComponentActivity() {
             p.prepare()
             p.play()
         }
-        jamClient.broadcastState(track.title, "", true, 0)
+        friendsManager.updateLocalPlaybackState(true, track.title)
     }
 
     private fun togglePlayPause() {
         mediaController?.let { p ->
             if (p.isPlaying) {
                 p.pause()
-                if (currentTrackIndex in tracks.indices) {
-                    jamClient.broadcastState(tracks[currentTrackIndex].title, "", false, (p.currentPosition / 1000).toInt())
-                }
+                val title = if (currentTrackIndex in tracks.indices) tracks[currentTrackIndex].title else ""
+                friendsManager.updateLocalPlaybackState(false, title)
             } else {
                 p.play()
-                if (currentTrackIndex in tracks.indices) {
-                    jamClient.broadcastState(tracks[currentTrackIndex].title, "", true, (p.currentPosition / 1000).toInt())
-                }
+                val title = if (currentTrackIndex in tracks.indices) tracks[currentTrackIndex].title else ""
+                friendsManager.updateLocalPlaybackState(true, title)
             }
         }
     }
 
     private fun seekTo(sec: Int) {
         mediaController?.seekTo(sec * 1000L)
+        if (currentTrackIndex in tracks.indices) {
+            friendsManager.broadcastJamState(tracks[currentTrackIndex].title, isPlaying, sec)
+        }
     }
 
     private fun playNext() {
@@ -255,6 +278,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        friendsManager.onDestroy()
         controllerFuture?.let { MediaController.releaseFuture(it) }
         super.onDestroy()
     }
@@ -271,7 +295,7 @@ fun MainScreen(
     currentPositionFlow: MutableStateFlow<Int>,
     durationFlow: MutableStateFlow<Int>,
     downloadManager: AudioDownloadManager,
-    jamClient: JamClient,
+    friendsManager: FriendsManager,
     onPlayTrack: (Int) -> Unit,
     onTogglePlay: () -> Unit,
     onSeek: (Int) -> Unit,
@@ -285,19 +309,20 @@ fun MainScreen(
 ) {
     var isDrawerOpen by remember { mutableStateOf(false) }
     var isDownloadSheetOpen by remember { mutableStateOf(false) }
-    var isJamDialogOpen by remember { mutableStateOf(false) }
+    var isFriendsPanelOpen by remember { mutableStateOf(false) }
     var isUpdateDialogOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
     val dlProgress by downloadManager.currentProgress.collectAsState()
-    val jamState by jamClient.syncState.collectAsState()
+    val jamState by friendsManager.jamState.collectAsState()
+    val pendingRequests by friendsManager.pendingRequests.collectAsState()
 
-    // Geri tuşuna basıldığında önce menüyü kapat
-    BackHandler(enabled = isDrawerOpen) {
-        isDrawerOpen = false
+    // Geri tuşu kontrolü
+    BackHandler(enabled = isFriendsPanelOpen || isDrawerOpen) {
+        if (isFriendsPanelOpen) isFriendsPanelOpen = false
+        else if (isDrawerOpen) isDrawerOpen = false
     }
 
-    // Arama filtrelemesi (Performans için derivedStateOf)
     val filteredTracks by remember(tracks, searchQuery) {
         derivedStateOf {
             if (searchQuery.isBlank()) tracks
@@ -310,7 +335,7 @@ fun MainScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(BgObsidian)) {
 
-        // ANA İÇERİK
+        // ANA EKRAN İÇERİĞİ
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
 
             // 1. ÜST ÇUBUK (HEADER - Windows ΛURNS ile %100 Birebir)
@@ -322,7 +347,7 @@ fun MainScreen(
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Menü Hamburger Düğmesi
+                // Menü Butonu
                 IconButton(onClick = { isDrawerOpen = true }) {
                     Icon(Icons.Default.Menu, contentDescription = "Menü", tint = TextWhite)
                 }
@@ -340,27 +365,38 @@ fun MainScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // [Arkadaşlar & Jam] Düğmesi
+                // [Arkadaşlar] Butonu (Bekleyen İstek Rozetli)
                 Surface(
-                    onClick = { isJamDialogOpen = true },
+                    onClick = { isFriendsPanelOpen = true },
                     shape = RoundedCornerShape(16.dp),
                     color = BgCard,
-                    border = BorderStroke(1.dp, if (jamState.isConnected) AccentPink else BorderDark),
+                    border = BorderStroke(1.dp, if (jamState.isActive) AccentPink else BorderDark),
                     modifier = Modifier.padding(end = 8.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Groups,
-                            contentDescription = null,
-                            tint = if (jamState.isConnected) AccentPink else AccentOrange,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Box {
+                            Icon(
+                                Icons.Default.Groups,
+                                contentDescription = null,
+                                tint = if (jamState.isActive) AccentPink else AccentOrange,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            if (pendingRequests.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(AccentPink)
+                                        .align(Alignment.TopEnd)
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (jamState.isConnected) "Jam Aktif" else "Jam",
+                            text = if (jamState.isActive) "Jam Aktif" else "Arkadaşlar",
                             color = TextWhite,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold
@@ -368,7 +404,7 @@ fun MainScreen(
                     }
                 }
 
-                // [+ İndir] Düğmesi (Sunset-Neon Gradyan Vurgulu)
+                // [+ İndir] Butonu
                 Surface(
                     onClick = { isDownloadSheetOpen = true },
                     shape = RoundedCornerShape(16.dp),
@@ -396,7 +432,7 @@ fun MainScreen(
                 }
             }
 
-            // ARAMA KUTUSU (Search Pill)
+            // ARAMA KUTUSU
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -424,17 +460,15 @@ fun MainScreen(
                 )
             )
 
-            // 2. EVRENSEL CANLI İNDİRME ÇUBUĞU (Sunset-Neon Gradyan)
+            // EVRENSEL CANLI İNDİRME ÇUBUĞU
             AnimatedVisibility(visible = dlProgress.isRunning || dlProgress.isDone) {
                 DownloadProgressBanner(dlProgress = dlProgress, onCancel = { downloadManager.cancelActiveDownload() })
             }
 
-            // 3. ŞARKI LİSTESİ & İNTERAKTİF NEON DURUM NOKTALARI (60 FPS Sıfır Kasıntı)
+            // ŞARKI LİSTESİ (60 FPS Sıfır Kasıntı)
             if (filteredTracks.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -447,9 +481,7 @@ fun MainScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentPadding = PaddingValues(bottom = 140.dp, top = 4.dp)
                 ) {
                     itemsIndexed(filteredTracks, key = { _, track -> track.id }) { index, track ->
@@ -466,7 +498,7 @@ fun MainScreen(
             }
         }
 
-        // 4. ALT YÜZEN CAM OYNATICI KARTI (FLOATING PLAYER DOCK)
+        // ALT YÜZEN OYNATICI DOCK
         if (currentTrackIndex in tracks.indices) {
             val curTrack = tracks[currentTrackIndex]
             FloatingPlayerDock(
@@ -489,17 +521,15 @@ fun MainScreen(
             )
         }
 
-        // 5. APPLE YAY FİZİKLİ SLIDE-OUT MENÜ (DRAWER)
+        // SOL ÇEKMECE MENÜ (DRAWER)
         if (isDrawerOpen) {
-            // Karartıcı Arka Plan (Scrim)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.65f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { isDrawerOpen = false }
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                        isDrawerOpen = false
+                    }
             )
         }
 
@@ -508,18 +538,18 @@ fun MainScreen(
             enter = slideInHorizontally(
                 initialOffsetX = { -it },
                 animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)
-            ) + fadeIn(animationSpec = tween(200)),
+            ) + fadeIn(tween(200)),
             exit = slideOutHorizontally(
                 targetOffsetX = { -it },
                 animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)
-            ) + fadeOut(animationSpec = tween(200)),
+            ) + fadeOut(tween(200)),
             modifier = Modifier.fillMaxHeight().width(284.dp)
         ) {
             DrawerContent(
                 trackCount = tracks.size,
                 onScanFolder = { isDrawerOpen = false; onRefreshTracks() },
                 onOpenDownload = { isDrawerOpen = false; isDownloadSheetOpen = true },
-                onOpenJam = { isDrawerOpen = false; isJamDialogOpen = true },
+                onOpenFriends = { isDrawerOpen = false; isFriendsPanelOpen = true },
                 onImportPlaylist = {
                     isDrawerOpen = false
                     Toast.makeText(it, "Çalma listesi içe aktarılıyor...", Toast.LENGTH_SHORT).show()
@@ -531,7 +561,26 @@ fun MainScreen(
             )
         }
 
-        // 6. YOUTUBE İNDİRME PENCERESİ (BottomSheet)
+        // ARKADAŞLAR VE JAM TAM EKRAN PANELİ (Windows ΛURNS ile %100 Birebir 3 Sekmeli)
+        AnimatedVisibility(
+            visible = isFriendsPanelOpen,
+            enter = slideInHorizontally(
+                initialOffsetX = { it },
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)
+            ) + fadeIn(tween(200)),
+            exit = slideOutHorizontally(
+                targetOffsetX = { it },
+                animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f)
+            ) + fadeOut(tween(200)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            FriendsPanelScreen(
+                friendsManager = friendsManager,
+                onClose = { isFriendsPanelOpen = false }
+            )
+        }
+
+        // YOUTUBE İNDİRME BOTTOM SHEET
         if (isDownloadSheetOpen) {
             YouTubeDownloadSheet(
                 onDismiss = { isDownloadSheetOpen = false },
@@ -542,15 +591,7 @@ fun MainScreen(
             )
         }
 
-        // 7. ARKADAŞLAR VE JAM CANLI DİNLEME DİYALOĞU
-        if (isJamDialogOpen) {
-            JamRoomDialog(
-                jamClient = jamClient,
-                onDismiss = { isJamDialogOpen = false }
-            )
-        }
-
-        // 8. GÜNCELLEMELERİ DENETLE DİYALOĞU
+        // GÜNCELLEMELERİ DENETLE DİYALOĞU
         if (isUpdateDialogOpen) {
             AlertDialog(
                 onDismissRequest = { isUpdateDialogOpen = false },
@@ -567,7 +608,7 @@ fun MainScreen(
                         Text("ΛURNS Android v1.1.0", color = AccentPink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Tebrikler! En güncel ve optimize edilmiş sürümü kullanıyorsunuz.\n• YouTube Doğrudan Ses İndirici\n• Apple Yay Fiziği Menü\n• 60 FPS Ultra Akıcı Obsidian Arayüz",
+                            "Tebrikler! En güncel ve optimize edilmiş sürümü kullanıyorsunuz.\n• Tam Entegre Arkadaşlar & Jam Sistemi\n• YouTube Doğrudan Ses İndirici\n• Apple Yay Fiziği Menü\n• 60 FPS Ultra Akıcı Obsidian Arayüz",
                             color = TextDim,
                             fontSize = 13.sp
                         )
@@ -583,21 +624,528 @@ fun MainScreen(
     }
 }
 
-// ==================== BİLEŞENLER ====================
+// ==================== ARKADAŞLAR & JAM TAM PANELİ ====================
+
+@Composable
+fun FriendsPanelScreen(
+    friendsManager: FriendsManager,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val myTag by friendsManager.myTag.collectAsState()
+    val myName by friendsManager.myName.collectAsState()
+    val friends by friendsManager.friends.collectAsState()
+    val pendingRequests by friendsManager.pendingRequests.collectAsState()
+    val jamState by friendsManager.jamState.collectAsState()
+    val isConnected by friendsManager.isConnected.collectAsState()
+
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Liste, 1: İstekler, 2: + Ekle
+    var isCopied by remember { mutableStateOf(false) }
+    var isEditNameOpen by remember { mutableStateOf(false) }
+    var newNameInput by remember { mutableStateOf("") }
+    var addTagInput by remember { mutableStateOf("") }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = BgObsidian
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            // 1. Üst Bar: Geri Dön, Başlık, Yenile Butonu
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Geri", tint = TextWhite)
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Text(
+                    text = "Arkadaşlar & Jam",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextWhite
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // Çevrimiçi Sunucu Durumu
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (isConnected) Color(0xFF34C759) else Color(0xFFFF3B30))
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(onClick = { friendsManager.requestAllStatuses() }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Yenile", tint = TextDim)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // 2. SENİN KARTIN (Windows ΛURNS ile Birebir)
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = BgSurface,
+                border = BorderStroke(1.dp, BorderDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Avatar & Durum Noktası
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2A142E)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = (myName.firstOrNull() ?: myTag.firstOrNull() ?: 'U').uppercase(),
+                            color = AccentOrange,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(BgSurface)
+                                .align(Alignment.BottomEnd),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(AccentPink)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "SENİN ETİKETİN",
+                                color = TextDim,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "İsmi Değiştir",
+                                tint = AccentOrange,
+                                modifier = Modifier
+                                    .size(13.dp)
+                                    .clickable {
+                                        newNameInput = myName
+                                        isEditNameOpen = true
+                                    }
+                            )
+                        }
+                        Text(
+                            text = myTag,
+                            color = TextWhite,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Görünen Adın: $myName",
+                            color = AccentOrange,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    // Kopyala Butonu
+                    Surface(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Aurns Tag", myTag))
+                            isCopied = true
+                            Toast.makeText(context, "Etiketin panoya kopyalandı!", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isCopied) AccentOrange else Color(0xFF1E1E1E),
+                        border = BorderStroke(0.5.dp, BorderDark)
+                    ) {
+                        Text(
+                            text = if (isCopied) "✓ Kopyalandı" else "Kopyala",
+                            color = if (isCopied) Color.Black else TextWhite,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 3. SEKMELER (Liste, İstekler, + Ekle)
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = BgCard,
+                border = BorderStroke(0.5.dp, BorderDark),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    val tabs = listOf(
+                        "Liste (${friends.size})",
+                        if (pendingRequests.isNotEmpty()) "İstek (${pendingRequests.size})" else "İstekler",
+                        "+ Ekle"
+                    )
+                    tabs.forEachIndexed { index, label ->
+                        val isSelected = (selectedTab == index)
+                        Surface(
+                            onClick = { selectedTab = index },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) Color(0xFF222222) else Color.Transparent,
+                            border = if (isSelected) BorderStroke(1.dp, AccentPink) else null,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) AccentOrange else TextMuted,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 4. SEKME İÇERİKLERİ
+            when (selectedTab) {
+                // SEKME 0: ARKADAŞ LİSTESİ
+                0 -> {
+                    if (friends.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.PersonAdd, contentDescription = null, tint = TextMuted, modifier = Modifier.size(44.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Henüz ekli arkadaşın yok.", color = TextDim, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("'+ Ekle' sekmesinden arkadaşının etiketini girerek davet gönderebilirsin.", color = TextMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                            }
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(friends, key = { it.tag }) { friend ->
+                                FriendRowItem(
+                                    friend = friend,
+                                    isInJamWithMe = (jamState.isActive && jamState.partnerTag.equals(friend.tag, ignoreCase = true)),
+                                    onInviteJam = { friendsManager.inviteFriendToJam(friend.tag) },
+                                    onRemove = { friendsManager.removeFriend(friend.tag) }
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+
+                // SEKME 1: BEKLEYEN İSTEKLER
+                1 -> {
+                    if (pendingRequests.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Bekleyen arkadaşlık isteği yok.", color = TextMuted, fontSize = 13.sp)
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(pendingRequests, key = { it.tag }) { req ->
+                                PendingRequestItem(
+                                    request = req,
+                                    onAccept = { friendsManager.acceptFriendRequest(req.tag) },
+                                    onReject = { friendsManager.rejectFriendRequest(req.tag) }
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+
+                // SEKME 2: + ARKADAŞ EKLE
+                2 -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        Text(
+                            text = "Arkadaşının Etiketini Gir",
+                            color = TextWhite,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Arkadaşının Aurns uygulamasındaki tam etiketi (# ile birlikte) gir.",
+                            color = TextDim,
+                            fontSize = 12.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedTextField(
+                            value = addTagInput,
+                            onValueChange = { addTagInput = it.take(30) },
+                            placeholder = { Text("Örn: Ahmet#1234", color = TextMuted) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextWhite,
+                                unfocusedTextColor = TextWhite,
+                                focusedBorderColor = AccentOrange,
+                                unfocusedBorderColor = BorderDark,
+                                focusedContainerColor = BgInput,
+                                unfocusedContainerColor = BgInput
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                if (friendsManager.sendFriendRequest(addTagInput)) {
+                                    Toast.makeText(context, "Arkadaşlık isteği gönderildi!", Toast.LENGTH_SHORT).show()
+                                    addTagInput = ""
+                                    selectedTab = 0
+                                } else {
+                                    Toast.makeText(context, "Geçersiz etiket veya zaten ekli!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        ) {
+                            Icon(Icons.Default.PersonAdd, contentDescription = null, tint = Color.Black)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Arkadaşlık İsteği Gönder", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // İSİM DEĞİŞTİRME DİYALOĞU
+        if (isEditNameOpen) {
+            AlertDialog(
+                onDismissRequest = { isEditNameOpen = false },
+                containerColor = BgCard,
+                title = { Text("Görünen Adını Değiştir", color = TextWhite, fontWeight = FontWeight.Bold) },
+                text = {
+                    OutlinedTextField(
+                        value = newNameInput,
+                        onValueChange = { newNameInput = it.take(20) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextWhite,
+                            unfocusedTextColor = TextWhite,
+                            focusedBorderColor = AccentOrange
+                        )
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newNameInput.isNotBlank()) {
+                                friendsManager.updateMyName(newNameInput)
+                                isEditNameOpen = false
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentOrange)
+                    ) {
+                        Text("Kaydet", color = Color.Black)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { isEditNameOpen = false }) {
+                        Text("İptal", color = TextMuted)
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun FriendRowItem(
+    friend: FriendItem,
+    isInJamWithMe: Boolean,
+    onInviteJam: () -> Unit,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (isInJamWithMe) Color(0xFF221326) else BgCard,
+        border = BorderStroke(1.dp, if (isInJamWithMe) AccentPink else BorderDark),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar & Çevrimiçi Rozeti
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF261C2C)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = (friend.name.firstOrNull() ?: 'U').uppercase(),
+                    color = AccentOrange,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(if (friend.isOnline) Color(0xFF34C759) else Color(0xFF555555))
+                        .align(Alignment.BottomEnd)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = friend.name,
+                    color = TextWhite,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = friend.tag,
+                    color = TextDim,
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+                // Şarkı / Çevrimiçi Durumu
+                Text(
+                    text = if (friend.isPlaying) "🎵 Çalıyor: ${friend.currentTrack}" else friend.currentTrack,
+                    color = if (friend.isPlaying) AccentPink else if (friend.isOnline) Color(0xFF34C759) else TextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = if (friend.isPlaying) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Jam'e Davet Et / Birlikte Dinle Butonu
+            if (friend.isOnline) {
+                Surface(
+                    onClick = onInviteJam,
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isInJamWithMe) AccentPink else Color(0xFF2A1C30),
+                    border = BorderStroke(1.dp, AccentPink),
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    Text(
+                        text = if (isInJamWithMe) "Jam'de" else "Jam",
+                        color = TextWhite,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                    )
+                }
+            }
+
+            // Silme Butonu
+            IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Arkadaşı Sil", tint = TextMuted, modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun PendingRequestItem(
+    request: FriendRequest,
+    onAccept: () -> Unit,
+    onReject: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = BgCard,
+        border = BorderStroke(1.dp, BorderDark),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = request.name, color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(text = request.tag, color = TextDim, fontSize = 11.sp)
+                Text(text = "Sana arkadaşlık isteği gönderdi", color = AccentOrange, fontSize = 11.sp)
+            }
+
+            IconButton(onClick = onAccept) {
+                Icon(Icons.Default.CheckCircle, contentDescription = "Kabul Et", tint = Color(0xFF34C759))
+            }
+            IconButton(onClick = onReject) {
+                Icon(Icons.Default.Cancel, contentDescription = "Reddet", tint = Color(0xFFFF3B30))
+            }
+        }
+    }
+}
+
+// ==================== DİĞER BİLEŞENLER ====================
 
 @Composable
 fun DrawerContent(
     trackCount: Int,
     onScanFolder: () -> Unit,
     onOpenDownload: () -> Unit,
-    onOpenJam: () -> Unit,
+    onOpenFriends: () -> Unit,
     onImportPlaylist: (android.content.Context) -> Unit,
     onExportPlaylist: () -> Unit,
     onClearList: () -> Unit,
     onCheckUpdates: () -> Unit,
     onClose: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -611,7 +1159,6 @@ fun DrawerContent(
                 .navigationBarsPadding()
                 .padding(horizontal = 14.dp, vertical = 16.dp)
         ) {
-            // Üst Başlık
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -639,7 +1186,6 @@ fun DrawerContent(
             HorizontalDivider(color = BorderDark, thickness = 0.5.dp)
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 7 Menü Maddesi (Windows ΛURNS ile Birebir Sıralama ve Tasarım)
             DrawerMenuItem(
                 icon = Icons.Default.FolderOpen,
                 title = "Müzik Klasörü Seç",
@@ -649,7 +1195,6 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Özel Neon Çerçeveli: Müzik Ara ve İndir
             DrawerMenuItem(
                 icon = Icons.Default.CloudDownload,
                 title = "Müzik Ara ve İndir",
@@ -660,13 +1205,12 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Özel Neon Çerçeveli: Arkadaşlar ve Jam
             DrawerMenuItem(
                 icon = Icons.Default.Groups,
                 title = "Arkadaşlar ve Jam",
                 subtitle = "Birlikte canlı dinle",
                 isSpecial = true,
-                onClick = onOpenJam
+                onClick = onOpenFriends
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -781,7 +1325,6 @@ fun TrackRowItem(
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Sol İndeks Numarası
         Text(
             text = "${index + 1}",
             fontSize = 13.sp,
@@ -789,12 +1332,10 @@ fun TrackRowItem(
             modifier = Modifier.width(26.dp)
         )
 
-        // İNTERAKTİF NEON DURUM NOKTASI (Aura Dots)
         AuraPulseDot(isCurrent = isCurrent, isPlaying = isPlaying)
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Parça Başlığı ve Sanatçı
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = track.title,
@@ -813,7 +1354,6 @@ fun TrackRowItem(
             )
         }
 
-        // Parça Süresi
         Text(
             text = "%02d:%02d".format(track.durationSec / 60, track.durationSec % 60),
             fontSize = 12.sp,
@@ -882,7 +1422,6 @@ fun FloatingPlayerDock(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Albüm Kapağı Kutusu
                 Box(
                     modifier = Modifier
                         .size(46.dp)
@@ -900,7 +1439,6 @@ fun FloatingPlayerDock(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Şarkı ve Sanatçı Bilgisi
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = track.title,
@@ -919,7 +1457,6 @@ fun FloatingPlayerDock(
                     )
                 }
 
-                // Karışık Çal (Shuffle)
                 IconButton(onClick = onToggleShuffle, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Default.Shuffle,
@@ -929,12 +1466,10 @@ fun FloatingPlayerDock(
                     )
                 }
 
-                // Önceki Parça
                 IconButton(onClick = onPrev, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.SkipPrevious, contentDescription = "Önceki", tint = TextWhite)
                 }
 
-                // Oynat / Duraklat (Neon Sunset Gradyan Buton)
                 IconButton(
                     onClick = onTogglePlay,
                     modifier = Modifier
@@ -950,12 +1485,10 @@ fun FloatingPlayerDock(
                     )
                 }
 
-                // Sonraki Parça
                 IconButton(onClick = onNext, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.SkipNext, contentDescription = "Sonraki", tint = TextWhite)
                 }
 
-                // Tekrar Çal (Repeat)
                 IconButton(onClick = onToggleRepeat, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Default.Repeat,
@@ -968,7 +1501,6 @@ fun FloatingPlayerDock(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // İlerleme Kaydırıcısı (Slider)
             Slider(
                 value = if (duration > 0) currentPos.toFloat() / duration else 0f,
                 onValueChange = { onSeek((it * duration).toInt()) },
@@ -1046,7 +1578,6 @@ fun DownloadProgressBanner(dlProgress: DownloadProgress, onCancel: () -> Unit) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Sunset-Neon Gradyan İlerleme Çubuğu
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1160,7 +1691,6 @@ fun YouTubeDownloadSheet(
                                 .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Video Küçük Resmi (Thumbnail)
                             AsyncImage(
                                 model = item.thumbnailUrl,
                                 contentDescription = null,
@@ -1201,88 +1731,4 @@ fun YouTubeDownloadSheet(
             }
         }
     }
-}
-
-@Composable
-fun JamRoomDialog(
-    jamClient: JamClient,
-    onDismiss: () -> Unit
-) {
-    val syncState by jamClient.syncState.collectAsState()
-    var roomInput by remember { mutableStateOf(syncState.roomCode) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = BgCard,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Groups, contentDescription = null, tint = AccentPink)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Arkadaşlar & Jam Canlı Dinle", color = TextWhite, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            }
-        },
-        text = {
-            Column {
-                Text(
-                    text = "Aynı oda koduna sahip tüm arkadaşlarınızla (Windows & Android) canlı şarkı ve süre senkronizasyonu yapılır.",
-                    color = TextDim,
-                    fontSize = 12.sp
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                OutlinedTextField(
-                    value = roomInput,
-                    onValueChange = { roomInput = it.take(12) },
-                    label = { Text("Oda Kodu (Örn: SELO1)", color = TextMuted) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextWhite,
-                        unfocusedTextColor = TextWhite,
-                        focusedBorderColor = AccentPink,
-                        unfocusedBorderColor = BorderDark,
-                        focusedContainerColor = BgInput,
-                        unfocusedContainerColor = BgInput
-                    )
-                )
-
-                if (syncState.isConnected) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "● Odaya Bağlı: ${syncState.roomCode}",
-                        color = Color(0xFF34C759),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            if (syncState.isConnected) {
-                TextButton(onClick = { jamClient.leaveRoom() }) {
-                    Text("Odadan Ayrıl", color = TextDanger, fontWeight = FontWeight.Bold)
-                }
-            } else {
-                Button(
-                    onClick = {
-                        if (roomInput.isNotBlank()) {
-                            jamClient.joinRoom(roomInput.trim(), "Android_${Build.MODEL}")
-                            onDismiss()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentPink),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Odaya Katıl", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Kapat", color = TextMuted)
-            }
-        }
-    )
 }
