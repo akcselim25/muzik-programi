@@ -1,5 +1,5 @@
 1.1.0
-https://raw.githubusercontent.com/akcselim25/muzik-programi/main/Aurns.exe
+https://raw.githubusercontent.com/selimakclk/aurns/main/Aurns.exe
 - Akilli Oynatma Listesi Paylasimi: Arkadasinizin paylastigi oynatma listesini ice aktardiginizda bilgisayarinizda olmayan sarkilar otomatik olarak arka planda indirilir ve aninda listeye eklenir.
 - Evrensel Canli Indirme Yuzdesi ve Durum Cubugu: Tekli sarki indirme, paylasilan liste indirme, Canli Jam otomatik indirme ve uygulama guncellemelerinde gercek zamanli yuzde (%) ve ilerleme cubugu gosterilir.
 - Apple Akiskan Arayuz ve Ultra Hizli Baslangic: Sifir takilma ile aninda acilan pencere, kesintiye ugratilabilir yay fizigi ve maksimum hafiflikte optimize edilmis pikselsel cizim motoru.

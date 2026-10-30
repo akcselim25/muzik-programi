@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define GITHUB_VERSION_URL L"https://raw.githubusercontent.com/akcselim25/muzik-programi/main/version.txt"
-#define DEFAULT_EXE_URL    L"https://raw.githubusercontent.com/akcselim25/muzik-programi/main/Aurns.exe"
+#define GITHUB_VERSION_URL L"https://raw.githubusercontent.com/selimakclk/aurns/main/version.txt"
+#define DEFAULT_EXE_URL    L"https://raw.githubusercontent.com/selimakclk/aurns/main/Aurns.exe"
 
 typedef struct {
     HWND hWnd;

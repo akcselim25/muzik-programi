@@ -7,7 +7,7 @@
   **Apple Akıcı Yay Fiziği • Akıllı Paylaşılan Liste • Canlı P2P Jam • Dahili YouTube İndirici**
 
   <p align="center">
-    <a href="https://github.com/akcselim25/muzik-programi/releases/latest"><img src="https://img.shields.io/badge/Sürüm-v1.1.0-FF416C?style=for-the-badge&logo=windows" alt="Version" /></a>
+    <a href="https://github.com/selimakclk/aurns/releases/latest"><img src="https://img.shields.io/badge/Sürüm-v1.1.0-FF416C?style=for-the-badge&logo=windows" alt="Version" /></a>
     <img src="https://img.shields.io/badge/RAM_Kullanımı-0.5_MB-00C9FF?style=for-the-badge&logo=speedtest" alt="RAM" />
     <img src="https://img.shields.io/badge/Mimari-Saf_C99_&_Win32-92FE9D?style=for-the-badge&logo=c" alt="Architecture" />
     <img src="https://img.shields.io/badge/FPS-60_FPS_Yay_Fiziği-F9D423?style=for-the-badge" alt="FPS" />
@@ -16,7 +16,7 @@
   </p>
 
   <p align="center">
-    <a href="https://github.com/akcselim25/muzik-programi/releases/latest/download/Aurns.exe">
+    <a href="https://github.com/selimakclk/aurns/releases/latest/download/Aurns.exe">
       <img src="https://img.shields.io/badge/Hemen_İndir-Aurns.exe_(v1.1.0)-FF4B2B?style=for-the-badge&logo=directus&logoColor=white" height="38" alt="Aurns.exe İndir" />
     </a>
   </p>
@@ -130,7 +130,7 @@ Modern masaüstü müzik oynatıcılarının çoğu **Electron** veya gömülü 
 Projeyi derlemek için **MinGW-w64 (GCC)** veya Windows C derleyicisi yeterlidir:
 
 ```cmd
-git clone https://github.com/akcselim25/muzik-programi.git
+git clone https://github.com/selimakclk/aurns.git
 cd muzik-programi
 compile.bat
 ```
