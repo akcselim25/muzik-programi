@@ -2,6 +2,7 @@ package com.aurns.player.downloader
 
 import android.app.DownloadManager
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Environment
 import kotlinx.coroutines.*
@@ -28,6 +29,7 @@ class AudioDownloadManager(private val context: Context) {
 
     private var activeDownloadId: Long = -1L
     private var pollJob: Job? = null
+    var onDownloadFinishedListener: (() -> Unit)? = null
 
     fun startDownload(videoId: String, title: String, artist: String) {
         scope.launch {
@@ -40,10 +42,16 @@ class AudioDownloadManager(private val context: Context) {
                 return@launch
             }
 
-            // 2. Güvenli Dosya İsmi Hazırla
+            // 2. Güvenli Dosya İsmi Hazırla (.m4a)
             val safeFileName = title.replace(Regex("[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ\\s-_.]"), "")
                 .trim()
+                .ifEmpty { "Aurns_Track_${System.currentTimeMillis()}" }
                 .take(64) + ".m4a"
+
+            val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+            val aurnsDir = File(musicDir, "Aurns")
+            if (!aurnsDir.exists()) aurnsDir.mkdirs()
+            val targetFile = File(aurnsDir, safeFileName)
 
             // 3. Android Sistem İndiricisine (DownloadManager) Teslim Et (Sıfır RAM Harcar)
             val request = DownloadManager.Request(Uri.parse(streamInfo.url)).apply {
@@ -52,13 +60,17 @@ class AudioDownloadManager(private val context: Context) {
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 setAllowedOverMetered(true)
                 setAllowedOverRoaming(true)
-                setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "Aurns/$safeFileName")
+                setDestinationUri(Uri.fromFile(targetFile))
             }
 
-            activeDownloadId = dm.enqueue(request)
-
-            // 4. Canlı İlerleme Çubuğu Takibi (%0 - %100)
-            startProgressPolling(activeDownloadId, title)
+            try {
+                activeDownloadId = dm.enqueue(request)
+                // 4. Canlı İlerleme Çubuğu Takibi (%0 - %100)
+                startProgressPolling(activeDownloadId, title, targetFile.absolutePath)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _currentProgress.value = DownloadProgress(title, 0, isRunning = false, error = e.localizedMessage)
+            }
         }
     }
 
@@ -71,7 +83,7 @@ class AudioDownloadManager(private val context: Context) {
         }
     }
 
-    private fun startProgressPolling(downloadId: Long, title: String) {
+    private fun startProgressPolling(downloadId: Long, title: String, filePath: String) {
         pollJob?.cancel()
         pollJob = scope.launch {
             var downloading = true
@@ -91,6 +103,17 @@ class AudioDownloadManager(private val context: Context) {
                             DownloadManager.STATUS_SUCCESSFUL -> {
                                 _currentProgress.value = DownloadProgress(title, 100, isRunning = false, isDone = true)
                                 downloading = false
+
+                                // Medya kütüphanesini anında tara ki şarkı listesinde hemen görünsün!
+                                MediaScannerConnection.scanFile(
+                                    context,
+                                    arrayOf(filePath),
+                                    arrayOf("audio/mp4", "audio/m4a")
+                                ) { _, _ ->
+                                    scope.launch(Dispatchers.Main) {
+                                        onDownloadFinishedListener?.invoke()
+                                    }
+                                }
                             }
                             DownloadManager.STATUS_FAILED -> {
                                 _currentProgress.value = DownloadProgress(title, 0, isRunning = false, error = "İndirme başarısız oldu")
